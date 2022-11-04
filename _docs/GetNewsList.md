@@ -9,11 +9,11 @@ curl -v "http://polina:polina@localhost:8080/login/news?created_at=2022-10-13&cr
 ```
 The request has two versions for authors and for everyone
 
-## Parame of request
+## Parameters of request 
 list of query parameters:
-| Field          Description       |
-| ------------- |-------------------|
-| created_at | news creation date  (in the format 2022-12-31)|
+| Field        |  Description       |  
+| ------------- |-------------------|  
+| created_at | news creation date  (in the format 2022-12-31)|  
 | created_until | news created before the date (in the format 2022-12-31)|
 | created_since |  news created after the date (in the format 2022-12-31) |
 | author |  authors name |
@@ -29,7 +29,7 @@ Then it sorted accord by haskell code (if sortBy parameter exists in request). T
 
 Query parameter sort_by:
 
-| Value         Description       |
+| Value        | Description       |
 | ------------- |-------------------|
 | author | authors name alphabetical sorting |
 | category | category name  alphabetical sorting |
