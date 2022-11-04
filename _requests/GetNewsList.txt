@@ -1,0 +1,79 @@
+list of query parameters:
+  :<|> "news"
+      :> QueryParam "created_at" DataTypes.DayAt
+      :> QueryParam "created_until" DataTypes.DayUntil
+      :> QueryParam "created_since" DataTypes.DaySince
+      :> QueryParam "author" DataTypes.Author
+      :> QueryParam "category_id" Int 
+      :> QueryParam "title" DataTypes.Title
+      :> QueryParam "content" DataTypes.Content
+      :> QueryParam "sort_by" DataTypes.SortBy
+      :> QueryParam "offset" DataTypes.Offset
+      :> QueryParam "limit" DataTypes.Limit
+      :> Get '[JSON] [DataTypes.News]
+
+how to sort:      
+instance FromHttpApiData SortBy where
+  parseQueryParam value
+    | T.toLower value == T.pack "author" = Right SortByAuthor
+    | T.toLower value == T.pack "category" = Right SortByCategory
+    | T.toLower value == T.pack "data" = Right SortByData
+    | T.toLower value == T.pack "foto" = Right SortByFoto
+    | otherwise = Left $ T.pack "Invalid sort_by value"
+
+
+----- Check offset and limit -----
+
+1. We don't filter anything. Check only the offset and limit
+curl -v "http://localhost:8080/news?offset=2&limit=5"
+
+----- Check filters -----
+
+1. Filter news by creation date: created_until
+curl -v "http://localhost:8080/news?created_until=2022-09-30&limit=5"
+
+2. Filter news by creation date: created_since
+curl -v "http://localhost:8080/news?created_since=2022-09-30&limit=5"
+
+3. Filter news by creation date: created_at
+curl -v "http://localhost:8080/news?created_at=2022-10-13&limit=5"
+
+4. Filter by: created_at & created_until. ERROR: BAD REQUEST!
+curl -v "http://localhost:8080/news?created_at=2022-10-13&created_until=2022-09-30&limit=5"
+
+5. Filter news by author name
+curl -v "http://localhost:8080/news?author=Пётр"
+
+6. Filter news by title
+curl -v "http://localhost:8080/news?title=Тандыр"
+
+7. Filter news by content
+curl -v "http://localhost:8080/news?content=Сергей"
+
+8. Filter news by category id
+curl -v "http://localhost:8080/news?category_id=1"
+
+----- Check sort by -----
+
+1. Sort news by author name
+curl -v "http://localhost:8080/news?sort_by=author&limit=10"
+
+2. Sort news by category name
+curl -v "http://localhost:8080/news?sort_by=category&limit=10"
+
+3. Sort news by category data (latest news is the first)
+curl -v "http://localhost:8080/news?sort_by=data&limit=10"
+
+4. Sort news by category foto
+curl -v "http://localhost:8080/news?sort_by=foto&limit=25"
+
+----- Check filters & sort & limit  -----
+
+1. filter & sort & limit  
+curl -v "http://localhost:8080/news?content=Сергей&sort_by=foto&limit=10"
+
+2. filter & filters & sort
+curl -v "http://localhost:8080/news?title=Тандыр&content=Сергей&sort_by=foto"
+
+3. filter & filter & filters & sort
+curl -v "http://localhost:8080/news?author=Егор&title=Тандыр&content=Сергей&sort_by=foto"

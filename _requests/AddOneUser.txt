@@ -1,0 +1,18 @@
+Post request for create a user. Only admins can create them
+Valid request - polina is admin   
+
+curl -i --user polina:polina \
+--header "Content-Type: application/json"   \
+--request POST   \
+--data '{"name":"Алиса", "login":"alica", "password":"alica", "admin": false, "author": true }' \
+http://localhost:8080/login/users
+
+
+Invalid request - user is not admin. Can not create a user
+Answer - HTTP/1.1 404 err404 Not Found
+
+curl -i --user loginUser2:loginUser2 \
+--header "Content-Type: application/json"   \
+--request POST   \
+--data '{"name":"sergey", "login":"123", "password":"123", "admin": true, "author": false }' \
+http://localhost:8080/login/users
