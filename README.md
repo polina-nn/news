@@ -174,8 +174,8 @@ For some get methods (return list) can use [Offset&Limit](_docs/OffsetLimit.md)
 * [Get category list](_docs/GetCategoryList.md) 
 * [Get one image](_docs/GetOneImage.md) 
 * [Get users list](_docs/GetUserList.md) 
-* [Get news list. With filtering and sorting](_docs/GetUserList.md) 
-* [Get news list. With search](_docs/GetUserList.md) 
+* [Get news list. With filtering and sorting](_docs/GetNewsList.md) 
+* [Get news list. With search](_docs/GetNewsSearchList.md) 
 
 ## POST methods. Add (create) a new resource in Data Base.
 

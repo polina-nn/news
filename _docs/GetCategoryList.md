@@ -26,17 +26,14 @@ No
 
 ## Success Response
 
-You receive JSON-serialized response with list of users object as a result.
+You receive JSON-serialized response with list of categories object as a result.
 
-User object in respons: 
+Category object in respons: 
 | Field         | Type 	   | Description       |
 | ------------- | ---------|-------------------|
-| user_admin| bool | true then user is admin|
-| user_author| bool | true then user is author|
-| user_created| string | creation date in the format "2022-03-15" |
-| user_login| string | login for Basic Authentication |
-| user_name	| string | user name |
-| user_password	| null | user password for Basic Authentication. Don`t returned |
+| category_id | number | Category id is assigned by the server automatically. |
+| category_name | string | Category name|
+| category_path	 | string | Category path |
 
 
 ## Error Responses
