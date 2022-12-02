@@ -82,7 +82,7 @@ run h = do
   let dbConfig = News.hDbConfig (hServerHandle h) -- database parameters
   let appConfig = News.hAppConfig (hServerHandle h) -- port for local host 8080
   let appPort = News.appPort appConfig
-  pool <- DbServices.initConnPool dbConfig -- :: IO (Pool Connection)
+  pool <- DbServices.initConnPool dbConfig
   POOL.withResource pool (`DbServices.migrateDb` (hServerHandle h, "_migrations"))
   Network.Wai.Handler.Warp.run appPort $ app (hServerHandle h) pool
 
@@ -145,8 +145,6 @@ userAuthorized conn login = do
     toUser (user_name, user_login, user_admin, user_author, user_created) =
       let user_password = Nothing
        in DataTypes.User {..}
-
--- https://hackage.haskell.org/package/postgresql-simple-0.6.4/docs/Database-PostgreSQL-Simple-SqlQQ.html#v:sql
 
 -- | suchUser. If the query returned one value, then the user will find it, otherwise no.
 -- Because logins are not repeated in the database

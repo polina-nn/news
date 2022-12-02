@@ -8,7 +8,9 @@ I took this example as the basis of the project (use servant and postgresql-simp
 
 I took this example as the basis of the project (use handle pattern for logging and config)  - https://github.com/fullstack-development/haskell-internship/tree/master/echo-bot-template
 
-You can use the links to study (review) some of the topics for this project. They are placed in the text, and in "References"
+You can use the links to study (review) some of the topics for this project. They are placed in the text, and in [# References](#references)
+
+What can be improved in [# ToDoList](#todolist)
 
 ## Basic libraries
 
@@ -48,15 +50,15 @@ If you have never worked with postgres -
 https://learn.coderslang.com/ru/0119-setting-up-and-getting-started-with-postgresql/
 
 ## Set config
-Attention please! You must have these two files at the root of the project: **logs, config.conf**
+Attention please! You must have the **config.conf** file at the root of the project.
 If file config.conf not exist, you must not run server. 
-You create empty file **logs** by yourself for logging.
+File **logs** created automatically for logging (If you choose logging in file)
 You must set some parameters in the **config.conf**:
 * Application parameters: appPort (I use 8080) and appShowLimit. Maximum array length per get request.
 * Database parameters (see above). 
 * Parameters for connection pool: noOfStripes, idleTime, stripeSize . Don`t edit. You can see about it - https://docs.servant.dev/en/stable/cookbook/db-postgres-pool/PostgresPool.html
-* Logging level (D - Debug, I - Info, W - Warning, E - Error).
-* Logging output  (C - Console, F- File). 
+* Logging level (Debug / Info / Warning / Error).
+* Logging output  (Terminal / File). 
 * Parameters for creation URI: scheme (http or https), host ("localhost" for tests), port  (8080 for tests) 
 
 
@@ -82,6 +84,10 @@ You can use it such as curl request. If you have never worked with curl - https:
 
 All migrations are at  [migrations](migrations).
 Before starting the server, you need to create a new empty database in the Postgres DB.
+During migrations, a user with login "polina" and password "polina" is automatically created (Author and administrator).
+You can create other administrators and authors, if you login as "polina", password "polina". 
+You can change in [_migrations/01.sql](_migrations/01.sql) the login and password. You must generating a password hash by [app/MainBase64.hs] (app/MainBase64.hs). 
+
 The name of the database and the owner put in the config:
 ```
 config {
@@ -218,6 +224,18 @@ I define general list of errors, and errors list for each endpoint or group of e
 ------
 * By default, data sorting by news creation time (newest news first) by the Postgress.
 Then it sorted accord by haskell code (if sortBy parameter exists in request). This is due to incorrect sorting of Cyrillic by the Postgress. I was unable to set up the correct alphabetical sorting of the data.
+* Нandling exceptions connecting to a non-existent database and work whith log file
+```
+"Exception: libpq: failed (connection to server at "localhost" (::1), port 5432 failed: FATAL:  database "news2" does not exist"
+"Exception: logs: openFile: resource busy (file is locked)"
+
+```
+* The terminal always displays authorization data, most likely it is from src/Server.hs
+```
+[]
+[("\1050\1072\1084\1080\1085 \1040\1074\1077\1083\1080\1085\1072",2022-12-02,"polina","1","\1040\1074\1077\1083\1080\1085\1072","\1061\1086\1088\1086\1096\1080\1081 \1082\1072\1084\1080\1085 \1087\1086\1089\1090\1088\1086\1080\1083 \1057\1077\1088\1075\1077\1081.",PGArray {fromPGArray = [8,9,10]},3,True)]
+[("\1050\1072\1084\1080\1085 \1040\1074\1077\1083\1080\1085\1072",2022-12-02,"polina","1","\1040\1074\1077\1083\1080\1085\1072","\1061\1086\1088\1086\1096\1080\1081 \1082\1072\1084\1080\1085 \1087\1086\1089\1090\1088\1086\1080\1083 \1057\1077\1088\1075\1077\1081.",PGArray {fromPGArray = [8,9,10]},3,True)]
+```
 * Add monad transformers to do with arrays such us [IO Either a b]
 
 

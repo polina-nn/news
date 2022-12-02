@@ -1,16 +1,11 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -Wno-missing-methods #-}
 
 module СhangePathForEditCategStep2Spec
@@ -18,8 +13,8 @@ module СhangePathForEditCategStep2Spec
   )
 where
 
-import qualified EndPoints.Lib.Category as Category
-import qualified EndPoints.Lib.CategoryHelpTypes as CategoryHelpTypes
+import qualified EndPoints.Lib.Category.Category as Category
+import qualified EndPoints.Lib.Category.CategoryHelpTypes as CategoryHelpTypes
 import Test.Hspec (Spec, describe, it, shouldBe)
 import Test.QuickCheck ()
 import qualified Types.DataTypes as DataTypes

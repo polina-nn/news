@@ -50,7 +50,7 @@ Admin
 
 You receive JSON-serialized response with category object as a result.
 
-User object in respons: 
+Category object in respons: 
 | Field         | Type 	   | Description       |
 | ------------- | ---------|-------------------|
 | category_id | number | Category id is assigned by the server automatically. |

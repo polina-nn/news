@@ -1,10 +1,10 @@
 name:                news
 version:             0.1.0.0
-github:              "githubuser/news"
+github:              "polina-nn/news"
 license:             BSD3
-author:              "Author name here"
-maintainer:          "example@example.com"
-copyright:           "2022 Author name here"
+author:              "Polina Morozova"
+maintainer:          "morozova_p_v@mail.ru"
+copyright:           "2022 Polina Morozova"
 
 extra-source-files:
 - README.md
@@ -17,29 +17,29 @@ extra-source-files:
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/githubuser/news#readme>
+description:         Please see the README on GitHub at <https://github.com/polina-nn/news#readme>
 
 dependencies:
 - base >= 4.7 && < 5
-- configurator        # работа с конфигом
-- time                # Data.Time.Calendar Data.Time для добавления текущего времени в логирование
-- text                # Data.Text
+- configurator        # for  Data.Configurator ( to work with config )
+- time                # for Data.Time.Calendar Data.Time (to add current time at the log )
+- text                # for Data.Text
 - QuickCheck
 - bytestring          # for use Data.ByteString.Lazy.Char8
 - hspec
-- servant  #Servant.API
-- servant-server # http server
+- servant              # for Servant.API
+- servant-server       # for http server
 - postgresql-simple
 - resource-pool
-- memory # Data.ByteArray.Encoding
-- cryptonite #Crypto.Hash
-- aeson #Data.Aeson
-- warp #Network.Wai.Handler.Warp (run)
-- mtl # Control.Monad.Identity
-- base64  # Data.ByteString.Base64 
-- containers  # Data.Map 
-- safe-exceptions #Control.Exception.Safe (throwString for working whith config) 
-- directory
+- memory               # Data.ByteArray.Encoding
+- cryptonite           # for Crypto.Hash  (work with a password)
+- aeson                # for Data.Aeson
+- warp                 # Network.Wai.Handler.Warp (run)
+- mtl                  # Control.Monad.Identity
+- base64               # Data.ByteString.Base64 
+- containers           # Data.Map 
+- safe-exceptions      # Control.Exception.Safe (throwString for working whith config) 
+- directory            # for System.Directory (check if image files exist)
 - postgresql-simple-migration  
 
 # About ghc options read here. https://ghc.gitlab.haskell.org/ghc/doc/users_guide/using-warnings.html#

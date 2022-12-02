@@ -13,13 +13,13 @@
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -Wno-missing-methods #-}
 
--- для работы import Database.PostgreSQL.Simple.SqlQQ (sql)
 module EndPoints.GetAuthorsNewsList
-  ( getAuthorsNewsList
-  , authorsNewsList
-  ) where
+  ( getAuthorsNewsList,
+    authorsNewsList,
+  )
+where
 
-import Control.Monad.IO.Class (MonadIO(liftIO))
+import Control.Monad.IO.Class (MonadIO (liftIO))
 import Data.Maybe (fromMaybe, isJust)
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
@@ -36,20 +36,20 @@ import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
 
 getAuthorsNewsList ::
-     News.Handle IO
-  -> DataTypes.Db
-  -> DataTypes.User
-  -> Maybe DataTypes.DayAt
-  -> Maybe DataTypes.DayUntil
-  -> Maybe DataTypes.DaySince
-  -> Maybe T.Text
-  -> Maybe Int
-  -> Maybe T.Text
-  -> Maybe T.Text
-  -> Maybe DataTypes.SortBy
-  -> Maybe DataTypes.Offset
-  -> Maybe DataTypes.Limit
-  -> Handler [DataTypes.News]
+  News.Handle IO ->
+  DataTypes.Db ->
+  DataTypes.User ->
+  Maybe DataTypes.DayAt ->
+  Maybe DataTypes.DayUntil ->
+  Maybe DataTypes.DaySince ->
+  Maybe T.Text ->
+  Maybe Int ->
+  Maybe T.Text ->
+  Maybe T.Text ->
+  Maybe DataTypes.SortBy ->
+  Maybe DataTypes.Offset ->
+  Maybe DataTypes.Limit ->
+  Handler [DataTypes.News]
 getAuthorsNewsList h DataTypes.Db {..} user da du ds ar i t c msort mo ml =
   (>>=)
     (liftIO $ _authorsNewsList (h, user, filt, msort, mo, ml))
@@ -59,14 +59,15 @@ getAuthorsNewsList h DataTypes.Db {..} user da du ds ar i t c msort mo ml =
     filt = News.toFilter da du ds ar i t c
 
 authorsNewsList ::
-     SQL.Connection
-  -> ( News.Handle IO
-     , DataTypes.User
-     , DataTypes.Filter
-     , Maybe DataTypes.SortBy
-     , Maybe DataTypes.Offset
-     , Maybe DataTypes.Limit)
-  -> IO (Either ErrorTypes.GetNewsError [DataTypes.News])
+  SQL.Connection ->
+  ( News.Handle IO,
+    DataTypes.User,
+    DataTypes.Filter,
+    Maybe DataTypes.SortBy,
+    Maybe DataTypes.Offset,
+    Maybe DataTypes.Limit
+  ) ->
+  IO (Either ErrorTypes.GetNewsError [DataTypes.News])
 authorsNewsList conn (h, user, f, msort, mo, ml) = do
   Logger.logInfo (News.hLogHandle h) $
     T.pack "Request with authentication: Get News List "
@@ -81,8 +82,8 @@ authorsNewsList conn (h, user, f, msort, mo, ml) = do
       Logger.logDebug (News.hLogHandle h) $
         T.concat [T.pack "All Check: OK!  \n"]
       res <-
-        authorsNewsList' conn user offset limit dbFiler >>=
-        News.sortNews h msort
+        authorsNewsList' conn user offset limit dbFiler
+          >>= News.sortNews h msort
       news <- Prelude.mapM (NewsIO.toNews conn h) res
       case News.checkErrorsToNews news res of
         (True, news') -> do
@@ -92,17 +93,17 @@ authorsNewsList conn (h, user, f, msort, mo, ml) = do
           return $ Right news'
         _ ->
           return $
-          Left $
-          ErrorTypes.GetNewsSQLRequestError $ ErrorTypes.SQLRequestError []
+            Left $
+              ErrorTypes.GetNewsSQLRequestError $ ErrorTypes.SQLRequestError []
 
 -- | authorsNewsList'  get the full list of news if the array is empty, there is no news
 authorsNewsList' ::
-     SQL.Connection
-  -> DataTypes.User
-  -> DataTypes.Offset
-  -> DataTypes.Limit
-  -> NewsHelpTypes.DbFilter
-  -> IO [NewsHelpTypes.DbNews]
+  SQL.Connection ->
+  DataTypes.User ->
+  DataTypes.Offset ->
+  DataTypes.Limit ->
+  NewsHelpTypes.DbFilter ->
+  IO [NewsHelpTypes.DbNews]
 authorsNewsList' conn user mo ml f@NewsHelpTypes.DbFilter {..}
   --  category specified in db_filer_category_id
   | isJust db_filer_category_id = authorsNewsListCategory conn user mo ml f
@@ -110,12 +111,12 @@ authorsNewsList' conn user mo ml f@NewsHelpTypes.DbFilter {..}
   | otherwise = authorsNewsListNotCategory conn user mo ml f
 
 authorsNewsListCategory ::
-     SQL.Connection
-  -> DataTypes.User
-  -> DataTypes.Offset
-  -> DataTypes.Limit
-  -> NewsHelpTypes.DbFilter
-  -> IO [NewsHelpTypes.DbNews]
+  SQL.Connection ->
+  DataTypes.User ->
+  DataTypes.Offset ->
+  DataTypes.Limit ->
+  NewsHelpTypes.DbFilter ->
+  IO [NewsHelpTypes.DbNews]
 authorsNewsListCategory conn DataTypes.User {..} off lim NewsHelpTypes.DbFilter {..} = do
   res <-
     SQL.query
@@ -131,28 +132,29 @@ authorsNewsListCategory conn DataTypes.User {..} off lim NewsHelpTypes.DbFilter 
             AND news_category_id = ?
             ORDER BY news_created DESC 
             LIMIT ?  OFFSET ?;|]
-      ( user_login
-      , db_filer_dayAt
-      , db_filer_dayUntil
-      , db_filer_daySince
-      , db_filer_author
-      , db_filer_title
-      , db_filer_content
-      , newsCat
-      , lim
-      , off)
+      ( user_login,
+        db_filer_dayAt,
+        db_filer_dayUntil,
+        db_filer_daySince,
+        db_filer_author,
+        db_filer_title,
+        db_filer_content,
+        newsCat,
+        lim,
+        off
+      )
   let dbNews = Prelude.map News.toDbNews res
   return dbNews
   where
     newsCat = fromMaybe 0 db_filer_category_id
 
 authorsNewsListNotCategory ::
-     SQL.Connection
-  -> DataTypes.User
-  -> DataTypes.Offset
-  -> DataTypes.Limit
-  -> NewsHelpTypes.DbFilter
-  -> IO [NewsHelpTypes.DbNews]
+  SQL.Connection ->
+  DataTypes.User ->
+  DataTypes.Offset ->
+  DataTypes.Limit ->
+  NewsHelpTypes.DbFilter ->
+  IO [NewsHelpTypes.DbNews]
 authorsNewsListNotCategory conn DataTypes.User {..} off lim NewsHelpTypes.DbFilter {..} = do
   res <-
     SQL.query
@@ -167,14 +169,15 @@ authorsNewsListNotCategory conn DataTypes.User {..} off lim NewsHelpTypes.DbFilt
             AND news_text LIKE ?
             ORDER BY news_created DESC 
             LIMIT ?  OFFSET ?;|]
-      ( user_login
-      , db_filer_dayAt
-      , db_filer_dayUntil
-      , db_filer_daySince
-      , db_filer_author
-      , db_filer_title
-      , db_filer_content
-      , lim
-      , off)
+      ( user_login,
+        db_filer_dayAt,
+        db_filer_dayUntil,
+        db_filer_daySince,
+        db_filer_author,
+        db_filer_title,
+        db_filer_content,
+        lim,
+        off
+      )
   let dbNews = Prelude.map News.toDbNews res
   return dbNews

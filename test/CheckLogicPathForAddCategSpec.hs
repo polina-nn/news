@@ -1,10 +1,10 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wno-missing-methods #-}
 
@@ -14,15 +14,13 @@ module CheckLogicPathForAddCategSpec
 where
 
 import Control.Monad.Identity (Identity (Identity))
-import qualified EndPoints.Lib.Category as Category
+import qualified EndPoints.Lib.Category.Category as Category
 import Handle (handleSpec)
 import Test.Hspec (Spec, describe, it, shouldBe)
 import Test.QuickCheck ()
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
 
--- checkLogicPathForAddCateg :: Monad m => News.Handle m -> DataTypes.CreateCategoryRequest -> Either ErrorTypes.AddEditCategoryError [DataTypes.Category]
--- -> m (Either ErrorTypes.AddEditCategoryError (DataTypes.CreateCategoryRequest, [DataTypes.Category]))
 spec :: Spec
 spec = describe "Category Check Logic Path For Add Category - OK! Does not contain holes in the numbering " $ do
   it "Invalid Logic Path For Add Category : add path 1.1.3 in  empty table" $

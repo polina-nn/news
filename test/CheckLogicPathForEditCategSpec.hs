@@ -1,10 +1,10 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wno-missing-methods #-}
 
@@ -14,8 +14,8 @@ module CheckLogicPathForEditCategSpec
 where
 
 import Control.Monad.Identity (Identity (Identity))
-import qualified EndPoints.Lib.Category as Category
-import qualified EndPoints.Lib.CategoryHelpTypes as CategoryHelpTypes
+import qualified EndPoints.Lib.Category.Category as Category
+import qualified EndPoints.Lib.Category.CategoryHelpTypes as CategoryHelpTypes
 import Handle (handleSpec)
 import Test.Hspec (Spec, describe, it, shouldBe)
 import Test.QuickCheck ()

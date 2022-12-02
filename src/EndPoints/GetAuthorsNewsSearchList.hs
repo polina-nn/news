@@ -13,13 +13,13 @@
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -Wno-missing-methods #-}
 
--- для работы import Database.PostgreSQL.Simple.SqlQQ (sql)
 module EndPoints.GetAuthorsNewsSearchList
-  ( getAuthorsNewsSearchList
-  , authorsNewsSearchList
-  ) where
+  ( getAuthorsNewsSearchList,
+    authorsNewsSearchList,
+  )
+where
 
-import Control.Monad.IO.Class (MonadIO(liftIO))
+import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
@@ -37,33 +37,34 @@ import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
 
 getAuthorsNewsSearchList ::
-     News.Handle IO
-  -> DataTypes.Db
-  -> DataTypes.User
-  -> Maybe T.Text
-  -> Maybe DataTypes.Offset
-  -> Maybe DataTypes.Limit
-  -> Handler [DataTypes.News]
+  News.Handle IO ->
+  DataTypes.Db ->
+  DataTypes.User ->
+  Maybe T.Text ->
+  Maybe DataTypes.Offset ->
+  Maybe DataTypes.Limit ->
+  Handler [DataTypes.News]
 getAuthorsNewsSearchList h DataTypes.Db {..} user msearch mo ml =
   (>>=)
     (liftIO $ _authorsNewsSearchList (h, user, msearch, mo, ml))
     ToHttpResponse.toHttpResponse
 
 authorsNewsSearchList ::
-     SQL.Connection
-  -> ( News.Handle IO
-     , DataTypes.User
-     , Maybe T.Text
-     , Maybe DataTypes.Offset
-     , Maybe DataTypes.Limit)
-  -> IO (Either ErrorTypes.GetNewsError [DataTypes.News])
+  SQL.Connection ->
+  ( News.Handle IO,
+    DataTypes.User,
+    Maybe T.Text,
+    Maybe DataTypes.Offset,
+    Maybe DataTypes.Limit
+  ) ->
+  IO (Either ErrorTypes.GetNewsError [DataTypes.News])
 authorsNewsSearchList _ (h, _, Nothing, _, _) = do
   Logger.logError (News.hLogHandle h) $
     T.pack $
-    show $
-    ErrorTypes.InvalidSearchGetNews $
-    ErrorTypes.InvalidRequest
-      "authorsNewsSearchList: BAD! Not text for searching \n"
+      show $
+        ErrorTypes.InvalidSearchGetNews $
+          ErrorTypes.InvalidRequest
+            "authorsNewsSearchList: BAD! Not text for searching \n"
   return $ Left $ ErrorTypes.InvalidSearchGetNews $ ErrorTypes.InvalidRequest []
 authorsNewsSearchList conn (h, user, Just search, mo, ml) = do
   Logger.logInfo (News.hLogHandle h) $
@@ -86,17 +87,17 @@ authorsNewsSearchList conn (h, user, Just search, mo, ml) = do
               return $ Right news'
             _ ->
               return $
-              Left $
-              ErrorTypes.GetNewsSQLRequestError $ ErrorTypes.SQLRequestError []
+                Left $
+                  ErrorTypes.GetNewsSQLRequestError $ ErrorTypes.SQLRequestError []
 
 authorsNewsSearchList' ::
-     SQL.Connection
-  -> News.Handle IO
-  -> DataTypes.User
-  -> T.Text
-  -> DataTypes.Offset
-  -> DataTypes.Limit
-  -> IO [NewsHelpTypes.DbNews]
+  SQL.Connection ->
+  News.Handle IO ->
+  DataTypes.User ->
+  T.Text ->
+  DataTypes.Offset ->
+  DataTypes.Limit ->
+  IO [NewsHelpTypes.DbNews]
 authorsNewsSearchList' conn _ DataTypes.User {..} search off lim = do
   res <-
     SQL.query

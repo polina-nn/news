@@ -28,7 +28,6 @@ import qualified EndPoints.GetOneImage as GetOneImage
 import qualified EndPoints.GetUserList as GetUserList
 import qualified Logger
 import qualified News
---import qualified Types.ConfigurationTypes
 import Types.DataTypes (Db (_addCategory))
 import qualified Types.DataTypes as DataTypes
 
@@ -75,25 +74,14 @@ createDb pool =
   where
     withConnPool = POOL.withResource pool
 
--- пока жестко задаю место файла с миграциями
 migrateDb :: SQL.Connection -> (News.Handle IO, String) -> IO ()
 migrateDb conn (h, xs) =
   do
     initResult <-
       SQL.withTransaction conn . Migration.runMigration $
         Migration.MigrationContext Migration.MigrationInitialization True conn
-
     Logger.logDebug (News.hLogHandle h) (T.pack ("migrateDb: MigrationInitialization " ++ show initResult))
     migrateResult <-
       SQL.withTransaction conn . Migration.runMigration $
         Migration.MigrationContext (Migration.MigrationDirectory xs) True conn
     Logger.logDebug (News.hLogHandle h) (T.pack ("migrateDb: Migration result " ++ show migrateResult))
-
-{--
-  where
-    dir = resourceFolder xs ++ "/dbscripts"
-
-resourceFolder :: [String] -> String
-resourceFolder [] = "src/resources"
-resourceFolder (folder : _) = folder
---}
