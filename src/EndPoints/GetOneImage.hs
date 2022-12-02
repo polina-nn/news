@@ -12,7 +12,6 @@
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -Wno-missing-methods #-}
 
--- для работы import Database.PostgreSQL.Simple.SqlQQ (sql)
 module EndPoints.GetOneImage
   ( getOneImage
   , oneImage

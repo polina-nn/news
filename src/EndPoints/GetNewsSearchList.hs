@@ -13,20 +13,12 @@
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -Wno-missing-methods #-}
 
--- для работы import Database.PostgreSQL.Simple.SqlQQ (sql)
 module EndPoints.GetNewsSearchList
   ( getNewsSearchList
   , newsSearchList
   ) where
 
-{--
-import Control.Exception.Base
-  ( Exception (displayException),
-    SomeException (SomeException),
-    catch,
-    throwIO,
-  )
-  --}
+
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL

@@ -79,7 +79,7 @@ serviceApi = Proxy
 run :: Handle -> IO ()
 run h = do
   Logger.logDebug (News.hLogHandle (hServerHandle h)) "run: Server is running"
-  let dbConfig = News.hDbConfig (hServerHandle h) -- database parameters
+  let dbConfig = News.hDbConfig (hServerHandle h)   -- database parameters
   let appConfig = News.hAppConfig (hServerHandle h) -- port for local host 8080
   let appPort = News.appPort appConfig
   pool <- DbServices.initConnPool dbConfig

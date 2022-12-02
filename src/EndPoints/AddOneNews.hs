@@ -13,7 +13,6 @@
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -Wno-missing-methods #-}
 
--- for import Database.PostgreSQL.Simple.SqlQQ (sql)
 module EndPoints.AddOneNews
   ( addNews
   , addOneNews

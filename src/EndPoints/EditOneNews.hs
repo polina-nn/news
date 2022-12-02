@@ -13,7 +13,6 @@
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -Wno-missing-methods #-}
 
--- для работы import Database.PostgreSQL.Simple.SqlQQ (sql)
 module EndPoints.EditOneNews
   ( editOneNews
   , editNews
@@ -457,7 +456,7 @@ getNewsIO conn h user idNews (Right (categs, imagesIds)) = do
           | otherwise = map (Lib.imageIdToURI h) xs
 
 ----- All checks ----
--- | eckIdIO - check news Id  (  id = 7 in  http://localhost:8080/news/7 )
+-- | ceckIdIO - check news Id  (  id = 7 in  http://localhost:8080/news/7 )
 ceckIdIO ::
      SQL.Connection
   -> News.Handle IO
@@ -560,7 +559,7 @@ checkImageFilesExistIO h r@DataTypes.EditNewsRequest {new_images = Just reqs} (R
       return . Left $
         ErrorTypes.NotExistImageFileAddEditNews $ ErrorTypes.InvalidContent []
 
--- | eckCategoryIdIO  check if there is a record with a given category id in the database ( only for the case with an editable category)
+-- | ceckCategoryIdIO  check if there is a record with a given category id in the database ( only for the case with an editable category)
 ceckCategoryIdIO ::
      SQL.Connection
   -> News.Handle IO
