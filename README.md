@@ -52,7 +52,7 @@ https://learn.coderslang.com/ru/0119-setting-up-and-getting-started-with-postgre
 ## Set config
 Attention please! You must have the **config.conf** file at the root of the project.
 If file config.conf not exist, you must not run server. 
-File **logs** created automatically for logging (If you choose logging in file)
+File **logs.txt** created automatically for logging (If you choose logging in file)
 You must set some parameters in the **config.conf**:
 * Application parameters: appPort (I use 8080) and appShowLimit. Maximum array length per get request.
 * Database parameters (see above). 

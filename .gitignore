@@ -28,7 +28,7 @@ cabal.project.local~
 
 .stack-work/
 /news.cabal
-logs
+logs.txt
 image/
 *~
 # Created by https://www.gitignore.io/api/osx

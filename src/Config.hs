@@ -150,7 +150,7 @@ getLoggerConfig conf = do
 validatefileHandle :: String -> IO System.IO.Handle
 validatefileHandle fileText =
   case fileText of
-    "File" -> appendLog "logs"
+    "File" -> appendLog "logs.txt"
     "Terminal" -> return System.IO.stderr
     _ -> do
       putStrLn "validatefileHandle: stdError is invalid in config.conf file"
@@ -161,11 +161,11 @@ appendLog :: FilePath -> IO System.IO.Handle
 appendLog path = do
   rez <- SD.doesFileExist path
   if rez
-    then System.IO.openFile "logs" System.IO.AppendMode
+    then System.IO.openFile "logs.txt" System.IO.AppendMode
     else do
-      putStrLn "Create the file /logs"
-      System.IO.writeFile "logs" []
-      System.IO.openFile "logs" System.IO.AppendMode
+      putStrLn "Create the file /logs.txt"
+      System.IO.writeFile "logs.txt" []
+      System.IO.openFile "logs.txt" System.IO.AppendMode
 
 validateLogLevel :: String -> IO Logger.Level
 validateLogLevel levelText =
