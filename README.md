@@ -76,7 +76,7 @@ stack exec news-exe
 stack test
 ```
 * how the server works and what we get in response to different requests (valid and not) see in [_requests](_requests).
-* one curl request for each "End Point" see in [ _scripts]( _scripts). Use command sh fileName.sh in terminal. Scripts are numbered, it will be executed from the first
+* one curl request for each "End Point" see in [ _scripts]( _scripts). Run from project root - "news" folder. Use command sh fileName.sh in terminal. Scripts are numbered, it will be executed from the first
 
 You can use it such as curl request. If you have never worked with curl - https://curl.se/docs/manual.html
 
