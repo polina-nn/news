@@ -4,13 +4,13 @@
 ```
 curl -v "http://localhost:8080/users?offset=2&limit=3"
 ```
- Can use wiht offset and limit.[See here](OffsetLimit.md)  If limit more then you set in config, server use limit from config.
+ Can use with offset and limit.[See here](OffsetLimit.md)  If limit more then you set in config, server use limit from config.
 ```
 curl -v "http://localhost:8080/users"
 curl -v "http://localhost:8080/users?limit=10"
 curl -v "http://localhost:8080/users?offset=2&limit=3"
 ```
-Attention please! Offset doesn`t work after limit.
+Attention please! Offset does not work after limit.
 ```
 ... /users?limit=3&offset=4  == ... /users?limit=3 
 ```
@@ -18,7 +18,7 @@ Attention please! Offset doesn`t work after limit.
 ## Method 
 GET
 
-## Аuthentication required 
+## authentication required 
 No
 
 ## Permissions required 
@@ -28,7 +28,7 @@ No
 
 You receive JSON-serialized response with list of users object as a result.
 
-User object in respons: 
+User object in response: 
 | Field         | Type 	   | Description       |
 | ------------- | ---------|-------------------|
 | user_admin| bool | true then user is admin|

@@ -13,7 +13,6 @@
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -Wno-missing-methods #-}
 
--- для работы import Database.PostgreSQL.Simple.SqlQQ (sql)
 module EndPoints.AddOneCategory
   ( addOneCategory
   , addCategory
@@ -60,16 +59,16 @@ addCategory conn (h, user, r) = do
   allCheck <-
     Lib.checkUserAdmin h user >>= checkSyntaxPath h r >>=
     CategoryIO.getAllCategoriesIO conn h >>=
-    Category.checkLogicPathForAddCateg h r
+    Category.checkLogicPathForAddCategory h r
   case allCheck :: Either ErrorTypes.AddEditCategoryError ( DataTypes.CreateCategoryRequest
                                                           , [DataTypes.Category]) of
     Left err -> return $ Left err
-    Right (req, categs) -> do
-      let tochangePaths =
-            Category.changePathForAddCateg req categs :: [CategoryHelpTypes.EditCategory]
+    Right (req, categories) -> do
+      let toChangePaths =
+            Category.changePathForAddCategory req categories :: [CategoryHelpTypes.EditCategory]
       rez <-
         catch
-          (CategoryIO.changePathCategoriesIO conn h tochangePaths >>=
+          (CategoryIO.changePathCategoriesIO conn h toChangePaths >>=
            addCategoryIO conn h req)
           handleError
       case rez of
@@ -143,9 +142,9 @@ addCategoryIO conn h DataTypes.CreateCategoryRequest {..} (Right _) = do
           return $
             Right
               (DataTypes.Category
-                 { category_path = path
-                 , category_id = rez
-                 , category_name = category
+                 { categoryPath = path
+                 , categoryId = rez
+                 , categoryName = category
                  })
         _ -> do
           Logger.logError (News.hLogHandle h) $
@@ -153,7 +152,7 @@ addCategoryIO conn h DataTypes.CreateCategoryRequest {..} (Right _) = do
             show $
             ErrorTypes.AddEditCategorySQLRequestError $
             ErrorTypes.SQLRequestError
-              "addCategoryIO! Dont get Id category or category_path is not unique "
+              "addCategoryIO! Don't get Id category or category_path is not unique "
           return $
             Left $
             ErrorTypes.AddEditCategorySQLRequestError $
@@ -164,7 +163,7 @@ addCategoryIO conn h DataTypes.CreateCategoryRequest {..} (Right _) = do
         show $
         ErrorTypes.AddEditCategorySQLRequestError $
         ErrorTypes.SQLRequestError
-          ("addCategoryIO! Dont INSERT INTO  category" ++ path)
+          ("addCategoryIO! Don't INSERT INTO  category" ++ path)
       return $
         Left $
         ErrorTypes.AddEditCategorySQLRequestError $

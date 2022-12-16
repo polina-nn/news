@@ -77,7 +77,7 @@ instance ToHttpResponse ErrorTypes.AddEditNewsError DataTypes.News where
     throwError err404 {errReasonPhrase = show a}
 
 -- | 4
--- | AddUserError - Сreation user errors
+-- | AddUserError - creation user errors
 instance ToHttpResponse ErrorTypes.AddUserError DataTypes.User where
   toHttpResponse (Right user) = return user
   toHttpResponse (Left (ErrorTypes.InvalidPermissionAddUser a)) =
@@ -105,7 +105,7 @@ instance ToHttpResponse ErrorTypes.GetNewsError [DataTypes.News] where
     throwError err400 {errReasonPhrase = show a}
 
 -- | 6
--- | GetContentError - get users or categoty list error
+-- | GetContentError - get users or category list error
 instance ToHttpResponse ErrorTypes.GetContentError [DataTypes.Category] where
   toHttpResponse (Right cat) = return cat
   toHttpResponse (Left (ErrorTypes.GetContentSQLRequestError a)) =

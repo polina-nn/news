@@ -50,7 +50,7 @@ addUser ::
   -> IO (Either ErrorTypes.AddUserError DataTypes.User)
 addUser conn (h, user, req) = do
   Logger.logInfo (News.hLogHandle h) $ T.pack "Request: Add User "
-  allCheck <- Lib.checkUserAdmin h user >>= ceckLogin conn h req
+  allCheck <- Lib.checkUserAdmin h user >>= checkLogin conn h req
   case allCheck of
     Left err -> return $ Left err
     Right _ -> do
@@ -95,32 +95,32 @@ addUserIO conn h DataTypes.CreateUserRequest {..} = do
       return
         (Right $
          DataTypes.User
-           { user_name = name
-           , user_login = login
-           , user_password = Nothing -- Do not show password
-           , user_created = created
-           , user_admin = admin
-           , user_author = author
+           { userName = name
+           , userLogin = login
+           , userPassword = Nothing -- Do not show password
+           , userCreated = created
+           , userAdmin = admin
+           , userAuthor = author
            })
     _ -> do
       Logger.logError (News.hLogHandle h) $
         T.pack $
         show $
         ErrorTypes.AddUserSQLRequestError $
-        ErrorTypes.SQLRequestError "addUserIO! Dont INSERT INTO  user table"
+        ErrorTypes.SQLRequestError "addUserIO! Don't INSERT INTO  user table"
       return $
         Left $ ErrorTypes.AddUserSQLRequestError $ ErrorTypes.SQLRequestError []
 
--- | ceckLogin - check the existence of the login. Duplication of login is not allowed
-ceckLogin ::
+-- | checkLogin - check the existence of the login. Duplication of login is not allowed
+checkLogin ::
      SQL.Connection
   -> News.Handle IO
   -> DataTypes.CreateUserRequest
   -> Either ErrorTypes.InvalidAdminPermission DataTypes.User
   -> IO (Either ErrorTypes.AddUserError DataTypes.CreateUserRequest)
-ceckLogin _ _ _ (Left err) =
+checkLogin _ _ _ (Left err) =
   return $ Left $ ErrorTypes.InvalidPermissionAddUser err
-ceckLogin conn h' r@DataTypes.CreateUserRequest {..} (Right _) = do
+checkLogin conn h' r@DataTypes.CreateUserRequest {..} (Right _) = do
   res <-
     SQL.query
       conn
@@ -132,7 +132,7 @@ ceckLogin conn h' r@DataTypes.CreateUserRequest {..} (Right _) = do
         then do
           Logger.logDebug (News.hLogHandle h') $
             T.pack
-              ("ceckLogin: OK! User whith login " ++ show login ++ " not exists")
+              ("checkLogin: OK! User with login " ++ show login ++ " not exists")
           return $ Right r
         else do
           Logger.logError (News.hLogHandle h') $
@@ -140,7 +140,7 @@ ceckLogin conn h' r@DataTypes.CreateUserRequest {..} (Right _) = do
             show $
             ErrorTypes.UserAlreadyExisted $
             ErrorTypes.InvalidContent
-              ("ceckLogin: BAD! User whith login " ++
+              ("checkLogin: BAD! User with login " ++
                show login ++ " already exists")
           return $
             Left $ ErrorTypes.UserAlreadyExisted $ ErrorTypes.InvalidContent []
@@ -149,6 +149,6 @@ ceckLogin conn h' r@DataTypes.CreateUserRequest {..} (Right _) = do
         T.pack $
         show $
         ErrorTypes.AddUserSQLRequestError $
-        ErrorTypes.SQLRequestError "ceckLogin: BAD! Logic error!"
+        ErrorTypes.SQLRequestError "checkLogin: BAD! Logic error!"
       return $
         Left $ ErrorTypes.AddUserSQLRequestError $ ErrorTypes.SQLRequestError []

@@ -1,7 +1,6 @@
 module MainBase64
-  ( mainBase64,
-  )
-where
+  ( mainBase64
+  ) where
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base64 as Base64

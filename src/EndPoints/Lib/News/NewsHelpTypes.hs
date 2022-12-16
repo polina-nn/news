@@ -15,27 +15,27 @@ import qualified Types.DataTypes as DataTypes
 -- | DbNews - contain data from the database. Makes filtering and sorting easier.
 data DbNews =
   DbNews
-    { db_news_title :: DataTypes.Name
-    , db_news_created :: TIME.Day
-    , db_news_author :: DataTypes.Name
-    , db_news_category_path :: DataTypes.Path
-    , db_news_category_name :: DataTypes.Name -- recursively all categories
-    , db_news_text :: T.Text
-    , db_news_images_id :: [Int]
-    , db_news_images_quantity :: Int
-    , db_news_published :: Bool
+    { dbNewsTitle :: DataTypes.Name
+    , dbNewsCreated :: TIME.Day
+    , dbNewsAuthor :: DataTypes.Name
+    , dbNewsCategoryPath :: DataTypes.Path
+    , dbNewsCategoryName :: DataTypes.Name -- recursively all categories
+    , dbNewsText :: T.Text
+    , dbNewsImagesId :: [Int]
+    , dbNewsImagesQuantity :: Int
+    , dbNewsPublished :: Bool
     }
   deriving (Show, Eq)
 
 -- | DbFilter - filtering data to database request
 data DbFilter =
   DbFilter
-    { db_filer_dayAt :: TIME.Day
-    , db_filer_dayUntil :: TIME.Day
-    , db_filer_daySince :: TIME.Day
-    , db_filer_author :: T.Text
-    , db_filer_category_id :: Maybe Int
-    , db_filer_title :: T.Text
-    , db_filer_content :: T.Text
+    { dbFilerDayAt :: TIME.Day
+    , dbFilerDayUntil :: TIME.Day
+    , dbFilerDaySince :: TIME.Day
+    , dbFilerAuthor :: T.Text
+    , dbFilerCategoryId :: Maybe Int
+    , dbFilerTitle :: T.Text
+    , dbFilerContent :: T.Text
     }
   deriving (Show, Eq)

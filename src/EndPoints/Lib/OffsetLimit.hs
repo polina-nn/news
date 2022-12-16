@@ -28,7 +28,7 @@ checkOffset h (Just offset)
       T.pack $
       show $
       ErrorTypes.InvalidOffset
-        ("checkOffset: Offset in requst is a negative number. Offset = " ++
+        ("checkOffset: Offset in request is a negative number. Offset = " ++
          show offset)
     return $ Left $ ErrorTypes.InvalidOffset []
 
@@ -36,7 +36,7 @@ checkOffset h (Just offset)
 checkLimit ::
      Monad m
   => News.Handle m
-  -- | take from requst for example in http://localhost:8080/users?limit=10
+  -- | take from request for example in http://localhost:8080/users?limit=10
   -> Maybe DataTypes.Limit
   -- | take from  AppConfig
   -> Int
@@ -52,7 +52,7 @@ checkLimit h (Just limit) appConfigLimit
       T.pack $
       show $
       ErrorTypes.InvalidLimit
-        ("checkLimit: Limit in requst is a negative number or zero. Limit = " ++
+        ("checkLimit: Limit in request is a negative number or zero. Limit = " ++
          show limit)
     return $ Left $ ErrorTypes.InvalidLimit []
 

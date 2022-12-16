@@ -24,7 +24,7 @@ All parameters are required.
 ## Method 
  POST
 
-## Аuthentication required 
+## Authentication required 
 Yes
 
 ## Permissions required 
@@ -34,15 +34,15 @@ Admin
 
 You receive JSON-serialized response with  User object as a result.
 
-User object in respons: 
+User object in response: 
 | Field         | Type 	   | Description       |
 | ------------- | ---------|-------------------|
-| user_admin| bool | true then user is admin|
-| user_author| bool | true then user is author|
-| user_created| string | creation date in the format "2022-03-15" |
-| user_login| string | login for Basic Authentication |
-| user_name	| string | user name |
-| user_password	| null | user password for Basic Authentication. Don`t returned |
+| userAdmin| bool | true then user is admin|
+| userAuthor| bool | true then user is author|
+| userCreated| string | creation date in the format "2022-03-15" |
+| userLogin| string | login for Basic Authentication |
+| userName	| string | user name |
+| userPassword	| null | user password for Basic Authentication. Don`t returned |
 
 
 ## Error Responses

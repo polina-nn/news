@@ -1,6 +1,5 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-{-# HLINT ignore "Use newtype instead of data" #-}
 -- | define Errors in EndPoints
 module Types.ErrorTypes where
 
@@ -39,7 +38,7 @@ instance Show InvalidLimit where
   show (InvalidLimit a) = show a
 
 -- | 3
--- | InvalidId  - Then resource whith this Id in URI (ex.700) don't exists in the Data Base (http://localhost:8080/image/700)
+-- | InvalidId  - Then resource with this Id in URI (ex.700) don't exists in the Data Base (http://localhost:8080/image/700)
 newtype InvalidId =
   InvalidId String
   deriving (Eq)
@@ -49,7 +48,7 @@ instance Show InvalidId where
   show (InvalidId a) = show a
 
 -- | 4
--- | InvalidContent  - Then content in request (ex.700a) is invalid. (--data '{ "new_path": "700a", "new_category": "kuku2 " }' \ )
+-- | InvalidContent  - Then content in request (ex.700a) is invalid. (--data '{ "new_path": "700a", "new_category": "cat " }' \ )
 newtype InvalidContent =
   InvalidContent String
   deriving (Eq)
@@ -147,7 +146,7 @@ data AddEditNewsError
   deriving (Show, Eq)
 
 -- | 4
--- | AddUserError - Сreation user errors
+-- | AddUserError - creation user errors
 data AddUserError
     -- |  InvalidPermissionAddUser - the user is not  admin
   = InvalidPermissionAddUser InvalidAdminPermission
@@ -161,17 +160,17 @@ data AddUserError
 data GetNewsError
   = InvalidLimitGetNews InvalidLimit
   | InvalidOffsetGetNews InvalidOffset
-    -- только в запросах c фильтрами например два фильтра по дате
+    -- | InvalidFilterGetNews - only in queries with filters
   | InvalidFilterGetNews InvalidRequest
-    -- только в запросах на поиск Then error in uri ( no word "text" in request news/search?offset=2&limit=3)
+    -- | InvalidSearchGetNews  - only in search queries. Then error in uri ( no word "text" in request news/search?offset=2&limit=3)
   | InvalidSearchGetNews InvalidRequest
-    -- только для запросов с аутентификацией
+    -- | InvalidPermissionGetNews - only for requests with authentication
   | InvalidPermissionGetNews InvalidAuthorPermission
   | GetNewsSQLRequestError SQLRequestError
   deriving (Show, Eq)
 
 -- | 6
--- | GetContentError - get users or categoty list error
+-- | GetContentError - get users or category list error
 data GetContentError
   = InvalidLimitGetContent InvalidLimit
   | InvalidOffsetGetContent InvalidOffset

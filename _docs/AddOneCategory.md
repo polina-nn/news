@@ -9,21 +9,21 @@ http://localhost:8080/login/category
 
 ## Example of categories
 
-Use this example to determine the path (Syntasis and logic. No holes or cycles in the numbering).  
-Category_id is assigned by the server automatically.  
-Сategory_path is unique, category names can be the same.  
-When adding a category with category_path=1, puffs of all categories below will be automatically overwritten.  
-(Сategory with name = Ася will have category_path = 2 and so on)  
+Use this example to determine the path (syntax and logic. No holes or cycles in the numbering).  
+CategoryId is assigned by the server automatically.  
+CategoryPath is unique, category names can be the same.  
+When adding a category with categoryPath=1, puffs of all categories below will be automatically overwritten.  
+(Categories with name = Ася will have categoryPath = 2 and so on)  
 
-Category {category_path = 1, category_id = 1, category_name = Ася }   
-Category {category_path = 1.1, category_id = 11, category_name = Ася Борисовна }   
-Category {category_path = 1.2, category_id = 9, category_name = Ася Михайловна }   
-Category {category_path = 1.2.1, category_id = 10, category_name = Ася Михайловна Иванова }   
-Category {category_path = 1.2.1.1, category_id = 12, category_name = Ася Михайловна Иванова-Борисова }   
-Category {category_path = 1.2.1.2, category_id = 13, category_name = Ася Михайловна Иванова-Власова }  
-Category {category_path = 2, category_id = 2, category_name = Борис  }  
-Category {category_path = 3, category_id = 8, category_name = Вася }   
-Category {category_path = 4, category_id = 3, category_name = Женя  }   
+Category {categoryPath = 1, category_id = 1, categoryName = Ася }   
+Category {categoryPath = 1.1, category_id = 11, categoryName = Ася Борисовна }   
+Category {categoryPath = 1.2, category_id = 9, categoryName = Ася Михайловна }   
+Category {categoryPath = 1.2.1, category_id = 10, categoryName = Ася Михайловна Иванова }   
+Category {categoryPath = 1.2.1.1, category_id = 12, categoryName = Ася Михайловна Иванова-Борисова }   
+Category {categoryPath = 1.2.1.2, category_id = 13, categoryName = Ася Михайловна Иванова-Власова }  
+Category {categoryPath = 2, category_id = 2, categoryName = Борис  }  
+Category {categoryPath = 3, category_id = 8, categoryName = Вася }   
+Category {categoryPath = 4, category_id = 3, categoryName = Женя  }   
 
 
 ## Parameters of request 
@@ -40,7 +40,7 @@ All parameters are required.
 ## Method 
 POST
 
-## Аuthentication required 
+## Authentication required 
 Yes
 
 ## Permissions required 
@@ -50,12 +50,12 @@ Admin
 
 You receive JSON-serialized response with category object as a result.
 
-Category object in respons: 
+Category object in response: 
 | Field         | Type 	   | Description       |
 | ------------- | ---------|-------------------|
-| category_id | number | Category id is assigned by the server automatically. |
-| category_name | string | Category name|
-| category_path	 | string | Category path |
+| categoryId | number | Category id is assigned by the server automatically. |
+| categoryName | string | Category name|
+| categoryPath	 | string | Category path |
 
 
 

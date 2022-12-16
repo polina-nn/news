@@ -18,7 +18,6 @@ module EndPoints.GetNewsSearchList
   , newsSearchList
   ) where
 
-
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
@@ -42,9 +41,9 @@ getNewsSearchList ::
   -> Maybe DataTypes.Offset
   -> Maybe DataTypes.Limit
   -> Handler [DataTypes.News]
-getNewsSearchList h DataTypes.Db {..} msearch mo ml =
+getNewsSearchList h DataTypes.Db {..} mSearch mo ml =
   (>>=)
-    (liftIO $ _newsSearchList (h, msearch, mo, ml))
+    (liftIO $ _newsSearchList (h, mSearch, mo, ml))
     ToHttpResponse.toHttpResponse
 
 newsSearchList ::

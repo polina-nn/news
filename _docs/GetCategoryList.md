@@ -4,13 +4,13 @@
 ```
 curl -v "http://localhost:8080/category?offset=0&limit=10"
 ```
- Can use wiht offset and limit.[See here](OffsetLimit.md)  If limit more then you set in config, server use limit from config.
+ Can use with offset and limit.[See here](OffsetLimit.md)  If limit more then you set in config, server use limit from config.
 ```
 curl -v "http://localhost:8080/category"
 curl -v "http://localhost:8080/category?limit=10"
 curl -v "http://localhost:8080/category?offset=2&limit=3"
 ```
-Attention please! Offset doesn`t work after limit.
+Attention please! Offset does not work after limit.
 ```
 ... /users?limit=3&offset=4  == ... /users?limit=3 
 ```
@@ -18,7 +18,7 @@ Attention please! Offset doesn`t work after limit.
 ## Method 
 GET
 
-## Аuthentication required 
+## Authentication required 
 No
 
 ## Permissions required 
@@ -28,12 +28,12 @@ No
 
 You receive JSON-serialized response with list of categories object as a result.
 
-Category object in respons: 
+Category object in response: 
 | Field         | Type 	   | Description       |
 | ------------- | ---------|-------------------|
-| category_id | number | Category id is assigned by the server automatically. |
-| category_name | string | Category name|
-| category_path	 | string | Category path |
+| categoryId | number | Category id is assigned by the server automatically. |
+| categoryName | string | Category name|
+| categoryPath	 | string | Category path |
 
 
 ## Error Responses

@@ -13,7 +13,6 @@
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -Wno-missing-methods #-}
 
--- для работы import Database.PostgreSQL.Simple.SqlQQ (sql)
 module EndPoints.AddOneImage
   ( addImage
   , addOneImage
@@ -90,7 +89,7 @@ checkImageFileExist h r@DataTypes.CreateImageRequest {..} (Right _) = do
   rez <- SD.doesFileExist image
   if rez
     then do
-      Logger.logDebug (News.hLogHandle h) $ T.pack "checkcImageFileExist: OK!"
+      Logger.logDebug (News.hLogHandle h) $ T.pack "checkImageFileExist: OK!"
       return $ Right r
     else do
       Logger.logError (News.hLogHandle h) $
@@ -98,7 +97,7 @@ checkImageFileExist h r@DataTypes.CreateImageRequest {..} (Right _) = do
         show $
         ErrorTypes.NotExistImageFile $
         ErrorTypes.InvalidContent
-          ("checkcImageFileExist: BAD!  File: does not exist (No such file or directory) " ++
+          ("checkImageFileExist: BAD!  File: does not exist (No such file or directory) " ++
            image)
       return . Left $
         ErrorTypes.NotExistImageFile $ ErrorTypes.InvalidContent []
@@ -128,12 +127,11 @@ checkBase64Image ::
 checkBase64Image _ (Left err) = return $ Left err
 checkBase64Image h (Right DataTypes.CreateImageRequest {..}) = do
   imageFile <- B.readFile image
-  case Base64.decodeBase64 imageFile -- Base64.isBase64 (SQL.fromOnly val)
-        of
+  case Base64.decodeBase64 imageFile of
     Right val -> do
       Logger.logDebug (News.hLogHandle h) $ T.pack "checkBase64Image: OK!"
-      Logger.logDebug (News.hLogHandle h) $ T.pack $ show val -- imageFile
-      return $ Right val -- imageFile -- val -- val
+      Logger.logDebug (News.hLogHandle h) $ T.pack $ show val
+      return $ Right val
     Left err -> do
       Logger.logError (News.hLogHandle h) $
         T.pack $

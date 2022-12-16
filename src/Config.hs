@@ -3,12 +3,11 @@
 
 -- | A module to provide a configuration reader for other modules.
 module Config
-  ( getAppConfig,
-    getDbConfig,
-    getLoggerConfig,
-    getURIConfig,
-  )
-where
+  ( getAppConfig
+  , getDbConfig
+  , getLoggerConfig
+  , getURIConfig
+  ) where
 
 import Control.Exception.Safe (throwString)
 import qualified Data.Configurator as C
@@ -19,31 +18,34 @@ import qualified News
 import qualified System.Directory as SD
 import qualified System.IO
 
-data MaybeDbConfig = MaybeDbConfig
-  { maybeDbHost :: Maybe String,
-    maybeDbName :: Maybe String,
-    maybeUser :: Maybe String,
-    maybePassword :: Maybe String,
-    maybeDbPort :: Maybe String,
-    maybeNoOfStripes :: Maybe Int,
-    maybeIdleTime :: Maybe Int,
-    maybeStripeSize :: Maybe Int
-  }
+data MaybeDbConfig =
+  MaybeDbConfig
+    { maybeDbHost :: Maybe String
+    , maybeDbName :: Maybe String
+    , maybeUser :: Maybe String
+    , maybePassword :: Maybe String
+    , maybeDbPort :: Maybe String
+    , maybeNoOfStripes :: Maybe Int
+    , maybeIdleTime :: Maybe Int
+    , maybeStripeSize :: Maybe Int
+    }
   deriving (Show, Eq)
 
-data MaybeAppConfig = MaybeAppConfig
-  { -- | maybeAppPort - launch port
-    maybeAppPort :: Maybe Int,
+data MaybeAppConfig =
+  MaybeAppConfig
+    -- | maybeAppPort - launch port
+    { maybeAppPort :: Maybe Int
     -- | maybeAppShowLimit - limit on the number of records in the server response
-    maybeAppShowLimit :: Maybe Int
-  }
+    , maybeAppShowLimit :: Maybe Int
+    }
   deriving (Show, Eq)
 
-data MaybeURIConfig = MaybeURIConfig
-  { maybeUriScheme :: Maybe String,
-    maybeUriHost :: Maybe String,
-    maybeUriPort :: Maybe Int
-  }
+data MaybeURIConfig =
+  MaybeURIConfig
+    { maybeUriScheme :: Maybe String
+    , maybeUriHost :: Maybe String
+    , maybeUriPort :: Maybe Int
+    }
   deriving (Show, Eq)
 
 getURIConfig :: C.Config -> IO News.URIConfig
@@ -60,20 +62,18 @@ getURIConfig conf = do
     checkURIConfig :: MaybeURIConfig -> Maybe News.URIConfig
     checkURIConfig (MaybeURIConfig (Just "Http") (Just uriHost) (Just uriPort)) =
       Just
-        ( News.URIConfig
-            { News.uriScheme = News.Http,
-              News.uriHost = uriHost,
-              News.uriPort = uriPort
-            }
-        )
+        (News.URIConfig
+           { News.uriScheme = News.Http
+           , News.uriHost = uriHost
+           , News.uriPort = uriPort
+           })
     checkURIConfig (MaybeURIConfig (Just "Https") (Just uriHost) (Just uriPort)) =
       Just
-        ( News.URIConfig
-            { News.uriScheme = News.Https,
-              News.uriHost = uriHost,
-              News.uriPort = uriPort
-            }
-        )
+        (News.URIConfig
+           { News.uriScheme = News.Https
+           , News.uriHost = uriHost
+           , News.uriPort = uriPort
+           })
     checkURIConfig _ = Nothing
 
 -- | getAppConfig Try to read all values from the config, if it doesn't work, I send throwString
@@ -121,42 +121,42 @@ getDbConfig conf = do
     checkDbConfig :: MaybeDbConfig -> Maybe News.DbConfig
     checkDbConfig (MaybeDbConfig (Just dbHost) (Just dbName) (Just user) (Just password) (Just dbPort) (Just noOfStripes) (Just idleTime) (Just stripeSize)) =
       Just
-        ( News.DbConfig
-            { News.dbHost = dbHost,
-              News.dbName = dbName,
-              News.user = user,
-              News.password = password,
-              News.dbPort = dbPort,
-              News.noOfStripes = noOfStripes,
-              News.idleTime = idleTime,
-              News.stripeSize = stripeSize
-            }
-        )
+        (News.DbConfig
+           { News.dbHost = dbHost
+           , News.dbName = dbName
+           , News.user = user
+           , News.password = password
+           , News.dbPort = dbPort
+           , News.noOfStripes = noOfStripes
+           , News.idleTime = idleTime
+           , News.stripeSize = stripeSize
+           })
     checkDbConfig _ = Nothing
 
 -- | getLoggerConfig if there are problems with reading the logging config -> log to the console and the info level
 getLoggerConfig :: C.Config -> IO Logger.Impl.Config
 getLoggerConfig conf = do
   readStdError <- C.lookupDefault "Terminal" conf "config.stdError" :: IO String
-  readMinLogLevel <- C.lookupDefault "Info" conf "config.minLogLevel" :: IO String
-  confFileHandle <- validatefileHandle readStdError
+  readMinLogLevel <-
+    C.lookupDefault "Info" conf "config.minLogLevel" :: IO String
+  confFileHandle <- validateFileHandle readStdError
   confMinLevel <- validateLogLevel readMinLogLevel
   return
     Logger.Impl.Config
-      { Logger.Impl.confFileHandle = confFileHandle,
-        Logger.Impl.confMinLevel = confMinLevel
+      { Logger.Impl.confFileHandle = confFileHandle
+      , Logger.Impl.confMinLevel = confMinLevel
       }
 
-validatefileHandle :: String -> IO System.IO.Handle
-validatefileHandle fileText =
+validateFileHandle :: String -> IO System.IO.Handle
+validateFileHandle fileText =
   case fileText of
     "File" -> appendLog "logs.txt"
     "Terminal" -> return System.IO.stderr
     _ -> do
-      putStrLn "validatefileHandle: stdError is invalid in config.conf file"
+      putStrLn "validateFileHandle: stdError is invalid in config.conf file"
       return System.IO.stderr
 
--- | appendLog  - Сheck the existence of the file, if it does't  exist, create and append
+-- | appendLog  - check the existence of the file, if it does't  exist, create and append
 appendLog :: FilePath -> IO System.IO.Handle
 appendLog path = do
   rez <- SD.doesFileExist path

@@ -9,14 +9,13 @@
 {-# OPTIONS_GHC -Wno-missing-methods #-}
 
 module EndPoints.Lib.News.News
-  ( checkUserOffsetLimitFilter, -- use in EndPoints.GetAuthorsNewsList
-    checkOffsetLimitFilter, -- use in EndPoints.GetNewsList
-    toDbNews, -- use in EndPoints.GetNewsList,  EndPoints.GetAuthorsNewsList
-    toFilter, -- use in EndPoints.GetNewsList,  EndPoints.GetAuthorsNewsList
-    sortNews, -- use in EndPoints.GetNewsList,  EndPoints.GetAuthorsNewsList
-    checkErrorsToNews, -- use in EndPoints.GetNewsList,  EndPoints.GetAuthorsNewsList
-  )
-where
+  ( checkUserOffsetLimitFilter -- use in EndPoints.GetAuthorsNewsList
+  , checkOffsetLimitFilter -- use in EndPoints.GetNewsList
+  , toDbNews -- use in EndPoints.GetNewsList,  EndPoints.GetAuthorsNewsList
+  , toFilter -- use in EndPoints.GetNewsList,  EndPoints.GetAuthorsNewsList
+  , sortNews -- use in EndPoints.GetNewsList,  EndPoints.GetAuthorsNewsList
+  , checkErrorsToNews -- use in EndPoints.GetNewsList,  EndPoints.GetAuthorsNewsList
+  ) where
 
 import Data.List (sortBy)
 import Data.Maybe (isNothing)
@@ -32,34 +31,28 @@ import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
 
 toFilter ::
-  Maybe DataTypes.DayAt ->
-  Maybe DataTypes.DayUntil ->
-  Maybe DataTypes.DaySince ->
-  Maybe T.Text ->
-  Maybe Int ->
-  Maybe T.Text ->
-  Maybe T.Text ->
-  DataTypes.Filter
-toFilter filer_dayAt filer_dayUntil filer_daySince filer_author filer_category_id filer_title filer_content =
+     Maybe DataTypes.DayAt
+  -> Maybe DataTypes.DayUntil
+  -> Maybe DataTypes.DaySince
+  -> Maybe T.Text
+  -> Maybe Int
+  -> Maybe T.Text
+  -> Maybe T.Text
+  -> DataTypes.Filter
+toFilter filerDayAt filerDayUntil filerDaySince filerAuthor filerCategoryId filerTitle filerContent =
   DataTypes.Filter {..}
 
 -- | checkUserOffsetLimitFilter - Check the validity of all data in the request. If ok, then a service DbFilter, otherwise an error
 -- the validity of SortBy is checked automatically by servant
 checkUserOffsetLimitFilter ::
-  ( News.Handle IO,
-    DataTypes.User,
-    DataTypes.Filter,
-    Maybe DataTypes.Offset,
-    Maybe DataTypes.Limit
-  ) ->
-  IO
-    ( Either
-        ErrorTypes.GetNewsError
-        ( DataTypes.Offset,
-          DataTypes.Limit,
-          NewsHelpTypes.DbFilter
-        )
-    )
+     ( News.Handle IO
+     , DataTypes.User
+     , DataTypes.Filter
+     , Maybe DataTypes.Offset
+     , Maybe DataTypes.Limit)
+  -> IO (Either ErrorTypes.GetNewsError ( DataTypes.Offset
+                                        , DataTypes.Limit
+                                        , NewsHelpTypes.DbFilter))
 checkUserOffsetLimitFilter (h, user, f, mo, ml) = do
   checkAuthor <- Lib.checkUserAuthor h user
   case checkAuthor of
@@ -76,19 +69,13 @@ checkUserOffsetLimitFilter (h, user, f, mo, ml) = do
 -- | checkOffsetLimitFilter - Check the validity of all data in the request. If ok, then a service DbFilter, otherwise an error
 -- the validity of SortBy is checked automatically by servant
 checkOffsetLimitFilter ::
-  ( News.Handle IO,
-    DataTypes.Filter,
-    Maybe DataTypes.Offset,
-    Maybe DataTypes.Limit
-  ) ->
-  IO
-    ( Either
-        ErrorTypes.GetNewsError
-        ( DataTypes.Offset,
-          DataTypes.Limit,
-          NewsHelpTypes.DbFilter
-        )
-    )
+     ( News.Handle IO
+     , DataTypes.Filter
+     , Maybe DataTypes.Offset
+     , Maybe DataTypes.Limit)
+  -> IO (Either ErrorTypes.GetNewsError ( DataTypes.Offset
+                                        , DataTypes.Limit
+                                        , NewsHelpTypes.DbFilter))
 checkOffsetLimitFilter (h, f, mo, ml) = do
   checkRequest <- OffsetLimit.checkOffsetLimitNews h mo ml
   case checkRequest of
@@ -100,50 +87,47 @@ checkOffsetLimitFilter (h, f, mo, ml) = do
 
 -- | checkFilter - Check the values in the filters and send the default values for a convenient request
 checkFilter ::
-  DataTypes.Filter -> Either ErrorTypes.GetNewsError NewsHelpTypes.DbFilter
+     DataTypes.Filter -> Either ErrorTypes.GetNewsError NewsHelpTypes.DbFilter
 checkFilter f@DataTypes.Filter {..} =
   case dayAtOrUntilOrSince f of
     Left err -> Left err
     Right _ ->
       Right
         NewsHelpTypes.DbFilter
-          { db_filer_dayAt = dayAt' filer_dayAt,
-            db_filer_dayUntil = dayUntil' filer_dayUntil,
-            db_filer_daySince =
-              daySince' filer_dayAt filer_dayUntil filer_daySince,
-            db_filer_author = text' filer_author,
-            db_filer_category_id = filer_category_id,
-            db_filer_title = text' filer_title,
-            db_filer_content = text' filer_content
+          { dbFilerDayAt = dayAt' filerDayAt
+          , dbFilerDayUntil = dayUntil' filerDayUntil
+          , dbFilerDaySince = daySince' filerDayAt filerDayUntil filerDaySince
+          , dbFilerAuthor = text' filerAuthor
+          , dbFilerCategoryId = filerCategoryId
+          , dbFilerTitle = text' filerTitle
+          , dbFilerContent = text' filerContent
           }
 
 dayAtOrUntilOrSince ::
-  DataTypes.Filter -> Either ErrorTypes.GetNewsError DataTypes.Filter
+     DataTypes.Filter -> Either ErrorTypes.GetNewsError DataTypes.Filter
 dayAtOrUntilOrSince fi@DataTypes.Filter {..}
-  | isNothing filer_dayAt
-      && isNothing filer_dayUntil
-      && isNothing filer_daySince =
+  | isNothing filerDayAt && isNothing filerDayUntil && isNothing filerDaySince =
     Right fi
-  | isNothing filer_dayUntil && isNothing filer_daySince = Right fi
-  | isNothing filer_dayAt && isNothing filer_daySince = Right fi
-  | isNothing filer_dayAt && isNothing filer_dayUntil = Right fi
+  | isNothing filerDayUntil && isNothing filerDaySince = Right fi
+  | isNothing filerDayAt && isNothing filerDaySince = Right fi
+  | isNothing filerDayAt && isNothing filerDayUntil = Right fi
   | otherwise =
     Left $ ErrorTypes.InvalidFilterGetNews $ ErrorTypes.InvalidRequest []
 
 dayAt' :: Maybe DataTypes.DayAt -> TIME.Day
-dayAt' Nothing = TIME.fromGregorian 2000 01 01 --- read "2000 - 01 - 01" :: TIME.Day -- day before dbase create
+dayAt' Nothing = TIME.fromGregorian 2000 01 01 --- read "2000 - 01 - 01" :: TIME.Day -- day before data base created
 dayAt' (Just v) = v
 
 dayUntil' :: Maybe DataTypes.DayUntil -> TIME.Day
-dayUntil' Nothing = TIME.fromGregorian 2000 01 01 --- read "2000 - 01 - 01" :: TIME.Day --  day before dbase create
+dayUntil' Nothing = TIME.fromGregorian 2000 01 01 --- read "2000 - 01 - 01" :: TIME.Day --  day before data base created
 dayUntil' (Just v) = v
 
 -- | daySince'  if all Days are nothing, then set the date to the day before the creation of the database so that everything is shown
 daySince' ::
-  Maybe DataTypes.DayAt ->
-  Maybe DataTypes.DayUntil ->
-  Maybe DataTypes.DaySince ->
-  TIME.Day
+     Maybe DataTypes.DayAt
+  -> Maybe DataTypes.DayUntil
+  -> Maybe DataTypes.DaySince
+  -> TIME.Day
 daySince' _ _ (Just v) = v
 daySince' dayAt dayUntil daySince
   | isNothing dayAt && isNothing dayUntil && isNothing daySince =
@@ -155,79 +139,75 @@ text' Nothing = T.pack "%"
 text' (Just v) = T.concat [T.pack "%", v, T.pack "%"]
 
 sortNews ::
-  News.Handle IO ->
-  Maybe DataTypes.SortBy ->
-  [NewsHelpTypes.DbNews] ->
-  IO [NewsHelpTypes.DbNews]
-sortNews h Nothing dbnews = do
+     News.Handle IO
+  -> Maybe DataTypes.SortBy
+  -> [NewsHelpTypes.DbNews]
+  -> IO [NewsHelpTypes.DbNews]
+sortNews h Nothing dbNews = do
   Logger.logDebug (News.hLogHandle h) $
     T.pack "sortNews: default by data (latest news is the first) \n"
-  return dbnews
-sortNews h (Just DataTypes.SortByAuthor) dbnews = do
+  return dbNews
+sortNews h (Just DataTypes.SortByAuthor) dbNews = do
   Logger.logDebug (News.hLogHandle h) $ T.pack "sortNews: by author name \n"
   let rez =
         sortBy
-          ( \x y ->
-              compare
-                (NewsHelpTypes.db_news_author x)
-                (NewsHelpTypes.db_news_author y)
-          )
-          dbnews
+          (\x y ->
+             compare
+               (NewsHelpTypes.dbNewsAuthor x)
+               (NewsHelpTypes.dbNewsAuthor y))
+          dbNews
   return rez
-sortNews h (Just DataTypes.SortByCategory) dbnews = do
+sortNews h (Just DataTypes.SortByCategory) dbNews = do
   Logger.logDebug (News.hLogHandle h) $ T.pack "sortNews: by category name \n"
   let rez =
         sortBy
-          ( \x y ->
-              compare
-                (NewsHelpTypes.db_news_category_name x)
-                (NewsHelpTypes.db_news_category_name y)
-          )
-          dbnews
+          (\x y ->
+             compare
+               (NewsHelpTypes.dbNewsCategoryName x)
+               (NewsHelpTypes.dbNewsCategoryName y))
+          dbNews
   return rez
-sortNews h (Just DataTypes.SortByData) dbnews = do
+sortNews h (Just DataTypes.SortByData) dbNews = do
   Logger.logDebug (News.hLogHandle h) $
     T.pack "sortNews: by data, default by data (latest first) \n"
-  return dbnews
-sortNews h (Just DataTypes.SortByFoto) dbnews = do
+  return dbNews
+sortNews h (Just DataTypes.SortByPhoto) dbNews = do
   Logger.logDebug (News.hLogHandle h) $
     T.pack "sortNews: by number of photos \n"
   let rez =
         sortBy
-          ( \x y ->
-              compare
-                (NewsHelpTypes.db_news_images_quantity x)
-                (NewsHelpTypes.db_news_images_quantity y)
-          )
-          dbnews
+          (\x y ->
+             compare
+               (NewsHelpTypes.dbNewsImagesQuantity x)
+               (NewsHelpTypes.dbNewsImagesQuantity y))
+          dbNews
   return rez
 
 toDbNews ::
-  ( T.Text,
-    TIME.Day,
-    T.Text,
-    String,
-    T.Text,
-    T.Text,
-    SQLTypes.PGArray Int,
-    Int,
-    Bool
-  ) ->
-  NewsHelpTypes.DbNews
-toDbNews (db_news_title, db_news_created, db_news_author, db_news_category_path, db_news_category_name, db_news_text, db_news_images_id', db_news_images_quantity, db_news_published) =
-  let db_news_images_id = SQLTypes.fromPGArray db_news_images_id'
+     ( T.Text
+     , TIME.Day
+     , T.Text
+     , String
+     , T.Text
+     , T.Text
+     , SQLTypes.PGArray Int
+     , Int
+     , Bool)
+  -> NewsHelpTypes.DbNews
+toDbNews (dbNewsTitle, dbNewsCreated, dbNewsAuthor, dbNewsCategoryPath, dbNewsCategoryName, dbNewsText, dbNewsImagesId', dbNewsImagesQuantity, dbNewsPublished) =
+  let dbNewsImagesId = SQLTypes.fromPGArray dbNewsImagesId'
    in NewsHelpTypes.DbNews {..}
 
 -- | checkErrorsToNews Count the number of errors in function toNews, if not return (True,  [DataTypes.News])
 checkErrorsToNews ::
-  [Either ErrorTypes.GetNewsError DataTypes.News] ->
-  [NewsHelpTypes.DbNews] ->
-  (Bool, [DataTypes.News])
+     [Either ErrorTypes.GetNewsError DataTypes.News]
+  -> [NewsHelpTypes.DbNews]
+  -> (Bool, [DataTypes.News])
 checkErrorsToNews news res =
   (length res == length (helpCheckErrors news), helpCheckErrors news)
   where
     helpCheckErrors ::
-      [Either ErrorTypes.GetNewsError DataTypes.News] -> [DataTypes.News]
+         [Either ErrorTypes.GetNewsError DataTypes.News] -> [DataTypes.News]
     helpCheckErrors [] = []
-    helpCheckErrors ((Left _) : xs) = helpCheckErrors xs
-    helpCheckErrors ((Right a) : xs) = a : helpCheckErrors xs
+    helpCheckErrors ((Left _):xs) = helpCheckErrors xs
+    helpCheckErrors ((Right a):xs) = a : helpCheckErrors xs
