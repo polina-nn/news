@@ -4,26 +4,26 @@
 curl -i --user polina:polina \
 --header "Content-Type: application/json"   \
 --request PUT   \
---data '{ "new_path":"2.5", "new_category": "Авелина"}' \
+--data '{ "newPath":"2.5", "newCategory": "Авелина"}' \
 http://localhost:8080/login/category/1
 
 
 ## Example of categories
  
-Category_id is the last parameter in uri.  
-Сategory_path is unique, category names can be the same.  
+CategoryId is the last parameter in uri.  
+CategoryPath is unique, category names can be the same.  
 The request specifies a new puff and a new category name. Puffs of other categories are rebuilt automatically if necessary.
 
-Use this example to determine the path (Syntasis and logic. No holes or cycles in the numbering).
-Category {category_path = 1, category_id = 1, category_name = Ася }   
-Category {category_path = 1.1, category_id = 11, category_name = Ася Борисовна }   
-Category {category_path = 1.2, category_id = 9, category_name = Ася Михайловна }   
-Category {category_path = 1.2.1, category_id = 10, category_name = Ася Михайловна Иванова }   
-Category {category_path = 1.2.1.1, category_id = 12, category_name = Ася Михайловна Иванова-Борисова }   
-Category {category_path = 1.2.1.2, category_id = 13, category_name = Ася Михайловна Иванова-Власова }  
-Category {category_path = 2, category_id = 2, category_name = Борис  }  
-Category {category_path = 3, category_id = 8, category_name = Вася }   
-Category {category_path = 4, category_id = 3, category_name = Женя  }   
+Use this example to determine the path (syntax and logic. No holes or cycles in the numbering).
+Category {categoryPath = 1, categoryId = 1, categoryName = Ася }   
+Category {categoryPath = 1.1, categoryId = 11, categoryName = Ася Борисовна }   
+Category {categoryPath = 1.2, categoryId = 9, categoryName = Ася Михайловна }   
+Category {categoryPath = 1.2.1, categoryId = 10, categoryName = Ася Михайловна Иванова }   
+Category {categoryPath = 1.2.1.1, categoryId = 12, categoryName = Ася Михайловна Иванова-Борисова }   
+Category {categoryPath = 1.2.1.2, categoryId = 13, categoryName = Ася Михайловна Иванова-Власова }  
+Category {categoryPath = 2, categoryId = 2, categoryName = Борис  }  
+Category {categoryPath = 3, categoryId = 8, categoryName = Вася }   
+Category {categoryPath = 4, categoryId = 3, categoryName = Женя  }   
 
 
 ## Parameters of request 
@@ -32,15 +32,15 @@ All parameters are required.
 
 | Field         | Type 	   | Description       |
 | ------------- | ---------|-------------------|
-| new_path | string | path to category |
-| new_category	| string | category name |
+| newPath | string | path to category |
+| newCategory	| string | category name |
 
 
 
 ## Method 
 PUT
 
-## Аuthentication required 
+## Authentication required 
 Yes
 
 ## Permissions required 
@@ -50,12 +50,12 @@ Admin
 
 You receive JSON-serialized response with category object as a result.
 
-User object in respons: 
+User object in response: 
 | Field         | Type 	   | Description       |
 | ------------- | ---------|-------------------|
-| category_id | number | Category id |
-| category_name | string | Category name|
-| category_path	 | string | Category path |
+| categoryId | number | Category id |
+| categoryName | string | Category name|
+| categoryPath	 | string | Category path |
 
 
 

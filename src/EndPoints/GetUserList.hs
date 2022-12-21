@@ -11,9 +11,9 @@ module EndPoints.GetUserList
 
 import Control.Monad.IO.Class (MonadIO(liftIO))
 import qualified Data.Text as T
-import qualified Data.Time as TIME
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
+import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.OffsetLimit as OffsetLimit
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
@@ -50,13 +50,8 @@ userList conn (h, mo, ml) = do
                 ORDER BY usr_created 
                 LIMIT ?  OFFSET ? |]
           (show limit, show offset)
-      let users = Prelude.map toUser res
+      let users = Prelude.map Lib.toUser res
       let toTextUsers = (T.concat $ map ToText.toText users) :: T.Text
       Logger.logDebug (News.hLogHandle h) $
         T.concat [T.pack "userList: OK! \n", toTextUsers]
       return $ Right users
-
-toUser :: (T.Text, String, Bool, Bool, TIME.Day) -> DataTypes.User
-toUser (user_name, user_login, user_admin, user_author, user_created) =
-  let user_password = Nothing
-   in DataTypes.User {..}

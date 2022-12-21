@@ -6,18 +6,16 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module Server
-  ( server,
-    serviceApi,
-    Handle (..),
-    run,
-  )
-where
+  ( server
+  , serviceApi
+  , Handle(..)
+  , run
+  ) where
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BSC8
 import qualified Data.Pool as POOL
 import qualified Data.Text as T
-import qualified Data.Time as TIME
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified DbServices
@@ -39,39 +37,39 @@ import qualified Logger
 import qualified Network.Wai.Handler.Warp
 import qualified News
 import Servant
-  ( Application,
-    BasicAuthCheck (..),
-    BasicAuthData (..),
-    BasicAuthResult (..),
-    Context (EmptyContext, (:.)),
-    Proxy (..),
-    Server,
-    serveWithContext,
-    (:<|>) ((:<|>)),
+  ( (:<|>)((:<|>))
+  , Application
+  , BasicAuthCheck(..)
+  , BasicAuthData(..)
+  , BasicAuthResult(..)
+  , Context((:.), EmptyContext)
+  , Proxy(..)
+  , Server
+  , serveWithContext
   )
 import qualified Types.ApiTypes as ApiTypes
 import qualified Types.DataTypes as DataTypes
 
-newtype Handle = Handle
-  { hServerHandle :: News.Handle IO
-  }
+newtype Handle =
+  Handle
+    { hServerHandle :: News.Handle IO
+    }
 
---import Prelude (return)
 server :: News.Handle IO -> DataTypes.Db -> Server ApiTypes.RestAPI
 server h db =
-  return (T.pack "Welcome to tiny news server") :<|> AddOneUser.addOneUser h db
-    :<|> AddOneCategory.addOneCategory h db
-    :<|> AddOneNews.addOneNews h db
-    :<|> AddOneImage.addOneImage h db
-    :<|> EditOneCategory.editOneCategory h db
-    :<|> EditOneNews.editOneNews h db
-    :<|> GetAuthorsNewsList.getAuthorsNewsList h db
-    :<|> GetAuthorsNewsSearchList.getAuthorsNewsSearchList h db
-    :<|> GetUserList.getUserList h db
-    :<|> GetOneImage.getOneImage h db
-    :<|> GetCategoryList.getCategoryList h db
-    :<|> GetNewsList.getNewsList h db
-    :<|> GetNewsSearchList.getNewsSearchList h db
+  return (T.pack "Welcome to tiny news server") :<|> AddOneUser.addOneUser h db :<|>
+  AddOneCategory.addOneCategory h db :<|>
+  AddOneNews.addOneNews h db :<|>
+  AddOneImage.addOneImage h db :<|>
+  EditOneCategory.editOneCategory h db :<|>
+  EditOneNews.editOneNews h db :<|>
+  GetAuthorsNewsList.getAuthorsNewsList h db :<|>
+  GetAuthorsNewsSearchList.getAuthorsNewsSearchList h db :<|>
+  GetUserList.getUserList h db :<|>
+  GetOneImage.getOneImage h db :<|>
+  GetCategoryList.getCategoryList h db :<|>
+  GetNewsList.getNewsList h db :<|>
+  GetNewsSearchList.getNewsSearchList h db
 
 serviceApi :: Proxy ApiTypes.RestAPI
 serviceApi = Proxy
@@ -79,33 +77,31 @@ serviceApi = Proxy
 run :: Handle -> IO ()
 run h = do
   Logger.logDebug (News.hLogHandle (hServerHandle h)) "run: Server is running"
-  let dbConfig = News.hDbConfig (hServerHandle h)   -- database parameters
-  let appConfig = News.hAppConfig (hServerHandle h) -- port for local host 8080
+  let dbConfig = News.hDbConfig (hServerHandle h)
+  let appConfig = News.hAppConfig (hServerHandle h)
   let appPort = News.appPort appConfig
   pool <- DbServices.initConnPool dbConfig
-  POOL.withResource pool (`DbServices.migrateDb` (hServerHandle h, "_migrations"))
+  POOL.withResource
+    pool
+    (`DbServices.migrateDb` (hServerHandle h, "_migrations"))
   Network.Wai.Handler.Warp.run appPort $ app (hServerHandle h) pool
 
 app :: News.Handle IO -> POOL.Pool SQL.Connection -> Application
 app h connPool =
   serveWithContext Server.serviceApi ctx $
-    Server.server h $ DbServices.createDb connPool
+  Server.server h $ DbServices.createDb connPool
   where
     ctx = BasicAuthCheck authCfg :. EmptyContext
     authCfg = myAuthCheck h connPool
 
--- myAuthCheck function is the one that actually check the username
+-- | myAuthCheck function is the one that actually check the username
 -- and password and return an value that indicate the status of authentication. Look in the 'app' function
--- to see how it is used. The value returned can be one of
--- Unauthorized
--- BadPassword
--- NoSuchUser
--- Authorized usr
+-- to see how it is used. The value returned can be one of: Unauthorized, BadPassword, NoSuchUser, Authorized usr
 myAuthCheck ::
-  News.Handle IO ->
-  POOL.Pool SQL.Connection ->
-  BasicAuthData ->
-  IO (BasicAuthResult DataTypes.User)
+     News.Handle IO
+  -> POOL.Pool SQL.Connection
+  -> BasicAuthData
+  -> IO (BasicAuthResult DataTypes.User)
 myAuthCheck h conns (BasicAuthData u p) = do
   isSuchUser <- withConnPool . flip suchUser $ u
   if isSuchUser == 0
@@ -139,12 +135,7 @@ userAuthorized conn login = do
       conn
       [sql| SELECT usr_name, usr_login, usr_admin, usr_author, usr_created FROM usr WHERE usr_login= ? |]
       (SQL.Only login)
-  return $ Prelude.map toUser res
-  where
-    toUser :: (T.Text, String, Bool, Bool, TIME.Day) -> DataTypes.User
-    toUser (user_name, user_login, user_admin, user_author, user_created) =
-      let user_password = Nothing
-       in DataTypes.User {..}
+  return $ Prelude.map Lib.toUser res
 
 -- | suchUser. If the query returned one value, then the user will find it, otherwise no.
 -- Because logins are not repeated in the database
@@ -163,12 +154,12 @@ suchUser conn login = do
 -- Good password it means that the entered password equals the password in the database.
 goodPassword :: SQL.Connection -> (ByteString, ByteString) -> IO Int
 goodPassword conn (login, password) = do
-  let hashedPassw = BSC8.pack $ Lib.hashed $ BSC8.unpack password
+  let hashedPassword = BSC8.pack $ Lib.hashed $ BSC8.unpack password
   res <-
     SQL.query
       conn
       [sql| SELECT COUNT (usr_login) FROM usr WHERE usr_login= ? AND usr_password= ? |]
-      (login, hashedPassw)
+      (login, hashedPassword)
   case res of
     [SQL.Only n] -> return n
     _ -> return 0

@@ -41,7 +41,6 @@ import qualified Logger
 import qualified News
 import Servant (Handler)
 import qualified System.Directory as SD
-import Types.DataTypes (EditNewsRequest(new_category_id))
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
 
@@ -70,9 +69,9 @@ editNews ::
 editNews conn (h, user, newsId, r) = do
   Logger.logInfo (News.hLogHandle h) $ T.pack "Request: Edit One News"
   allCheck <-
-    ceckIdIO conn h newsId >>= checkUserThisNewsAuthorIO conn h user >>=
+    checkIdIO conn h newsId >>= checkUserThisNewsAuthorIO conn h user >>=
     checkImageFilesExistIO h r >>=
-    ceckCategoryIdIO conn h >>=
+    checkCategoryIdIO conn h >>=
     checkPngImages h >>=
     checkBase64ImagesIO h
   case allCheck :: Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest of
@@ -80,9 +79,9 @@ editNews conn (h, user, newsId, r) = do
     Right _ ->
       catch
         (newTileIO conn h newsId r >>= newCatIdIO conn h newsId >>=
-         newtextIO conn h newsId >>=
-         newimagesIO conn h newsId >>=
-         newpublishIO conn h newsId >>=
+         newTextIO conn h newsId >>=
+         newImagesIO conn h newsId >>=
+         newPublishIO conn h newsId >>=
          getNewsCategoryIO conn h newsId >>=
          getNewsImagesIO conn h newsId >>=
          getNewsIO conn h user newsId)
@@ -103,9 +102,9 @@ newTileIO ::
   -> IdNews
   -> DataTypes.EditNewsRequest
   -> IO (Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest)
-newTileIO _ _ _ r@DataTypes.EditNewsRequest {new_title = Nothing} =
+newTileIO _ _ _ r@DataTypes.EditNewsRequest {newTitle = Nothing} =
   return $ Right r
-newTileIO conn h newsId r@DataTypes.EditNewsRequest {new_title = Just title} = do
+newTileIO conn h newsId r@DataTypes.EditNewsRequest {newTitle = Just title} = do
   res <-
     SQL.execute
       conn
@@ -121,7 +120,7 @@ newTileIO conn h newsId r@DataTypes.EditNewsRequest {new_title = Just title} = d
         T.pack $
         show $
         ErrorTypes.AddEditNewsSQLRequestError $
-        ErrorTypes.SQLRequestError "newTileIO: BAD! Dont UPDATE  news"
+        ErrorTypes.SQLRequestError "newTileIO: BAD! Don't UPDATE  news"
       return $
         Left $
         ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
@@ -133,9 +132,9 @@ newCatIdIO ::
   -> Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest
   -> IO (Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest)
 newCatIdIO _ _ _ (Left err) = return (Left err)
-newCatIdIO _ _ _ (Right r@DataTypes.EditNewsRequest {new_category_id = Nothing}) =
+newCatIdIO _ _ _ (Right r@DataTypes.EditNewsRequest {newCategoryId = Nothing}) =
   return $ Right r
-newCatIdIO conn h newsId (Right r@DataTypes.EditNewsRequest {new_category_id = Just catId}) = do
+newCatIdIO conn h newsId (Right r@DataTypes.EditNewsRequest {newCategoryId = Just catId}) = do
   res <-
     SQL.execute
       conn
@@ -151,21 +150,21 @@ newCatIdIO conn h newsId (Right r@DataTypes.EditNewsRequest {new_category_id = J
         T.pack $
         show $
         ErrorTypes.AddEditNewsSQLRequestError $
-        ErrorTypes.SQLRequestError "newCatIdIO: BAD! Dont UPDATE  news"
+        ErrorTypes.SQLRequestError "newCatIdIO: BAD! Don't UPDATE  news"
       return $
         Left $
         ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
 
-newtextIO ::
+newTextIO ::
      SQL.Connection
   -> News.Handle IO
   -> IdNews
   -> Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest
   -> IO (Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest)
-newtextIO _ _ _ (Left err) = return (Left err)
-newtextIO _ _ _ (Right r@DataTypes.EditNewsRequest {new_text = Nothing}) =
+newTextIO _ _ _ (Left err) = return (Left err)
+newTextIO _ _ _ (Right r@DataTypes.EditNewsRequest {newText = Nothing}) =
   return $ Right r
-newtextIO conn h newsId (Right r@DataTypes.EditNewsRequest {new_text = Just text}) = do
+newTextIO conn h newsId (Right r@DataTypes.EditNewsRequest {newText = Just text}) = do
   res <-
     SQL.execute
       conn
@@ -174,31 +173,31 @@ newtextIO conn h newsId (Right r@DataTypes.EditNewsRequest {new_text = Just text
   case read (show res) :: Int of
     1 -> do
       Logger.logDebug (News.hLogHandle h) $
-        T.concat [T.pack "newtextIO: OK! UPDATE news "]
+        T.concat [T.pack "newTextIO: OK! UPDATE news "]
       return $ Right r
     _ -> do
       Logger.logError (News.hLogHandle h) $
         T.pack $
         show $
         ErrorTypes.AddEditNewsSQLRequestError $
-        ErrorTypes.SQLRequestError "newtextIO: BAD! Dont UPDATE  news"
+        ErrorTypes.SQLRequestError "newTextIO: BAD! Don't UPDATE  news"
       return $
         Left $
         ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
 
-newimagesIO ::
+newImagesIO ::
      SQL.Connection
   -> News.Handle IO
   -> IdNews
   -> Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest
   -> IO (Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest)
-newimagesIO _ _ _ (Left err) = return (Left err)
-newimagesIO _ _ _ (Right r@DataTypes.EditNewsRequest {new_images = Nothing}) =
+newImagesIO _ _ _ (Left err) = return (Left err)
+newImagesIO _ _ _ (Right r@DataTypes.EditNewsRequest {newImages = Nothing}) =
   return $ Right r
-newimagesIO conn h newsId (Right r@DataTypes.EditNewsRequest {new_images = Just reqs}) = do
-  rez <- mapM (NewsIO.addImageNewsIO conn h) reqs
-  let rez' = map help rez -- list of new news images
-  if 0 `notElem` rez' -- so all drawings are added
+newImagesIO conn h newsId (Right r@DataTypes.EditNewsRequest {newImages = Just req}) = do
+  rez <- mapM (NewsIO.addImageNewsIO conn h) req
+  let rez' = map help rez
+  if 0 `notElem` rez'
     then do
       Logger.logDebug (News.hLogHandle h) $ T.pack "addImageNewsIO: OK!"
       res <-
@@ -209,14 +208,14 @@ newimagesIO conn h newsId (Right r@DataTypes.EditNewsRequest {new_images = Just 
       case read (show res) :: Int of
         1 -> do
           Logger.logDebug (News.hLogHandle h) $
-            T.concat [T.pack "newimagesIO: OK! UPDATE news "]
+            T.concat [T.pack "newImagesIO: OK! UPDATE news "]
           return $ Right r
         _ -> do
           Logger.logError (News.hLogHandle h) $
             T.pack $
             show $
             ErrorTypes.AddEditNewsSQLRequestError $
-            ErrorTypes.SQLRequestError "newimagesIO: BAD! Dont UPDATE  news"
+            ErrorTypes.SQLRequestError "newImagesIO: BAD! Don't UPDATE  news"
           return $
             Left $
             ErrorTypes.AddEditNewsSQLRequestError $
@@ -227,7 +226,7 @@ newimagesIO conn h newsId (Right r@DataTypes.EditNewsRequest {new_images = Just 
         show $
         ErrorTypes.AddEditNewsSQLRequestError $
         ErrorTypes.SQLRequestError
-          ("addImageNewsIO:BAD! Dont add all images. Only" ++ show (length rez))
+          ("addImageNewsIO:BAD! Don't add all images. Only" ++ show (length rez))
       return $
         Left $
         ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
@@ -236,16 +235,16 @@ newimagesIO conn h newsId (Right r@DataTypes.EditNewsRequest {new_images = Just 
     help (Left _) = 0
     help (Right val) = val
 
-newpublishIO ::
+newPublishIO ::
      SQL.Connection
   -> News.Handle IO
   -> IdNews
   -> Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest
   -> IO (Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest)
-newpublishIO _ _ _ (Left err) = return (Left err)
-newpublishIO _ _ _ (Right r@DataTypes.EditNewsRequest {new_published = Nothing}) =
+newPublishIO _ _ _ (Left err) = return (Left err)
+newPublishIO _ _ _ (Right r@DataTypes.EditNewsRequest {newPublished = Nothing}) =
   return $ Right r
-newpublishIO conn h newsId (Right r@DataTypes.EditNewsRequest {new_published = Just pub}) = do
+newPublishIO conn h newsId (Right r@DataTypes.EditNewsRequest {newPublished = Just pub}) = do
   res <-
     SQL.execute
       conn
@@ -254,14 +253,14 @@ newpublishIO conn h newsId (Right r@DataTypes.EditNewsRequest {new_published = J
   case read (show res) :: Int of
     1 -> do
       Logger.logDebug (News.hLogHandle h) $
-        T.concat [T.pack "newpublishIO: OK! UPDATE news "]
+        T.concat [T.pack "newPublishIO: OK! UPDATE news "]
       return $ Right r
     _ -> do
       Logger.logError (News.hLogHandle h) $
         T.pack $
         show $
         ErrorTypes.AddEditNewsSQLRequestError $
-        ErrorTypes.SQLRequestError "newpublishIO: BAD! Dont UPDATE  news"
+        ErrorTypes.SQLRequestError "newPublishIO: BAD! Don't UPDATE  news"
       return $
         Left $
         ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
@@ -379,7 +378,6 @@ getNewsImagesIO conn h idNews (Right cats) = do
       conn
       [sql| SELECT EXISTS (SELECT news_images_id FROM news WHERE  news_id = ? AND news_images_id IS NOT NULL) |]
       (SQL.Only idNews) :: IO [SQL.Only Bool]
-  --  if there are pictures -> true, else -> false
   case res of
     [val] ->
       if SQL.fromOnly val
@@ -388,15 +386,15 @@ getNewsImagesIO conn h idNews (Right cats) = do
                      conn
                      " SELECT news_images_id    FROM news WHERE  news_id = ? "
                      (SQL.Only idNews) :: IO [SQL.Only (SQLTypes.PGArray IdImage)]
-                 let ints = SQLTypes.fromPGArray $ SQL.fromOnly ids
-                 return (Right (cats, ints)))
+                 let idImages = SQLTypes.fromPGArray $ SQL.fromOnly ids
+                 return (Right (cats, idImages)))
         else return (Right (cats, []))
     _ -> do
       Logger.logError (News.hLogHandle h) $
         T.pack $
         show $
         ErrorTypes.AddEditNewsSQLRequestError $
-        ErrorTypes.SQLRequestError "ceckIdIO! Dont ceckId category"
+        ErrorTypes.SQLRequestError "checkIdIO! Don't checkId category"
       return $
         Left $
         ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
@@ -409,7 +407,7 @@ getNewsIO ::
   -> Either ErrorTypes.AddEditNewsError ([DataTypes.Category], [IdImage])
   -> IO (Either ErrorTypes.AddEditNewsError DataTypes.News)
 getNewsIO _ _ _ _ (Left err) = return $ Left err
-getNewsIO conn h user idNews (Right (categs, imagesIds)) = do
+getNewsIO conn h user idNews (Right (categories, imagesIds)) = do
   res <-
     SQL.query
       conn
@@ -419,7 +417,7 @@ getNewsIO conn h user idNews (Right (categs, imagesIds)) = do
       (SQL.Only idNews) :: IO [(T.Text, TIME.Day, T.Text, Bool)]
   case res of
     [val] -> do
-      let news = toNews val user categs imagesIds
+      let news = toNews val user categories imagesIds
       Logger.logDebug (News.hLogHandle h) $
         T.concat [T.pack "addNewsIO: OK!", ToText.toText news]
       return $ Right news
@@ -428,7 +426,7 @@ getNewsIO conn h user idNews (Right (categs, imagesIds)) = do
         T.pack $
         show $
         ErrorTypes.AddEditNewsSQLRequestError $
-        ErrorTypes.SQLRequestError "addNewsIO! Dont INSERT INTO  news table"
+        ErrorTypes.SQLRequestError "addNewsIO! Don't INSERT INTO  news table"
       return $
         Left $
         ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
@@ -441,13 +439,13 @@ getNewsIO conn h user idNews (Right (categs, imagesIds)) = do
       -> DataTypes.News
     toNews (news_title, news_created, news_text, news_published) DataTypes.User {..} cats imagesId =
       DataTypes.News
-        { news_title = news_title
-        , news_created = news_created
-        , news_author = user_name
-        , news_category = cats
-        , news_text = news_text
-        , news_images = imageUris imagesId
-        , news_published = news_published
+        { newsTitle = news_title
+        , newsCreated = news_created
+        , newsAuthor = userName
+        , newsCategory = cats
+        , newsText = news_text
+        , newsImages = imageUris imagesId
+        , newsPublished = news_published
         }
       where
         imageUris :: [IdImage] -> [DataTypes.URI]
@@ -456,13 +454,13 @@ getNewsIO conn h user idNews (Right (categs, imagesIds)) = do
           | otherwise = map (Lib.imageIdToURI h) xs
 
 ----- All checks ----
--- | ceckIdIO - check news Id  (  id = 7 in  http://localhost:8080/news/7 )
-ceckIdIO ::
+-- | checkIdIO - check news Id  (  id = 7 in  http://localhost:8080/news/7 )
+checkIdIO ::
      SQL.Connection
   -> News.Handle IO
   -> IdNews
   -> IO (Either ErrorTypes.AddEditNewsError IdNews)
-ceckIdIO conn h newsId = do
+checkIdIO conn h newsId = do
   res <-
     SQL.query
       conn
@@ -474,7 +472,7 @@ ceckIdIO conn h newsId = do
         T.pack $
         show $
         ErrorTypes.AddEditNewsSQLRequestError $
-        ErrorTypes.SQLRequestError "ceckIdIO! Dont ceckId category"
+        ErrorTypes.SQLRequestError "checkIdIO! Don't checkId category"
       return $
         Left $
         ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
@@ -482,14 +480,14 @@ ceckIdIO conn h newsId = do
       if SQL.fromOnly $ head res
         then (do Logger.logDebug (News.hLogHandle h) $
                    T.pack
-                     ("ceckIdIO: OK! News whith id " ++ show newsId ++ " exists")
+                     ("checkIdIO: OK! News with id " ++ show newsId ++ " exists")
                  return $ Right newsId)
         else (do Logger.logError (News.hLogHandle h) $
                    T.pack $
                    show $
                    ErrorTypes.InvalidNewsId $
                    ErrorTypes.InvalidId
-                     ("ceckIdIO: BAD! News whith id " ++
+                     ("checkIdIO: BAD! News with id " ++
                       show newsId ++ " not exists")
                  return $
                    Left $ ErrorTypes.InvalidNewsId $ ErrorTypes.InvalidId [])
@@ -510,7 +508,7 @@ checkUserThisNewsAuthorIO conn h DataTypes.User {..} (Right newsId) = do
       (SQL.Only newsId) :: IO [SQL.Only String]
   case res of
     [newsAuthorLogin] ->
-      if SQL.fromOnly newsAuthorLogin == user_login
+      if SQL.fromOnly newsAuthorLogin == userLogin
         then do
           Logger.logDebug (News.hLogHandle h) $
             T.pack "checkUserThisNewsAuthorIO: OK!"
@@ -541,10 +539,10 @@ checkImageFilesExistIO ::
   -> Either ErrorTypes.AddEditNewsError IdNews
   -> IO (Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest)
 checkImageFilesExistIO _ _ (Left err) = return $ Left err
-checkImageFilesExistIO _ r@DataTypes.EditNewsRequest {new_images = Nothing} (Right _) =
+checkImageFilesExistIO _ r@DataTypes.EditNewsRequest {newImages = Nothing} (Right _) =
   return $ Right r
-checkImageFilesExistIO h r@DataTypes.EditNewsRequest {new_images = Just reqs} (Right _) = do
-  rez <- mapM (SD.doesFileExist . DataTypes.image) reqs
+checkImageFilesExistIO h r@DataTypes.EditNewsRequest {newImages = Just req} (Right _) = do
+  rez <- mapM (SD.doesFileExist . DataTypes.image) req
   if and rez
     then do
       Logger.logDebug (News.hLogHandle h) $ T.pack "checkImageFilesExistIO: OK!"
@@ -555,25 +553,25 @@ checkImageFilesExistIO h r@DataTypes.EditNewsRequest {new_images = Just reqs} (R
         show $
         ErrorTypes.NotExistImageFileAddEditNews $
         ErrorTypes.InvalidContent
-          "checkcImageFileExistIO: BAD!  File: does not exist (No such file or directory) "
+          "checkImageFileExistIO: BAD!  File: does not exist (No such file or directory) "
       return . Left $
         ErrorTypes.NotExistImageFileAddEditNews $ ErrorTypes.InvalidContent []
 
--- | ceckCategoryIdIO  check if there is a record with a given category id in the database ( only for the case with an editable category)
-ceckCategoryIdIO ::
+-- | checkCategoryIdIO  check if there is a record with a given category id in the database ( only for the case with an editable category)
+checkCategoryIdIO ::
      SQL.Connection
   -> News.Handle IO
   -> Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest
   -> IO (Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest)
-ceckCategoryIdIO _ _ (Left err) = return $ Left err
-ceckCategoryIdIO _ _ (Right r@DataTypes.EditNewsRequest {new_category_id = Nothing}) =
+checkCategoryIdIO _ _ (Left err) = return $ Left err
+checkCategoryIdIO _ _ (Right r@DataTypes.EditNewsRequest {newCategoryId = Nothing}) =
   return $ Right r
-ceckCategoryIdIO conn h (Right r@DataTypes.EditNewsRequest {new_category_id = Just categoryId}) = do
+checkCategoryIdIO conn h (Right r@DataTypes.EditNewsRequest {newCategoryId = Just categoryId}) = do
   res <-
     SQL.query
       conn
       [sql| SELECT category_path  FROM category WHERE category_id = ?|]
-      (SQL.Only categoryId) :: IO [SQL.Only String] --(SQL.toRow id)
+      (SQL.Only categoryId) :: IO [SQL.Only String]
   case res of
     [_] -> return $ Right r
     _ -> do
@@ -582,7 +580,7 @@ ceckCategoryIdIO conn h (Right r@DataTypes.EditNewsRequest {new_category_id = Ju
         show $
         ErrorTypes.InvalidCategoryIdAddEditNews $
         ErrorTypes.InvalidContent
-          ("ceckCategoryIdIO: BAD! Category whith id " ++
+          ("checkCategoryIdIO: BAD! Category with id " ++
            show categoryId ++ " not exists")
       return $
         Left $
@@ -593,10 +591,10 @@ checkPngImages ::
   -> Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest
   -> IO (Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest)
 checkPngImages _ (Left err) = return $ Left err
-checkPngImages _ (Right r@DataTypes.EditNewsRequest {new_images = Nothing}) =
+checkPngImages _ (Right r@DataTypes.EditNewsRequest {newImages = Nothing}) =
   return $ Right r
-checkPngImages h (Right r@DataTypes.EditNewsRequest {new_images = Just reqs}) =
-  if length (filter (\x -> DataTypes.format x == "png") reqs) == length reqs
+checkPngImages h (Right r@DataTypes.EditNewsRequest {newImages = Just req}) =
+  if length (filter (\x -> DataTypes.format x == "png") req) == length req
     then do
       Logger.logDebug (News.hLogHandle h) $ T.pack "checkPngImages: OK!"
       return $ Right r
@@ -614,11 +612,11 @@ checkBase64ImagesIO ::
   -> Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest
   -> IO (Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest)
 checkBase64ImagesIO _ (Left err) = return $ Left err
-checkBase64ImagesIO _ (Right r@DataTypes.EditNewsRequest {new_images = Nothing}) =
+checkBase64ImagesIO _ (Right r@DataTypes.EditNewsRequest {newImages = Nothing}) =
   return $ Right r
-checkBase64ImagesIO h (Right r@DataTypes.EditNewsRequest {new_images = Just reqs}) = do
-  imageFiles <- mapM (B.readFile . DataTypes.image) reqs
-  if length (filter Base64.isBase64 imageFiles) == length reqs
+checkBase64ImagesIO h (Right r@DataTypes.EditNewsRequest {newImages = Just req}) = do
+  imageFiles <- mapM (B.readFile . DataTypes.image) req
+  if length (filter Base64.isBase64 imageFiles) == length req
     then do
       Logger.logDebug (News.hLogHandle h) $ T.pack "checkBase64Image: OK!"
       return (Right r)

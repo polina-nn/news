@@ -14,10 +14,9 @@
 {-# OPTIONS_GHC -Wno-missing-methods #-}
 
 module EndPoints.Lib.News.NewsIO
-  ( addImageNewsIO, -- use in EndPoints.AddOneNews, EndPoints.EditOneNews
-    toNews, --use in EndPoints.GetNewsList,  EndPoints.GetAuthorsNewsList
-  )
-where
+  ( addImageNewsIO -- use in EndPoints.AddOneNews, EndPoints.EditOneNews
+  , toNews --use in EndPoints.GetNewsList,  EndPoints.GetAuthorsNewsList
+  ) where
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base64 as Base64
@@ -38,10 +37,10 @@ type CategoryPath = String
 
 -- | addImageNewsIO adding one pictures to the table of pictures when working with news
 addImageNewsIO ::
-  SQL.Connection ->
-  News.Handle IO ->
-  DataTypes.CreateImageRequest ->
-  IO (Either ErrorTypes.AddEditNewsError IdImage)
+     SQL.Connection
+  -> News.Handle IO
+  -> DataTypes.CreateImageRequest
+  -> IO (Either ErrorTypes.AddEditNewsError IdImage)
 addImageNewsIO conn h DataTypes.CreateImageRequest {..} = do
   content <- B.readFile image
   let imageDecodeBase64ByteString = Base64.decodeBase64Lenient content
@@ -63,42 +62,42 @@ addImageNewsIO conn h DataTypes.CreateImageRequest {..} = do
         _ -> do
           Logger.logError (News.hLogHandle h) $
             T.pack $
-              show $
-                ErrorTypes.AddEditNewsSQLRequestError $
-                  ErrorTypes.SQLRequestError "addImageNewsIO: BAD!"
+            show $
+            ErrorTypes.AddEditNewsSQLRequestError $
+            ErrorTypes.SQLRequestError "addImageNewsIO: BAD!"
           return $
             Left $
-              ErrorTypes.AddEditNewsSQLRequestError $
-                ErrorTypes.SQLRequestError []
+            ErrorTypes.AddEditNewsSQLRequestError $
+            ErrorTypes.SQLRequestError []
     _ -> do
       Logger.logError (News.hLogHandle h) $
         T.pack $
-          show $
-            ErrorTypes.AddEditNewsSQLRequestError $
-              ErrorTypes.SQLRequestError "addImageNewsIO: BAD!"
+        show $
+        ErrorTypes.AddEditNewsSQLRequestError $
+        ErrorTypes.SQLRequestError "addImageNewsIO: BAD!"
       return $
         Left $
-          ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
+        ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
 
 toNews ::
-  SQL.Connection ->
-  News.Handle IO ->
-  NewsHelpTypes.DbNews ->
-  IO (Either ErrorTypes.GetNewsError DataTypes.News)
+     SQL.Connection
+  -> News.Handle IO
+  -> NewsHelpTypes.DbNews
+  -> IO (Either ErrorTypes.GetNewsError DataTypes.News)
 toNews con h NewsHelpTypes.DbNews {..} = do
-  categs <- getCategoriesIO con h db_news_category_path
-  case categs of
+  categories <- getCategoriesIO con h dbNewsCategoryPath
+  case categories of
     Left err -> return $ Left err
     Right cats -> do
       let news =
             DataTypes.News
-              { news_title = db_news_title,
-                news_created = db_news_created,
-                news_author = db_news_author,
-                news_category = cats,
-                news_text = db_news_text,
-                news_images = imageUris db_news_images_id,
-                news_published = db_news_published
+              { newsTitle = dbNewsTitle
+              , newsCreated = dbNewsCreated
+              , newsAuthor = dbNewsAuthor
+              , newsCategory = cats
+              , newsText = dbNewsText
+              , newsImages = imageUris dbNewsImagesId
+              , newsPublished = dbNewsPublished
               }
       return $ Right news
   where
@@ -107,10 +106,10 @@ toNews con h NewsHelpTypes.DbNews {..} = do
     imageUris xs = map (Lib.imageIdToURI h) xs
 
 getCategoriesIO ::
-  SQL.Connection ->
-  News.Handle IO ->
-  CategoryPath ->
-  IO (Either ErrorTypes.GetNewsError [DataTypes.Category])
+     SQL.Connection
+  -> News.Handle IO
+  -> CategoryPath
+  -> IO (Either ErrorTypes.GetNewsError [DataTypes.Category])
 getCategoriesIO con h''' path = do
   res <-
     SQL.query
@@ -121,9 +120,9 @@ getCategoriesIO con h''' path = do
     [] -> do
       Logger.logError (News.hLogHandle h''') $
         T.pack $
-          show $
-            ErrorTypes.GetNewsSQLRequestError $
-              ErrorTypes.SQLRequestError "getNewsCategoryIO: getCategoriesIO : BAD "
+        show $
+        ErrorTypes.GetNewsSQLRequestError $
+        ErrorTypes.SQLRequestError "getNewsCategoryIO: getCategoriesIO : BAD "
       return $
         Left $ ErrorTypes.GetNewsSQLRequestError $ ErrorTypes.SQLRequestError []
     _ -> do

@@ -14,18 +14,17 @@
 {-# OPTIONS_GHC -Wno-missing-methods #-}
 
 module EndPoints.EditOneCategory
-  ( editOneCategory,
-    editCategory,
-  )
-where
+  ( editOneCategory
+  , editCategory
+  ) where
 
 import Control.Exception.Base
-  ( Exception (displayException),
-    SomeException (SomeException),
-    catch,
-    throwIO,
+  ( Exception(displayException)
+  , SomeException(SomeException)
+  , catch
+  , throwIO
   )
-import Control.Monad.IO.Class (MonadIO (liftIO))
+import Control.Monad.IO.Class (MonadIO(liftIO))
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
@@ -42,57 +41,52 @@ import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
 
 editOneCategory ::
-  News.Handle IO ->
-  DataTypes.Db ->
-  DataTypes.User ->
-  Int ->
-  DataTypes.EditCategoryRequest ->
-  Handler DataTypes.Category
+     News.Handle IO
+  -> DataTypes.Db
+  -> DataTypes.User
+  -> Int
+  -> DataTypes.EditCategoryRequest
+  -> Handler DataTypes.Category
 editOneCategory h DataTypes.Db {..} user catId r =
   (>>=)
     (liftIO $ _editCategory (h, user, catId, r))
     ToHttpResponse.toHttpResponse
 
 editCategory ::
-  SQL.Connection ->
-  (News.Handle IO, DataTypes.User, Int, DataTypes.EditCategoryRequest) ->
-  IO (Either ErrorTypes.AddEditCategoryError DataTypes.Category)
+     SQL.Connection
+  -> (News.Handle IO, DataTypes.User, Int, DataTypes.EditCategoryRequest)
+  -> IO (Either ErrorTypes.AddEditCategoryError DataTypes.Category)
 editCategory conn (h, user, catId, r) = do
   allCheck <-
-    Lib.checkUserAdmin h user >>= ceckIdIO conn h catId r >>= checkSyntaxPath h
-      >>= CategoryIO.getAllCategoriesIO conn h
-      >>= Category.checkLogicPathForEditCateg h catId r
-  case allCheck ::
-         Either
-           ErrorTypes.AddEditCategoryError
-           ( CategoryHelpTypes.EditCategoryFullRequest,
-             [DataTypes.Category]
-           ) of
+    Lib.checkUserAdmin h user >>= checkIdIO conn h catId r >>= checkSyntaxPath h >>=
+    CategoryIO.getAllCategoriesIO conn h >>=
+    Category.checkLogicPathForEditCategory h catId r
+  case allCheck :: Either ErrorTypes.AddEditCategoryError ( CategoryHelpTypes.EditCategoryFullRequest
+                                                          , [DataTypes.Category]) of
     Left err -> return $ Left err
-    Right (editCategFullReq, categs) -> do
+    Right (editCategoryFullReq, categories) -> do
       Logger.logDebug (News.hLogHandle h) $
         T.concat
-          [ T.pack "editCategory:allCheck: OK!  \n",
-            ToText.toText editCategFullReq
+          [ T.pack "editCategory:allCheck: OK!  \n"
+          , ToText.toText editCategoryFullReq
           ]
       Logger.logDebug (News.hLogHandle h) $
-        T.concat (Prelude.map ToText.toText categs)
-      case Category.changePathsForEditCateg editCategFullReq categs :: Maybe [CategoryHelpTypes.EditCategory] of
+        T.concat (Prelude.map ToText.toText categories)
+      case Category.changePathsForEditCategory editCategoryFullReq categories :: Maybe [CategoryHelpTypes.EditCategory] of
         Nothing -> do
           Logger.logError (News.hLogHandle h) $
             T.pack $
-              show $
-                ErrorTypes.InvalidValuePath $
-                  ErrorTypes.InvalidContent
-                    "check Developer Error, then update categorys table"
+            show $
+            ErrorTypes.InvalidValuePath $
+            ErrorTypes.InvalidContent
+              "check Developer Error, then update categories table"
           return $
             Left $ ErrorTypes.InvalidValuePath $ ErrorTypes.InvalidContent []
-        Just tochangePaths -> do
+        Just toChangePaths -> do
           rez <-
             catch
-              ( CategoryIO.changePathCategoriesIO conn h tochangePaths
-                  >>= editCategoryNameIO conn h editCategFullReq
-              )
+              (CategoryIO.changePathCategoriesIO conn h toChangePaths >>=
+               editCategoryNameIO conn h editCategoryFullReq)
               handleError
           case rez of
             (Right newCategory) -> do
@@ -107,8 +101,8 @@ editCategory conn (h, user, catId, r) = do
               return rez
   where
     handleError ::
-      SomeException ->
-      IO (Either ErrorTypes.AddEditCategoryError DataTypes.Category)
+         SomeException
+      -> IO (Either ErrorTypes.AddEditCategoryError DataTypes.Category)
     handleError (SomeException e) = do
       let errMsg = displayException e
       Logger.logError
@@ -116,109 +110,87 @@ editCategory conn (h, user, catId, r) = do
         (T.pack ("editCategory:handleError:" ++ show errMsg))
       throwIO e
 
--- | ceckIdIO  - check if there is a record with the given category id in the database ( id = 7 в базе http://localhost:8080/category/7 )
-ceckIdIO ::
-  SQL.Connection ->
-  News.Handle IO ->
-  Int ->
-  DataTypes.EditCategoryRequest ->
-  Either ErrorTypes.InvalidAdminPermission DataTypes.User ->
-  IO (Either ErrorTypes.AddEditCategoryError DataTypes.EditCategoryRequest)
-ceckIdIO _ _ _ _ (Left err) =
+-- | checkIdIO  - check if there is a record with the given category id in the database ( id = 7 in http://localhost:8080/category/7 )
+checkIdIO ::
+     SQL.Connection
+  -> News.Handle IO
+  -> Int
+  -> DataTypes.EditCategoryRequest
+  -> Either ErrorTypes.InvalidAdminPermission DataTypes.User
+  -> IO (Either ErrorTypes.AddEditCategoryError DataTypes.EditCategoryRequest)
+checkIdIO _ _ _ _ (Left err) =
   return $ Left $ ErrorTypes.InvalidPermissionAddEditCategory err
-ceckIdIO conn h catId r (Right _) = do
+checkIdIO conn h catId r (Right _) = do
   res <-
     SQL.query
       conn
       [sql| SELECT EXISTS (SELECT category_id  FROM category WHERE category_id = ?) |]
-      (SQL.Only catId) ::
-      IO [SQL.Only Bool]
+      (SQL.Only catId) :: IO [SQL.Only Bool]
   case res of
     [] -> do
       Logger.logError (News.hLogHandle h) $
         T.pack $
-          show $
-            ErrorTypes.AddEditCategorySQLRequestError $
-              ErrorTypes.SQLRequestError "ceckIdIO! Dont ceckId category"
+        show $
+        ErrorTypes.AddEditCategorySQLRequestError $
+        ErrorTypes.SQLRequestError "checkIdIO! Don't checkId category"
       return $
         Left $
-          ErrorTypes.AddEditCategorySQLRequestError $
-            ErrorTypes.SQLRequestError []
+        ErrorTypes.AddEditCategorySQLRequestError $
+        ErrorTypes.SQLRequestError []
     _ ->
       if SQL.fromOnly $ head res
-        then
-          ( do
-              Logger.logDebug (News.hLogHandle h) $
-                T.pack
-                  ( "ceckId: OK! Category whith id "
-                      ++ show catId
-                      ++ " exists"
-                  )
-              return $ Right r
-          )
-        else
-          ( do
-              Logger.logError (News.hLogHandle h) $
-                T.pack $
-                  show $
-                    ErrorTypes.InvalidCategoryId $
-                      ErrorTypes.InvalidId
-                        ( "ceckId: BAD! Category whith id "
-                            ++ show catId
-                            ++ " not exists"
-                        )
-              return $
-                Left $ ErrorTypes.InvalidCategoryId $ ErrorTypes.InvalidId []
-          )
+        then (do Logger.logDebug (News.hLogHandle h) $
+                   T.pack
+                     ("checkId: OK! Category with id " ++
+                      show catId ++ " exists")
+                 return $ Right r)
+        else (do Logger.logError (News.hLogHandle h) $
+                   T.pack $
+                   show $
+                   ErrorTypes.InvalidCategoryId $
+                   ErrorTypes.InvalidId
+                     ("checkId: BAD! Category with id " ++
+                      show catId ++ " not exists")
+                 return $
+                   Left $ ErrorTypes.InvalidCategoryId $ ErrorTypes.InvalidId [])
 
 checkSyntaxPath ::
-  News.Handle IO ->
-  Either ErrorTypes.AddEditCategoryError DataTypes.EditCategoryRequest ->
-  IO (Either ErrorTypes.AddEditCategoryError DataTypes.EditCategoryRequest)
+     News.Handle IO
+  -> Either ErrorTypes.AddEditCategoryError DataTypes.EditCategoryRequest
+  -> IO (Either ErrorTypes.AddEditCategoryError DataTypes.EditCategoryRequest)
 checkSyntaxPath _ (Left er) = return $ Left er
-checkSyntaxPath
-  _
-  r@( Right
-        DataTypes.EditCategoryRequest
-          { DataTypes.new_path = Nothing,
-            DataTypes.new_category = _
-          }
-      ) = return r
-checkSyntaxPath
-  h
-  r@( Right
-        DataTypes.EditCategoryRequest
-          { DataTypes.new_path = Just path,
-            DataTypes.new_category = _
-          }
-      ) =
-    if Category.validSyntaxPath path
-      then return r
-      else do
-        Logger.logError (News.hLogHandle h) $
-          T.pack $
-            show $
-              ErrorTypes.InvalidSyntaxPath $
-                ErrorTypes.InvalidContent
-                  ( "checkSyntaxPath: BAD! Path is not valid! Only digits(not zero begin) and points must have! "
-                      ++ path
-                  )
-        return $
-          Left $ ErrorTypes.InvalidSyntaxPath $ ErrorTypes.InvalidContent []
+checkSyntaxPath _ r@(Right DataTypes.EditCategoryRequest { DataTypes.newPath = Nothing
+                                                         , DataTypes.newCategory = _
+                                                         }) = return r
+checkSyntaxPath h r@(Right DataTypes.EditCategoryRequest { DataTypes.newPath = Just path
+                                                         , DataTypes.newCategory = _
+                                                         }) =
+  if Category.validSyntaxPath path
+    then return r
+    else do
+      Logger.logError (News.hLogHandle h) $
+        T.pack $
+        show $
+        ErrorTypes.InvalidSyntaxPath $
+        ErrorTypes.InvalidContent
+          ("checkSyntaxPath: BAD! Path is not valid! Only digits(not zero begin) and points must have! " ++
+           path)
+      return $
+        Left $ ErrorTypes.InvalidSyntaxPath $ ErrorTypes.InvalidContent []
 
 editCategoryNameIO ::
-  SQL.Connection ->
-  News.Handle IO ->
-  CategoryHelpTypes.EditCategoryFullRequest ->
-  Either ErrorTypes.AddEditCategoryError Int ->
-  IO (Either ErrorTypes.AddEditCategoryError DataTypes.Category)
+     SQL.Connection
+  -> News.Handle IO
+  -> CategoryHelpTypes.EditCategoryFullRequest
+  -> Either ErrorTypes.AddEditCategoryError Int
+  -> IO (Either ErrorTypes.AddEditCategoryError DataTypes.Category)
 editCategoryNameIO _ _ _ (Left er) = return $ Left er
 editCategoryNameIO conn h CategoryHelpTypes.EditCategoryFullRequest {..} (Right _) = do
   res <-
     SQL.execute
       conn
       [sql| UPDATE category SET category_name = ? WHERE category_id = ? ;|]
-      (new_category', id')
+      (newCategory', id')
   case read (show res) :: Int of
     1 -> do
       rez_new_path <-
@@ -228,20 +200,20 @@ editCategoryNameIO conn h CategoryHelpTypes.EditCategoryFullRequest {..} (Right 
           (SQL.Only id')
       let rez_new_path' = SQL.fromOnly . head $ rez_new_path :: String
       let editedCategory =
-            Category.toCategories (rez_new_path', id', new_category')
+            Category.toCategories (rez_new_path', id', newCategory')
       Logger.logInfo (News.hLogHandle h) $
         T.concat
-          [ T.pack "editCategoryIO: OK! UPDATE  category: ",
-            ToText.toText editedCategory
+          [ T.pack "editCategoryIO: OK! UPDATE  category: "
+          , ToText.toText editedCategory
           ]
       return $ Right editedCategory
     _ -> do
       Logger.logError (News.hLogHandle h) $
         T.pack $
-          show $
-            ErrorTypes.AddEditCategorySQLRequestError $
-              ErrorTypes.SQLRequestError "editCategoryIO: BAD! Dont UPDATE  category"
+        show $
+        ErrorTypes.AddEditCategorySQLRequestError $
+        ErrorTypes.SQLRequestError "editCategoryIO: BAD! Don't UPDATE  category"
       return $
         Left $
-          ErrorTypes.AddEditCategorySQLRequestError $
-            ErrorTypes.SQLRequestError []
+        ErrorTypes.AddEditCategorySQLRequestError $
+        ErrorTypes.SQLRequestError []

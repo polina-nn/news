@@ -7,7 +7,7 @@ curl -v  "http://localhost:8080/image/1"
 ## Method 
 GET
 
-## Аuthentication required 
+## authentication required 
 No
 
 ## Permissions required 

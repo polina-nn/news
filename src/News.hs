@@ -17,8 +17,8 @@ type AppConfigLimit = Int
 
 data AppConfig =
   AppConfig
-    { appPort :: Int -- порт запуска
-    , appShowLimit :: AppConfigLimit -- лимит кол-ва записей в ответе  сервера
+    { appPort :: Int
+    , appShowLimit :: AppConfigLimit
     }
   deriving (Show, Eq)
 
@@ -35,8 +35,7 @@ data DbConfig =
     }
   deriving (Show, Eq)
 
--- при запросе картинки возвращаю URI:
--- | URI scheme to use
+-- | URI scheme to use (when requesting an image, I return the URI)
 data Scheme
     -- | http://
   = Http

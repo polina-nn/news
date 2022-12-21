@@ -71,7 +71,7 @@ stack build
 stack exec news-exe
 ```
 ## For test
-* for test use. I tested only logic function for working whith categories and offset&limit.
+* for test use. I tested only logic function for working with categories and offset&limit.
 ```haskell
 stack test
 ```
@@ -104,8 +104,8 @@ Schema is at [DatabaseSchema](_docs/DatabaseSchema.md)
 
 # Project structure 
 ------
-I explain only content of some folders and files. In other plaсes content is standard.
-Folders whith prefixed are used for documentation and running/testing server (examples requests or content and do not contain haskell code). 
+I explain only content of some folders and files. In other places content is standard.
+Folders with prefixed are used for documentation and running/testing server (examples requests or content and do not contain haskell code). 
 
 ```
 news/
@@ -134,15 +134,15 @@ news/
 │ │   │  ├── Lib.hs # Some function for many End Points
 │ │   │  ├── OffsetLimit.hs     # Offset limit for End Points 
 │ │   │  ├── ToHttpResponse.hs # class ToHttpResponse for throwError by servant
-│ │   │  └── ToText.hs # class ToText.hs for present in Loging results of requests
-│ │   ├── AddOneCategory.hs #  Create one category (Аuthentication admin required)
-│ │   ├── AddOneImage.hs #  Create a path to one loaded image (Аuthentication author required)
-│ │   ├── AddOneNews.hs #  Create one news  (Аuthentication author required)
-│ │   ├── AddOneUser.hs # Create one user (Аuthentication admin required)
+│ │   │  └── ToText.hs # class ToText.hs for present in logging results of requests
+│ │   ├── AddOneCategory.hs #  Create one category (authentication admin required)
+│ │   ├── AddOneImage.hs #  Create a path to one loaded image (authentication author required)
+│ │   ├── AddOneNews.hs #  Create one news  (authentication author required)
+│ │   ├── AddOneUser.hs # Create one user (authentication admin required)
 │ │   ├── EditOneCategory.hs #  Edit one category
 │ │   ├── EditOneNews.hs #  Edit one news
-│ │   ├── GetAuthorsNewsList.hs # Get news list after filers and sorts (Аuthentication author required)
-│ │   ├── GetAuthorsNewsSearchList.hs # Get news list after search (Аuthentication author required)
+│ │   ├── GetAuthorsNewsList.hs # Get news list after filers and sorts (authentication author required)
+│ │   ├── GetAuthorsNewsSearchList.hs # Get news list after search (authentication author required)
 │ │   ├── GetCategoryList.hs # Get a list of categories
 │ │   ├── GetNewsList.hs # Get news list after filers and sorts
 │ │   ├── GetNewsSearchList.hs # Get news list after search  
@@ -157,7 +157,7 @@ news/
 │ │   ├── DataTypes.hs  # all types except api, config, error
 │ │   └── ErrorTypes.hs # Error for endpoints
 │ │
-│ ├── Congig.hs  # Configuration reader and default config value
+│ ├── Config.hs  # Configuration reader and default config value
 │ ├── DbServices.hs # Connection pool to DB used in module Server
 │ ├── Logger.hs # The logger interface module. Not define an implementation
 │ ├── News.hs # Handle for config and logger
@@ -174,7 +174,7 @@ Simple hello from server. Example:
 ```
 curl -v http://localhost:8080/  
 ```
-## GET methods for representation of a resource. Can use a brouser for it.
+## GET methods for representation of a resource. Can use a browser for it.
 For some get methods (return list) can use [Offset&Limit](_docs/OffsetLimit.md) 
 
 * [Get category list](_docs/GetCategoryList.md) 
@@ -224,7 +224,7 @@ I define general list of errors, and errors list for each endpoint or group of e
 ------
 * By default, data sorting by news creation time (newest news first) by the Postgress.
 Then it sorted accord by haskell code (if sortBy parameter exists in request). This is due to incorrect sorting of Cyrillic by the Postgress. I was unable to set up the correct alphabetical sorting of the data.
-* Нandling exceptions connecting to a non-existent database and work whith log file
+* Нandling exceptions connecting to a non-existent database and work with log file
 ```
 "Exception: libpq: failed (connection to server at "localhost" (::1), port 5432 failed: FATAL:  database "news2" does not exist"
 "Exception: logs: openFile: resource busy (file is locked)"

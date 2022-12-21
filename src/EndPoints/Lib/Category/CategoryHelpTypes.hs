@@ -15,31 +15,31 @@ data EditCategory =
   EditCategory
     -- | _id - never change
     { _id :: DataTypes.Id
-    -- | new_path - change path when moving categories (when edit or add category)
-    , new_path :: DataTypes.Path
+    -- | newPath - change path when moving categories (when edit or add category)
+    , newPath :: DataTypes.Path
     }
   deriving (Show, Eq)
 
--- | EditCategoryFullReques - full request,
--- based on edit request. Created by toFullReqiest function after checking edit requst and table category in Data Base.
+-- | EditCategoryFullRequest - full request,
+-- based on edit request. Created by toFullRequest function after checking edit request and table category in Data Base.
 data EditCategoryFullRequest =
   EditCategoryFullRequest
     -- | id' - never change  take from put request  (e.g http://localhost:8080/category/41  id' = 41 )
     { id' :: DataTypes.Id
     -- | cur_path' - path of category with id'
-    , cur_path' :: DataTypes.Path
+    , curPath' :: DataTypes.Path
     -- | cur_category' - name of category with id'
-    , cur_category' :: DataTypes.Name
+    , curCategory' :: DataTypes.Name
     -- | cur_level' - level of category with id'
-    , cur_level' :: Level
+    , curLevel' :: Level
     -- | new_path' - expected new path for category with id' (take from request, if path not changed new_path' == cur_path' )
-    , new_path' :: DataTypes.Path
+    , newPath' :: DataTypes.Path
     -- | new_category' - expected new name for category with id' (take from request, if name not changed new_category' == cur_category' )
-    , new_category' :: DataTypes.Name
+    , newCategory' :: DataTypes.Name
     -- | cur_level' - level of category new_path'
-    , new_level' :: Level
+    , newLevel' :: Level
     -- | new_path_stay_after_id' - allow to add a new puff in the right place
-    , new_path_stay_after_id' :: DataTypes.Id
+    , newPathStayAfterId' :: DataTypes.Id
     }
   deriving (Show, Eq)
 

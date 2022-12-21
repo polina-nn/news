@@ -34,14 +34,14 @@ Query parameter sort_by:
 | author | authors name alphabetical sorting |
 | category | category name  alphabetical sorting |
 | data |  sorting by news creation time (newest news first)  |
-| foto |  the number of photos in the news|
+| photo |  the number of photos in the news|
 | category_id	|  category by id |
 
 
 ## Method 
 GET
 
-## Аuthentication required 
+## authentication required 
 YES - http://polina:polina@localhost:8080/login/news
 NO - http://localhost:8080/news
 
@@ -53,18 +53,18 @@ NO
 
 You receive JSON-serialized response with list of news object as a result.
 
-News object in respons: 
+News object in response: 
 
-News object in respons: 
+News object in response: 
 | Field         | Type 	   | Description       |
 | ------------- | ---------|-------------------|
-| news_title  | string | news title|
-| news_created | string | creation date in the format "2022-03-15" |
-| news_author | string | author name |
-| news_category | array Category | categories array  to root category |
-| news_text	| string | news text |
-| news_images	| array URI | images URI |
-| news_published	| bool | news published or not |
+| newsTitle  | string | news title|
+| newsCreated | string | creation date in the format "2022-03-15" |
+| newsAuthor | string | author name |
+| newsCategory | array Category | categories array  to root category |
+| newsText	| string | news text |
+| newsImages	| array URI | images URI |
+| newsPublished	| bool | news published or not |
 
 Category object see at [_docs/AddOneCategory.md](_docs/AddOneCategory.md)   
 URI object see at [_docs/AddOneImage.md](_docs/AddOneImage.md) 

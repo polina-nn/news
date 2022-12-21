@@ -39,8 +39,8 @@ oneImage ::
   -> IO (Either ErrorTypes.GetImageError B.ByteString)
 oneImage conn (h, id') = do
   Logger.logDebug (News.hLogHandle h) $ T.pack "Request: Get One Image"
-  resCeckId <- ceckId conn (h, id')
-  case resCeckId of
+  resCheckId <- checkId conn (h, id')
+  case resCheckId of
     Right _ -> do
       res <-
         SQL.query
@@ -54,11 +54,11 @@ oneImage conn (h, id') = do
       return $ Right $ read rez --  Base64.decodeBase64Lenient rez
     Left err -> return $ Left err
 
-ceckId ::
+checkId ::
      SQL.Connection
   -> (News.Handle IO, Integer)
   -> IO (Either ErrorTypes.GetImageError Integer)
-ceckId conn (h', id') = do
+checkId conn (h', id') = do
   res <-
     SQL.query
       conn
@@ -67,7 +67,7 @@ ceckId conn (h', id') = do
   if SQL.fromOnly $ head res
     then do
       Logger.logDebug (News.hLogHandle h') $
-        T.pack ("ceckId: OK! Image whith id " ++ show id' ++ " exists")
+        T.pack ("checkId: OK! Image with id " ++ show id' ++ " exists")
       return $ Right id'
     else do
       Logger.logError (News.hLogHandle h') $
@@ -75,5 +75,5 @@ ceckId conn (h', id') = do
         show $
         ErrorTypes.InvalidImagedId $
         ErrorTypes.InvalidId
-          ("ceckId: OK! Image whith id " ++ show id' ++ "not exists")
+          ("checkId: OK! Image with id " ++ show id' ++ "not exists")
       return $ Left $ ErrorTypes.InvalidImagedId $ ErrorTypes.InvalidId []

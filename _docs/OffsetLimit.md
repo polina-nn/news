@@ -11,7 +11,7 @@ curl -v "http://localhost:8080/users"
 curl -v "http://localhost:8080/users?limit=10"
 curl -v "http://localhost:8080/users?offset=2&limit=3"
 ```
-Attention please! Offset doesn`t work after limit.
+Attention please! Offset does not work after limit.
 ```
 ... /users?limit=3&offset=4  == ... /users?limit=3 
 ```
