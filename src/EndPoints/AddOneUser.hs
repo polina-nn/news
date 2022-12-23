@@ -7,7 +7,6 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wno-missing-methods #-}
 
 module EndPoints.AddOneUser
   ( addOneUser

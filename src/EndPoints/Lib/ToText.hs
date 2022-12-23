@@ -6,7 +6,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# OPTIONS_GHC -Wno-missing-methods #-}
 
 module EndPoints.Lib.ToText
   ( toText

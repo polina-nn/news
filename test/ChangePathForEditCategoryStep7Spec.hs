@@ -6,7 +6,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wno-missing-methods #-}
 
 module ChangePathForEditCategoryStep7Spec
   ( spec

@@ -6,7 +6,6 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wno-missing-methods #-}
 
 module EndPoints.Lib.News.News
   ( checkUserOffsetLimitFilter -- use in EndPoints.GetAuthorsNewsList

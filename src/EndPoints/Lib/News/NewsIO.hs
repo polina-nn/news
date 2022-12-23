@@ -11,7 +11,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators #-}
-{-# OPTIONS_GHC -Wno-missing-methods #-}
 
 module EndPoints.Lib.News.NewsIO
   ( addImageNewsIO -- use in EndPoints.AddOneNews, EndPoints.EditOneNews

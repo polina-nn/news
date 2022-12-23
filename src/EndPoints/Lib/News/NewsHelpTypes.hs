@@ -3,7 +3,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wno-missing-methods #-}
 
 -- | EndPoints.Lib.News.NewsHelpTypes help types for working with news
 module EndPoints.Lib.News.NewsHelpTypes where
