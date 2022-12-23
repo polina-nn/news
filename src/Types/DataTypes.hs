@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -124,11 +125,7 @@ data User =
     , userAdmin :: Bool
     , userAuthor :: Bool
     }
-  deriving (Show, Generic, Eq)
-
-instance A.ToJSON User
-
-instance A.FromJSON User
+  deriving (Show, Generic, Eq, A.ToJSON, A.FromJSON)
 
 ---------IMAGE-------------
 -- | CreateImage
@@ -138,11 +135,7 @@ data CreateImageRequest =
     , format :: String
     , image :: FilePath
     }
-  deriving (Show, Generic, Eq)
-
-instance A.ToJSON CreateImageRequest
-
-instance A.FromJSON CreateImageRequest
+  deriving (Show, Generic, Eq, A.ToJSON, A.FromJSON)
 
 data URI' =
   URI'
@@ -163,11 +156,7 @@ data Category =
     , categoryId :: Id
     , categoryName :: Name
     }
-  deriving (Show, Generic, Ord, Eq)
-
-instance A.ToJSON Category
-
-instance A.FromJSON Category
+  deriving (Show, Generic, Ord, Eq, A.ToJSON, A.FromJSON)
 
 -- |  CreateCategoryRequest - for create category  in request.
 -- You must fill all fields in curl request
@@ -189,11 +178,7 @@ data EditCategoryRequest =
     { newPath :: Maybe Path
     , newCategory :: Maybe Name
     }
-  deriving (Show, Generic, Eq)
-
-instance A.ToJSON EditCategoryRequest
-
-instance A.FromJSON EditCategoryRequest
+  deriving (Show, Generic, Eq, A.ToJSON, A.FromJSON)
 
 ---------NEWS-------------
 data CreateNewsRequest =
@@ -204,11 +189,7 @@ data CreateNewsRequest =
     , images :: Maybe [CreateImageRequest]
     , published :: Bool
     }
-  deriving (Show, Generic, Eq)
-
-instance A.ToJSON CreateNewsRequest
-
-instance A.FromJSON CreateNewsRequest
+  deriving (Show, Generic, Eq, A.ToJSON, A.FromJSON)
 
 data EditNewsRequest =
   EditNewsRequest
@@ -218,11 +199,7 @@ data EditNewsRequest =
     , newImages :: Maybe [CreateImageRequest]
     , newPublished :: Maybe Bool
     }
-  deriving (Show, Generic, Eq)
-
-instance A.ToJSON EditNewsRequest
-
-instance A.FromJSON EditNewsRequest
+  deriving (Show, Generic, Eq, A.ToJSON, A.FromJSON)
 
 data News =
   News
@@ -234,8 +211,4 @@ data News =
     , newsImages :: [URI]
     , newsPublished :: Bool
     }
-  deriving (Show, Generic, Eq)
-
-instance A.ToJSON News
-
-instance A.FromJSON News
+  deriving (Show, Generic, Eq, A.ToJSON, A.FromJSON)
