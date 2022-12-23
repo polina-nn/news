@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# OPTIONS_GHC -Wno-missing-fields #-}
 
 -- | A module to provide a configuration reader for other modules.
 module Config

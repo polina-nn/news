@@ -1,5 +1,3 @@
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
 -- | define Errors in EndPoints
 module Types.ErrorTypes where
 

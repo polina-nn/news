@@ -3,7 +3,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
-{-# OPTIONS_GHC -Wno-missing-methods #-}
 
 -- | EndPoints.Lib.CategoryHelpTypes help types for working add and edit fields in Category
 module EndPoints.Lib.Category.CategoryHelpTypes where
