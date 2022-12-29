@@ -1,6 +1,7 @@
 module ValidSyntaxPathSpec
-  ( spec
-  ) where
+  ( spec,
+  )
+where
 
 import qualified EndPoints.Lib.Category.Category as Category
 import Test.Hspec (Spec, describe, it, shouldBe)

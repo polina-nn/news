@@ -13,9 +13,10 @@
 {-# LANGUAGE TypeOperators #-}
 
 module EndPoints.Lib.Category.CategoryIO
-  ( changePathCategoriesIO
-  , getAllCategoriesIO
-  ) where
+  ( changePathCategoriesIO,
+    getAllCategoriesIO,
+  )
+where
 
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
@@ -28,10 +29,10 @@ import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
 
 changePathCategoriesIO ::
-     SQL.Connection
-  -> News.Handle IO
-  -> [CategoryHelpTypes.EditCategory]
-  -> IO (Either ErrorTypes.AddEditCategoryError Int)
+  SQL.Connection ->
+  News.Handle IO ->
+  [CategoryHelpTypes.EditCategory] ->
+  IO (Either ErrorTypes.AddEditCategoryError Int)
 changePathCategoriesIO _ h [] = do
   Logger.logInfo
     (News.hLogHandle h)
@@ -47,21 +48,22 @@ changePathCategoriesIO conn h rs = count
         else do
           Logger.logError (News.hLogHandle h) $
             T.pack $
-            show $
-            ErrorTypes.AddEditCategorySQLRequestError $
-            ErrorTypes.SQLRequestError
-              ("changePathOneCategoryIO:BAD! Don't UPDATE  all categories. Update only" ++
-               show (length rez))
+              show $
+                ErrorTypes.AddEditCategorySQLRequestError $
+                  ErrorTypes.SQLRequestError
+                    ( "changePathOneCategoryIO:BAD! Don't UPDATE  all categories. Update only"
+                        ++ show (length rez)
+                    )
           return $
             Left $
-            ErrorTypes.AddEditCategorySQLRequestError $
-            ErrorTypes.SQLRequestError []
+              ErrorTypes.AddEditCategorySQLRequestError $
+                ErrorTypes.SQLRequestError []
 
 changePathOneCategoryIO ::
-     SQL.Connection
-  -> News.Handle IO
-  -> CategoryHelpTypes.EditCategory
-  -> IO (Either ErrorTypes.AddEditCategoryError Int)
+  SQL.Connection ->
+  News.Handle IO ->
+  CategoryHelpTypes.EditCategory ->
+  IO (Either ErrorTypes.AddEditCategoryError Int)
 changePathOneCategoryIO conn h CategoryHelpTypes.EditCategory {..} = do
   res <-
     SQL.execute
@@ -72,30 +74,37 @@ changePathOneCategoryIO conn h CategoryHelpTypes.EditCategory {..} = do
     1 -> do
       Logger.logInfo
         (News.hLogHandle h)
-        (T.pack
-           ("changePathOneCategoryIO: OK!  " ++
-            "\n" ++ "id =  " ++ show _id ++ " path = " ++ newPath))
+        ( T.pack
+            ( "changePathOneCategoryIO: OK!  "
+                ++ "\n"
+                ++ "id =  "
+                ++ show _id
+                ++ " path = "
+                ++ newPath
+            )
+        )
       return $ Right 1
     _ -> do
       Logger.logError (News.hLogHandle h) $
         T.pack $
-        show $
-        ErrorTypes.AddEditCategorySQLRequestError
-          (ErrorTypes.SQLRequestError
-             "changePathOneCategoryIO:BAD! Don't UPDATE  category")
+          show $
+            ErrorTypes.AddEditCategorySQLRequestError
+              ( ErrorTypes.SQLRequestError
+                  "changePathOneCategoryIO:BAD! Don't UPDATE  category"
+              )
       return $
         Left $
-        ErrorTypes.AddEditCategorySQLRequestError $
-        ErrorTypes.SQLRequestError []
+          ErrorTypes.AddEditCategorySQLRequestError $
+            ErrorTypes.SQLRequestError []
 
 -- | getAllCategories --
 -- when we add the first category to the response, we get an empty array in getAllCategoriesIO
 getAllCategoriesIO ::
-     Show m
-  => SQL.Connection
-  -> News.Handle IO
-  -> Either ErrorTypes.AddEditCategoryError m
-  -> IO (Either ErrorTypes.AddEditCategoryError [DataTypes.Category])
+  Show m =>
+  SQL.Connection ->
+  News.Handle IO ->
+  Either ErrorTypes.AddEditCategoryError m ->
+  IO (Either ErrorTypes.AddEditCategoryError [DataTypes.Category])
 getAllCategoriesIO _ _ (Left err) = return $ Left err
 getAllCategoriesIO conn _ (Right _) = do
   res <-

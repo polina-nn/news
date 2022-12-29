@@ -3,13 +3,14 @@
 
 -- |  EndPoints.Lib.Lib - library of helper pure functions for EndPoints
 module EndPoints.Lib.Lib
-  ( checkUserAdmin
-  , checkUserAuthor
-  , currentDay
-  , hashed
-  , imageIdToURI
-  , toUser
-  ) where
+  ( checkUserAdmin,
+    checkUserAuthor,
+    currentDay,
+    hashed,
+    imageIdToURI,
+    toUser,
+  )
+where
 
 import qualified Crypto.Hash
 import qualified Data.ByteArray.Encoding as BAE
@@ -23,10 +24,10 @@ import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
 
 checkUserAdmin ::
-     Monad m
-  => News.Handle m
-  -> DataTypes.User
-  -> m (Either ErrorTypes.InvalidAdminPermission DataTypes.User)
+  Monad m =>
+  News.Handle m ->
+  DataTypes.User ->
+  m (Either ErrorTypes.InvalidAdminPermission DataTypes.User)
 checkUserAdmin h r@DataTypes.User {..} =
   if userAdmin
     then do
@@ -35,16 +36,16 @@ checkUserAdmin h r@DataTypes.User {..} =
     else do
       Logger.logError (News.hLogHandle h) $
         T.pack $
-        show $
-        ErrorTypes.InvalidAdminPermission
-          "checkUserAdmin: BAD! User is not admin. Invalid Permission for this request."
+          show $
+            ErrorTypes.InvalidAdminPermission
+              "checkUserAdmin: BAD! User is not admin. Invalid Permission for this request."
       return . Left $ ErrorTypes.InvalidAdminPermission []
 
 checkUserAuthor ::
-     Monad m
-  => News.Handle m
-  -> DataTypes.User
-  -> m (Either ErrorTypes.InvalidAuthorPermission DataTypes.User)
+  Monad m =>
+  News.Handle m ->
+  DataTypes.User ->
+  m (Either ErrorTypes.InvalidAuthorPermission DataTypes.User)
 checkUserAuthor h r@DataTypes.User {..} =
   if userAuthor
     then do
@@ -53,9 +54,9 @@ checkUserAuthor h r@DataTypes.User {..} =
     else do
       Logger.logError (News.hLogHandle h) $
         T.pack $
-        show $
-        ErrorTypes.InvalidAuthorPermission
-          "checkUserAuthor: BAD! User is not author. Invalid Permission for this request."
+          show $
+            ErrorTypes.InvalidAuthorPermission
+              "checkUserAuthor: BAD! User is not author. Invalid Permission for this request."
       return . Left $ ErrorTypes.InvalidAuthorPermission []
 
 imageIdToURI :: News.Handle IO -> Int -> DataTypes.URI

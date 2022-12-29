@@ -1,6 +1,7 @@
 module Main
-  ( main
-  ) where
+  ( main,
+  )
+where
 
 import qualified Config
 import qualified Control.Exception as Exc
@@ -11,6 +12,7 @@ import qualified Logger
 import qualified Logger.Impl
 import qualified News
 import qualified Server
+import qualified Types.DataTypes as DataTypes
 
 main :: IO ()
 main = do
@@ -35,7 +37,7 @@ withLogHandle conf f = do
 
 runServer :: News.Handle IO -> IO ()
 runServer serverHandle =
-  Server.run Server.Handle {Server.hServerHandle = serverHandle}
+  Server.run DataTypes.Handle {DataTypes.hServerHandle = serverHandle}
 
 makeServerHandle :: C.Config -> Logger.Handle IO -> IO (News.Handle IO)
 makeServerHandle conf logHandle = do
@@ -47,8 +49,8 @@ makeServerHandle conf logHandle = do
   putStrLn "getURIConfig OK!"
   pure
     News.Handle
-      { News.hLogHandle = logHandle
-      , News.hAppConfig = appConfig
-      , News.hDbConfig = dbConfig
-      , News.hURIConfig = uriConfig
+      { News.hLogHandle = logHandle,
+        News.hAppConfig = appConfig,
+        News.hDbConfig = dbConfig,
+        News.hURIConfig = uriConfig
       }
