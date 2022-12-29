@@ -13,22 +13,24 @@
 {-# LANGUAGE TypeOperators #-}
 
 module EndPoints.AddOneImage
-  ( addImage
-  , addOneImage
-  ) where
+  ( addImage,
+    addOneImage,
+  )
+where
 
 import Control.Exception.Base
-  ( Exception(displayException)
-  , SomeException(SomeException)
-  , catch
-  , throwIO
+  ( Exception (displayException),
+    SomeException (SomeException),
+    catch,
+    throwIO,
   )
-import Control.Monad.IO.Class (MonadIO(liftIO))
+import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
+import qualified DbException
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified Logger
@@ -41,47 +43,52 @@ import qualified Types.ErrorTypes as ErrorTypes
 type ImageDecodeBase64ByteString = B.ByteString
 
 addOneImage ::
-     News.Handle IO
-  -> DataTypes.Db
-  -> DataTypes.User
-  -> DataTypes.CreateImageRequest
-  -> Handler DataTypes.URI
+  News.Handle IO ->
+  DataTypes.Db ->
+  DataTypes.User ->
+  DataTypes.CreateImageRequest ->
+  Handler DataTypes.URI
 addOneImage h DataTypes.Db {..} user createImageReq =
   (>>=)
     (liftIO $ _addImage (h, user, createImageReq))
     ToHttpResponse.toHttpResponse
 
 addImage ::
-     SQL.Connection
-  -> (News.Handle IO, DataTypes.User, DataTypes.CreateImageRequest)
-  -> IO (Either ErrorTypes.AddImageError DataTypes.URI)
-addImage conn (h, user, createImage) = do
+  SQL.Connection ->
+  (News.Handle IO, DataTypes.User, DataTypes.CreateImageRequest) ->
+  IO (Either ErrorTypes.AddImageError DataTypes.URI)
+addImage _ (h, user, createImage) = do
   Logger.logDebug (News.hLogHandle h) $ T.pack "Request: Add One Image"
   allCheck <-
-    Lib.checkUserAuthor h user >>= checkImageFileExist h createImage >>=
-    checkPngImage h >>=
-    checkBase64Image h
+    Lib.checkUserAuthor h user >>= checkImageFileExist h createImage
+      >>= checkPngImage h
+      >>= checkBase64Image h
   case allCheck :: Either ErrorTypes.AddImageError ImageDecodeBase64ByteString of
     Left err -> return $ Left err
-    Right imageDecodeBase64ByteString ->
-      catch
-        (addImageIO conn h createImage imageDecodeBase64ByteString)
-        handleError
+    Right imageDecodeBase64ByteString -> do
+      tryConnectDb <- DbException.tryRequestConnectDb h
+      case tryConnectDb of
+        Left err -> return $ Left $ ErrorTypes.AddImageSQLRequestError err
+        Right conn ->
+          catch
+            (addImageIO conn h createImage imageDecodeBase64ByteString)
+            handleError
   where
     handleError ::
-         SomeException -> IO (Either ErrorTypes.AddImageError DataTypes.URI)
+      SomeException -> IO (Either ErrorTypes.AddImageError DataTypes.URI)
     handleError (SomeException e) = do
       Logger.logInfo (News.hLogHandle h) $
         T.pack
-          ("addImage:handleError: throwIO is unknown error" ++
-           displayException e)
+          ( "addImage:handleError: throwIO is unknown error"
+              ++ displayException e
+          )
       throwIO e
 
 checkImageFileExist ::
-     News.Handle IO
-  -> DataTypes.CreateImageRequest
-  -> Either ErrorTypes.InvalidAuthorPermission m
-  -> IO (Either ErrorTypes.AddImageError DataTypes.CreateImageRequest)
+  News.Handle IO ->
+  DataTypes.CreateImageRequest ->
+  Either ErrorTypes.InvalidAuthorPermission m ->
+  IO (Either ErrorTypes.AddImageError DataTypes.CreateImageRequest)
 checkImageFileExist _ _ (Left err) =
   return $ Left $ ErrorTypes.InvalidPermissionAddImage err
 checkImageFileExist h r@DataTypes.CreateImageRequest {..} (Right _) = do
@@ -93,18 +100,19 @@ checkImageFileExist h r@DataTypes.CreateImageRequest {..} (Right _) = do
     else do
       Logger.logError (News.hLogHandle h) $
         T.pack $
-        show $
-        ErrorTypes.NotExistImageFile $
-        ErrorTypes.InvalidContent
-          ("checkImageFileExist: BAD!  File: does not exist (No such file or directory) " ++
-           image)
+          show $
+            ErrorTypes.NotExistImageFile $
+              ErrorTypes.InvalidContent
+                ( "checkImageFileExist: BAD!  File: does not exist (No such file or directory) "
+                    ++ image
+                )
       return . Left $
         ErrorTypes.NotExistImageFile $ ErrorTypes.InvalidContent []
 
 checkPngImage ::
-     News.Handle IO
-  -> Either ErrorTypes.AddImageError DataTypes.CreateImageRequest
-  -> IO (Either ErrorTypes.AddImageError DataTypes.CreateImageRequest)
+  News.Handle IO ->
+  Either ErrorTypes.AddImageError DataTypes.CreateImageRequest ->
+  IO (Either ErrorTypes.AddImageError DataTypes.CreateImageRequest)
 checkPngImage _ (Left err) = return $ Left err
 checkPngImage h (Right r@DataTypes.CreateImageRequest {..}) =
   if format == "png"
@@ -114,15 +122,15 @@ checkPngImage h (Right r@DataTypes.CreateImageRequest {..}) =
     else do
       Logger.logError (News.hLogHandle h) $
         T.pack $
-        show $
-        ErrorTypes.NotPngImage $
-        ErrorTypes.InvalidContent ("checkPngImage: BAD! Format " ++ format)
+          show $
+            ErrorTypes.NotPngImage $
+              ErrorTypes.InvalidContent ("checkPngImage: BAD! Format " ++ format)
       return . Left $ ErrorTypes.NotPngImage $ ErrorTypes.InvalidContent []
 
 checkBase64Image ::
-     News.Handle IO
-  -> Either ErrorTypes.AddImageError DataTypes.CreateImageRequest
-  -> IO (Either ErrorTypes.AddImageError ImageDecodeBase64ByteString)
+  News.Handle IO ->
+  Either ErrorTypes.AddImageError DataTypes.CreateImageRequest ->
+  IO (Either ErrorTypes.AddImageError ImageDecodeBase64ByteString)
 checkBase64Image _ (Left err) = return $ Left err
 checkBase64Image h (Right DataTypes.CreateImageRequest {..}) = do
   imageFile <- B.readFile image
@@ -134,17 +142,17 @@ checkBase64Image h (Right DataTypes.CreateImageRequest {..}) = do
     Left err -> do
       Logger.logError (News.hLogHandle h) $
         T.pack $
-        show $
-        ErrorTypes.NotBase64Image $
-        ErrorTypes.InvalidContent ("checkBase64Image: BAD!" ++ show err)
+          show $
+            ErrorTypes.NotBase64Image $
+              ErrorTypes.InvalidContent ("checkBase64Image: BAD!" ++ show err)
       return . Left $ ErrorTypes.NotBase64Image $ ErrorTypes.InvalidContent []
 
 addImageIO ::
-     SQL.Connection
-  -> News.Handle IO
-  -> DataTypes.CreateImageRequest
-  -> ImageDecodeBase64ByteString
-  -> IO (Either ErrorTypes.AddImageError DataTypes.URI)
+  SQL.Connection ->
+  News.Handle IO ->
+  DataTypes.CreateImageRequest ->
+  ImageDecodeBase64ByteString ->
+  IO (Either ErrorTypes.AddImageError DataTypes.URI)
 addImageIO conn h DataTypes.CreateImageRequest {..} im = do
   resId <-
     SQL.query_ conn [sql| select NEXTVAL('image_id_seq');|] :: IO [SQL.Only Int]
@@ -162,22 +170,19 @@ addImageIO conn h DataTypes.CreateImageRequest {..} im = do
               uriEnd = DataTypes.URI' {uriPath = "image", uriId = idIm}
           Logger.logDebug (News.hLogHandle h) $
             T.pack ("addImageIO: OK! " ++ show uriBegin ++ show uriEnd)
+          liftIO $ SQL.close conn
           return $ Right $ show uriBegin ++ show uriEnd
-        _ -> do
-          Logger.logError (News.hLogHandle h) $
-            T.pack $
-            show $
-            ErrorTypes.AddImageSQLRequestError $
-            ErrorTypes.SQLRequestError "addImageIO: BAD!"
-          return $
-            Left $
-            ErrorTypes.AddImageSQLRequestError $ ErrorTypes.SQLRequestError []
-    _ -> do
-      Logger.logError (News.hLogHandle h) $
+        _ -> addImageSQLRequestError conn h
+    _ -> addImageSQLRequestError conn h
+  where
+    addImageSQLRequestError :: SQL.Connection -> News.Handle IO -> IO (Either ErrorTypes.AddImageError DataTypes.URI)
+    addImageSQLRequestError conn' h' = do
+      Logger.logError (News.hLogHandle h') $
         T.pack $
-        show $
-        ErrorTypes.AddImageSQLRequestError $
-        ErrorTypes.SQLRequestError "addImageIO: BAD!"
+          show $
+            ErrorTypes.AddImageSQLRequestError $
+              ErrorTypes.SQLRequestError "addImageIO: BAD!"
+      liftIO $ SQL.close conn'
       return $
         Left $
-        ErrorTypes.AddImageSQLRequestError $ ErrorTypes.SQLRequestError []
+          ErrorTypes.AddImageSQLRequestError $ ErrorTypes.SQLRequestError []

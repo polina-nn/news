@@ -13,14 +13,16 @@
 {-# LANGUAGE TypeOperators #-}
 
 module EndPoints.GetNewsSearchList
-  ( getNewsSearchList
-  , newsSearchList
-  ) where
+  ( getNewsSearchList,
+    newsSearchList,
+  )
+where
 
-import Control.Monad.IO.Class (MonadIO(liftIO))
+import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
+import qualified DbException
 import qualified EndPoints.Lib.News.News as News
 import qualified EndPoints.Lib.News.NewsHelpTypes as NewsHelpTypes
 import qualified EndPoints.Lib.News.NewsIO as NewsIO
@@ -30,61 +32,67 @@ import qualified EndPoints.Lib.ToText as ToText
 import qualified Logger
 import qualified News
 import Servant (Handler)
+import Types.DataTypes (Db (_authorsNewsSearchList))
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
 
 getNewsSearchList ::
-     News.Handle IO
-  -> DataTypes.Db
-  -> Maybe T.Text
-  -> Maybe DataTypes.Offset
-  -> Maybe DataTypes.Limit
-  -> Handler [DataTypes.News]
+  News.Handle IO ->
+  DataTypes.Db ->
+  Maybe T.Text ->
+  Maybe DataTypes.Offset ->
+  Maybe DataTypes.Limit ->
+  Handler [DataTypes.News]
 getNewsSearchList h DataTypes.Db {..} mSearch mo ml =
   (>>=)
     (liftIO $ _newsSearchList (h, mSearch, mo, ml))
     ToHttpResponse.toHttpResponse
 
 newsSearchList ::
-     SQL.Connection
-  -> ( News.Handle IO
-     , Maybe T.Text
-     , Maybe DataTypes.Offset
-     , Maybe DataTypes.Limit)
-  -> IO (Either ErrorTypes.GetNewsError [DataTypes.News])
+  SQL.Connection ->
+  ( News.Handle IO,
+    Maybe T.Text,
+    Maybe DataTypes.Offset,
+    Maybe DataTypes.Limit
+  ) ->
+  IO (Either ErrorTypes.GetNewsError [DataTypes.News])
 newsSearchList _ (h, Nothing, _, _) = do
   Logger.logError (News.hLogHandle h) $
     T.pack $
-    show $
-    ErrorTypes.InvalidSearchGetNews $
-    ErrorTypes.InvalidRequest "newsSearchList: BAD! Not text for searching \n"
+      show $
+        ErrorTypes.InvalidSearchGetNews $
+          ErrorTypes.InvalidRequest "newsSearchList: BAD! Not text for searching \n"
   return $ Left $ ErrorTypes.InvalidSearchGetNews $ ErrorTypes.InvalidRequest []
-newsSearchList conn (h, Just search, mo, ml) = do
+newsSearchList _authorsNewsSearchList (h, Just search, mo, ml) = do
   Logger.logInfo (News.hLogHandle h) $ T.pack "Request: Get News Search List "
   checkRequest <- OffsetLimit.checkOffsetLimitNews h mo ml
   case checkRequest of
     Left err -> return $ Left err
     Right (offset, limit) -> do
-      res <- newsSearchList' conn h search offset limit
-      news <- Prelude.mapM (NewsIO.toNews conn h) res
-      case News.checkErrorsToNews news res of
-        (True, news') -> do
-          let toTextNews = (T.concat $ map ToText.toText news') :: T.Text
-          Logger.logInfo (News.hLogHandle h) $
-            T.concat [T.pack "authorsNewsSearchList: OK! \n", toTextNews]
-          return $ Right news'
-        _ ->
-          return $
-          Left $
-          ErrorTypes.GetNewsSQLRequestError $ ErrorTypes.SQLRequestError []
+      tryConnectDb <- DbException.tryRequestConnectDb h
+      case tryConnectDb of
+        Left err -> return $ Left $ ErrorTypes.GetNewsSQLRequestError err
+        Right conn -> do
+          res <- newsSearchList' conn h search offset limit
+          news <- Prelude.mapM (NewsIO.toNews conn h) res
+          case News.checkErrorsToNews news res of
+            (True, news') -> do
+              let toTextNews = (T.concat $ map ToText.toText news') :: T.Text
+              Logger.logInfo (News.hLogHandle h) $
+                T.concat [T.pack "authorsNewsSearchList: OK! \n", toTextNews]
+              liftIO $ SQL.close conn
+              return $ Right news'
+            _ -> do
+              liftIO $ SQL.close conn
+              return $ Left $ ErrorTypes.GetNewsSQLRequestError $ ErrorTypes.SQLRequestError []
 
 newsSearchList' ::
-     SQL.Connection
-  -> News.Handle IO
-  -> T.Text
-  -> DataTypes.Offset
-  -> DataTypes.Limit
-  -> IO [NewsHelpTypes.DbNews]
+  SQL.Connection ->
+  News.Handle IO ->
+  T.Text ->
+  DataTypes.Offset ->
+  DataTypes.Limit ->
+  IO [NewsHelpTypes.DbNews]
 newsSearchList' conn _ search off lim = do
   res <-
     SQL.query
