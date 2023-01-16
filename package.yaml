@@ -51,6 +51,23 @@ ghc-options:
               # but remain off in normal compilations for the time being. 
               # This allows library authors eager to make their code future compatible to adapt to new features before they even generate warnings.
 
+default-extensions:
+- DataKinds
+- DisambiguateRecordFields
+- DeriveAnyClass
+- DeriveGeneric 
+- FlexibleContexts
+- FlexibleInstances
+- GeneralizedNewtypeDeriving
+- MultiParamTypeClasses
+- OverloadedStrings
+- QuasiQuotes
+- RankNTypes 
+- RecordWildCards
+- ScopedTypeVariables 
+- TypeOperators
+
+
 
 library:
   source-dirs: src

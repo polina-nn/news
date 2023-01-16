@@ -1,24 +1,17 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeFamilies #-}
-
 module EndPoints.Lib.ToHttpResponse
-  ( toHttpResponse
-  ) where
+  ( toHttpResponse,
+  )
+where
 
 import qualified Data.ByteString as B
 import Servant
-  ( Handler
-  , ServerError(errReasonPhrase)
-  , err400
-  , err403
-  , err404
-  , err500
-  , throwError
+  ( Handler,
+    ServerError (errReasonPhrase),
+    err400,
+    err403,
+    err404,
+    err500,
+    throwError,
   )
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes

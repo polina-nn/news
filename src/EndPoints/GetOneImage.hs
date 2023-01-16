@@ -1,28 +1,15 @@
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeOperators #-}
-
 module EndPoints.GetOneImage
-  ( getOneImage
-  , oneImage
-  ) where
+  ( getOneImage,
+    oneImage,
+  )
+where
 
-import Control.Monad.IO.Class (MonadIO(liftIO))
+import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Data.ByteString as B
-import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
-import qualified Logger
+import Logger (logDebug, logError, (.<))
 import qualified News
 import Servant (Handler)
 import qualified Types.DataTypes as DataTypes
@@ -33,11 +20,11 @@ getOneImage h DataTypes.Db {..} idImage =
   (>>=) (liftIO $ _oneImage (h, idImage)) ToHttpResponse.toHttpResponse
 
 oneImage ::
-     SQL.Connection
-  -> (News.Handle IO, Integer)
-  -> IO (Either ErrorTypes.GetImageError B.ByteString)
+  SQL.Connection ->
+  (News.Handle IO, Integer) ->
+  IO (Either ErrorTypes.GetImageError B.ByteString)
 oneImage conn (h, id') = do
-  Logger.logDebug (News.hLogHandle h) $ T.pack "Request: Get One Image"
+  Logger.logDebug (News.hLogHandle h) "Request: Get One Image"
   resCheckId <- checkId conn (h, id')
   case resCheckId of
     Right _ -> do
@@ -45,34 +32,30 @@ oneImage conn (h, id') = do
         SQL.query
           conn
           [sql| SELECT image_content FROM image WHERE image_id = ? |]
-          (SQL.Only id') :: IO [SQL.Only String] --(SQL.toRow id)
+          (SQL.Only id') ::
+          IO [SQL.Only String]
       let rez = SQL.fromOnly . head $ res
       Logger.logDebug
         (News.hLogHandle h)
-        (T.pack ("oneImage: OK! Get image with ID " ++ show id'))
-      return $ Right $ read rez --  Base64.decodeBase64Lenient rez
+        ("oneImage: OK! Get image with ID " .< id')
+      return $ Right $ read rez
     Left err -> return $ Left err
 
 checkId ::
-     SQL.Connection
-  -> (News.Handle IO, Integer)
-  -> IO (Either ErrorTypes.GetImageError Integer)
+  SQL.Connection ->
+  (News.Handle IO, Integer) ->
+  IO (Either ErrorTypes.GetImageError Integer)
 checkId conn (h', id') = do
   res <-
     SQL.query
       conn
       [sql| SELECT EXISTS (SELECT image_id  FROM image WHERE image_id = ?) |]
-      (SQL.Only id') :: IO [SQL.Only Bool] --(SQL.toRow id)
+      (SQL.Only id') ::
+      IO [SQL.Only Bool]
   if SQL.fromOnly $ head res
     then do
-      Logger.logDebug (News.hLogHandle h') $
-        T.pack ("checkId: OK! Image with id " ++ show id' ++ " exists")
+      Logger.logDebug (News.hLogHandle h') ("checkId: OK! Exist image with id " .< id')
       return $ Right id'
     else do
-      Logger.logError (News.hLogHandle h') $
-        T.pack $
-        show $
-        ErrorTypes.InvalidImagedId $
-        ErrorTypes.InvalidId
-          ("checkId: OK! Image with id " ++ show id' ++ "not exists")
+      Logger.logError (News.hLogHandle h') ("ERROR " .< ErrorTypes.InvalidImagedId (ErrorTypes.InvalidId ("checkId: BAD! Not Exist image with id " ++ show id')))
       return $ Left $ ErrorTypes.InvalidImagedId $ ErrorTypes.InvalidId []
