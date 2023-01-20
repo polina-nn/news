@@ -11,6 +11,7 @@ import Control.Exception.Base
     throwIO,
   )
 import Control.Monad.IO.Class (MonadIO (liftIO))
+import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.Category.Category as Category
@@ -42,6 +43,7 @@ editCategory ::
   (News.Handle IO, DataTypes.User, Int, DataTypes.EditCategoryRequest) ->
   IO (Either ErrorTypes.AddEditCategoryError DataTypes.Category)
 editCategory conn (h, user, catId, r) = do
+  Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Edit Category: \n", ToText.toText r, "with category id ", T.pack $ show catId, "\nby user: ", ToText.toText user]
   allCheck <-
     Lib.checkUserAdmin h user >>= checkIdIO conn h catId r >>= checkSyntaxPath h
       >>= CategoryIO.getAllCategoriesIO conn h
@@ -54,8 +56,9 @@ editCategory conn (h, user, catId, r) = do
            ) of
     Left err -> return $ Left err
     Right (editCategoryFullReq, categories) -> do
-      Logger.logDebug (News.hLogHandle h) ("editCategory:allCheck: OK!  \n" .< ToText.toText editCategoryFullReq)
-      Logger.logDebug (News.hLogHandle h) ("categories " .< Prelude.map ToText.toText categories)
+      let newCategories = T.concat $ Prelude.map ToText.toText categories
+      Logger.logDebug (News.hLogHandle h) $ T.concat ["editCategory:allCheck: OK!  \n", ToText.toText editCategoryFullReq]
+      Logger.logDebug (News.hLogHandle h) $ T.concat ["categories ", newCategories]
       case Category.changePathsForEditCategory editCategoryFullReq categories of
         Nothing -> do
           Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidValuePath (ErrorTypes.InvalidContent "check Developer Error, then update categories table"))
@@ -70,7 +73,7 @@ editCategory conn (h, user, catId, r) = do
               handleError
           case rez of
             (Right newCategory) -> do
-              Logger.logInfo (News.hLogHandle h) ("editCategory: OK!  \n" .< ToText.toText newCategory)
+              Logger.logInfo (News.hLogHandle h) $ T.concat ["editCategory: OK!  \n", ToText.toText newCategory]
               return rez
             (Left newCategoryError) -> do
               Logger.logInfo
@@ -116,12 +119,12 @@ checkIdIO conn h catId r (Right _) = do
       if SQL.fromOnly $ head res
         then
           ( do
-              Logger.logDebug (News.hLogHandle h) ("checkId: OK! Exists category with id " .< catId)
+              Logger.logDebug (News.hLogHandle h) "checkId: OK! Exists category"
               return $ Right r
           )
         else
           ( do
-              Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidCategoryId (ErrorTypes.InvalidId ("checkId: BAD! Not exists category with id " ++ show catId)))
+              Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidCategoryId (ErrorTypes.InvalidId "checkId: BAD! Not exists category with id "))
               return $
                 Left $ ErrorTypes.InvalidCategoryId $ ErrorTypes.InvalidId []
           )
@@ -150,7 +153,7 @@ checkSyntaxPath
     if Category.validSyntaxPath path
       then return r
       else do
-        Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidSyntaxPath (ErrorTypes.InvalidContent ("checkSyntaxPath: BAD! Path is not valid! Only digits(not zero begin) and points must have! " ++ path)))
+        Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidSyntaxPath (ErrorTypes.InvalidContent "checkSyntaxPath: BAD! Path is not valid! Only digits(not zero begin) and points must have! "))
         return $
           Left $ ErrorTypes.InvalidSyntaxPath $ ErrorTypes.InvalidContent []
 
@@ -177,7 +180,7 @@ editCategoryNameIO conn h CategoryHelpTypes.EditCategoryFullRequest {..} (Right 
       let rez_new_path' = SQL.fromOnly . head $ rez_new_path :: String
       let editedCategory =
             Category.toCategories (rez_new_path', id', newCategory')
-      Logger.logInfo (News.hLogHandle h) ("editCategoryIO: OK! UPDATE  category: " .< ToText.toText editedCategory)
+      Logger.logInfo (News.hLogHandle h) $ T.concat ["editCategoryIO: OK! UPDATE  category: ", ToText.toText editedCategory]
 
       return $ Right editedCategory
     _ -> do

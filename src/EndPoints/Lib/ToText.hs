@@ -3,12 +3,83 @@ module EndPoints.Lib.ToText
   )
 where
 
+import qualified Data.Maybe as M
 import qualified Data.Text as T
 import qualified EndPoints.Lib.Category.CategoryHelpTypes as CategoryHelpTypes
 import qualified Types.DataTypes as DataTypes
 
 class ToText a where
   toText :: a -> T.Text
+
+---------USER-------------
+
+instance ToText DataTypes.CreateUserRequest where
+  toText DataTypes.CreateUserRequest {..} =
+    T.concat
+      [ "CreateUserRequest {user_name = ",
+        name,
+        ", login = ",
+        T.pack login,
+        ", admin = ",
+        T.pack $ show admin,
+        ", author = ",
+        T.pack $ show author,
+        "} \n"
+      ]
+
+instance ToText DataTypes.User where
+  toText DataTypes.User {..} =
+    T.concat
+      [ "User {user_name = ",
+        userName,
+        ", user_login = ",
+        T.pack userLogin,
+        ", user_password = ",
+        T.pack $ show userPassword,
+        ", user_created = ",
+        T.pack $ show userCreated,
+        ", user_admin = ",
+        T.pack $ show userAdmin,
+        ", user_author = ",
+        T.pack $ show userAuthor,
+        "} \n"
+      ]
+
+---------IMAGE-------------
+
+instance ToText DataTypes.CreateImageRequest where
+  toText DataTypes.CreateImageRequest {..} =
+    T.concat
+      [ "\n     CreateImageRequest {file = ",
+        file,
+        ", format = ",
+        T.pack format,
+        ", image = ",
+        T.pack image,
+        "}"
+      ]
+
+-------- CATEGORY ----------------
+
+instance ToText DataTypes.CreateCategoryRequest where
+  toText DataTypes.CreateCategoryRequest {..} =
+    T.concat
+      [ "CreateCategoryRequest {path = ",
+        T.pack path,
+        ", category = ",
+        category,
+        "} \n"
+      ]
+
+instance ToText DataTypes.EditCategoryRequest where
+  toText DataTypes.EditCategoryRequest {..} =
+    T.concat
+      [ "EditCategoryRequest {newPath = ",
+        T.pack $ M.fromMaybe "" newPath,
+        ", newCategory = ",
+        M.fromMaybe "" newCategory,
+        "} \n"
+      ]
 
 instance ToText DataTypes.Category where
   toText DataTypes.Category {..} =
@@ -44,21 +115,37 @@ instance ToText CategoryHelpTypes.EditCategoryFullRequest where
         "} \n"
       ]
 
-instance ToText DataTypes.User where
-  toText DataTypes.User {..} =
+---------NEWS-------------
+
+instance ToText DataTypes.EditNewsRequest where
+  toText DataTypes.EditNewsRequest {..} =
     T.concat
-      [ "User {user_name = ",
-        userName,
-        ", user_login = ",
-        T.pack userLogin,
-        ", user_password = ",
-        T.pack $ show userPassword,
-        ", user_created = ",
-        T.pack $ show userCreated,
-        ", user_admin = ",
-        T.pack $ show userAdmin,
-        ", user_author = ",
-        T.pack $ show userAuthor,
+      [ "\nEditNewsRequest {\nnewTitle = ",
+        M.fromMaybe "" newTitle,
+        ", \nnewCategoryId = ",
+        T.pack $ show newCategoryId,
+        ", \nnewText = ",
+        M.fromMaybe "" newText,
+        ",  \nnewImages = ",
+        T.concat $ M.maybe [] (map toText) newImages,
+        ",  \nnewPublished = ",
+        T.pack $ show newPublished,
+        "} \n"
+      ]
+
+instance ToText DataTypes.CreateNewsRequest where
+  toText DataTypes.CreateNewsRequest {..} =
+    T.concat
+      [ "\nCreateNewsRequest {\ntitle = ",
+        title,
+        ", \nnewsCategoryId = ",
+        T.pack $ show newsCategoryId,
+        ", \ntext = ",
+        text,
+        ",  \nimages = ",
+        T.concat $ M.maybe [] (map toText) images,
+        ",  \npublished = ",
+        T.pack $ show published,
         "} \n"
       ]
 
@@ -93,3 +180,23 @@ toText' DataTypes.Category {..} =
       categoryName,
       "}"
     ]
+
+instance ToText DataTypes.Filter where
+  toText DataTypes.Filter {..} =
+    T.concat
+      [ "\nFilter {\nfilerDayAt = ",
+        T.pack $ show filterDayAt,
+        ", \nfilerDayUntil = ",
+        T.pack $ show filterDayUntil,
+        ", \nfilerDaySince = ",
+        T.pack $ show filterDaySince,
+        ", \nfilerAuthor  = ",
+        M.fromMaybe "" filterAuthor,
+        ", \nfilerCategoryId = ",
+        T.pack $ show filterCategoryId,
+        ",  \nfilerTitle = ",
+        M.fromMaybe "" filterTitle,
+        ",  \nfilerContent = ",
+        M.fromMaybe "" filterContent,
+        "} \n"
+      ]

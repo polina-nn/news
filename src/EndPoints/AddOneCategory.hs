@@ -11,6 +11,7 @@ import Control.Exception.Base
     throwIO,
   )
 import Control.Monad.IO.Class (MonadIO (liftIO))
+import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.Category.Category as Category
@@ -41,6 +42,7 @@ addCategory ::
   (News.Handle IO, DataTypes.User, DataTypes.CreateCategoryRequest) ->
   IO (Either ErrorTypes.AddEditCategoryError DataTypes.Category)
 addCategory conn (h, user, r) = do
+  Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add Category: \n", ToText.toText r, "by user: ", ToText.toText user]
   allCheck <-
     Lib.checkUserAdmin h user >>= checkSyntaxPath h r
       >>= CategoryIO.getAllCategoriesIO conn h
@@ -63,7 +65,7 @@ addCategory conn (h, user, r) = do
           handleError
       case rez of
         (Right newCategory) -> do
-          Logger.logInfo (News.hLogHandle h) ("addCategory: OK! \n" .< ToText.toText newCategory)
+          Logger.logInfo (News.hLogHandle h) $ T.concat ["addCategory: OK! \n", ToText.toText newCategory]
           return rez
         (Left newCategoryError) -> do
           Logger.logError
@@ -97,9 +99,7 @@ checkSyntaxPath h r@DataTypes.CreateCategoryRequest {..} (Right _) =
         ( "ERROR "
             .< ErrorTypes.InvalidSyntaxPath
               ( ErrorTypes.InvalidContent
-                  ( "checkSyntaxPath: BAD! Path is not valid! Only digits(not zero begin) and points must have! "
-                      ++ path
-                  )
+                  "checkSyntaxPath: BAD! Path is not valid! Only digits(not zero begin) and points must have! "
               )
         )
       return $
@@ -118,9 +118,6 @@ addCategoryIO conn h DataTypes.CreateCategoryRequest {..} (Right _) = do
       conn
       [sql| INSERT INTO  category (category_path, category_name)  VALUES (?,?) ;|]
       (path, category)
-  Logger.logInfo
-    (News.hLogHandle h)
-    ("addCategoryIO: OK! INSERT INTO \n" .< res)
   case read (show res) :: Int of
     1 -> do
       resId <-
@@ -158,8 +155,7 @@ addCategoryIO conn h DataTypes.CreateCategoryRequest {..} (Right _) = do
         (News.hLogHandle h)
         ( "ERROR "
             .< ErrorTypes.AddEditCategorySQLRequestError
-              ( ErrorTypes.SQLRequestError
-                  ("addCategoryIO! Don't INSERT INTO  category" ++ path)
+              ( ErrorTypes.SQLRequestError "addCategoryIO! Don't INSERT INTO  category"
               )
         )
       return $

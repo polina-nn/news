@@ -7,7 +7,6 @@ where
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base64 as Base64
 import qualified Database.PostgreSQL.Simple as SQL
-import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.Category.Category as Category
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.News.NewsHelpTypes as NewsHelpTypes
@@ -28,12 +27,11 @@ addImageNewsIO ::
   IO (Either ErrorTypes.AddEditNewsError IdImage)
 addImageNewsIO conn h DataTypes.CreateImageRequest {..} = do
   content <- B.readFile image
-  let imageDecodeBase64ByteString = Base64.decodeBase64Lenient content
-  resId <-
-    SQL.query_ conn [sql| select NEXTVAL('image_id_seq');|] :: IO [SQL.Only Int]
+  resId <- SQL.query_ conn "select NEXTVAL('image_id_seq')"
   case resId of
     [val] -> do
       let idIm = SQL.fromOnly val
+          imageDecodeBase64ByteString = Base64.decodeBase64Lenient content
       res <-
         SQL.execute
           conn
@@ -43,19 +41,11 @@ addImageNewsIO conn h DataTypes.CreateImageRequest {..} = do
         1 -> do
           Logger.logDebug (News.hLogHandle h) ("addImageIO: OK! Image_id  " .< show idIm)
           return $ Right idIm
-        _ -> do
-          Logger.logError
-            (News.hLogHandle h)
-            ( "ERROR "
-                .< ErrorTypes.AddEditNewsSQLRequestError
-                  ( ErrorTypes.SQLRequestError "addImageNewsIO: BAD!"
-                  )
-            )
-          return $
-            Left $
-              ErrorTypes.AddEditNewsSQLRequestError $
-                ErrorTypes.SQLRequestError []
-    _ -> do
+        _ -> sqlRequestError
+    _ -> sqlRequestError
+  where
+    sqlRequestError :: IO (Either ErrorTypes.AddEditNewsError IdImage)
+    sqlRequestError = do
       Logger.logError
         (News.hLogHandle h)
         ( "ERROR "
@@ -63,9 +53,7 @@ addImageNewsIO conn h DataTypes.CreateImageRequest {..} = do
               ( ErrorTypes.SQLRequestError "addImageNewsIO: BAD!"
               )
         )
-      return $
-        Left $
-          ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
+      return $ Left $ ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
 
 toNews ::
   SQL.Connection ->
@@ -102,7 +90,7 @@ getCategoriesIO con h''' path = do
   res <-
     SQL.query
       con
-      [sql| SELECT category_path, category_id, category_name FROM category WHERE ? LIKE category_path||'%' ORDER BY category_path;|]
+      "SELECT category_path, category_id, category_name FROM category WHERE ? LIKE category_path||'%' ORDER BY category_path"
       (SQL.Only path)
   case res of
     [] -> do
@@ -117,5 +105,4 @@ getCategoriesIO con h''' path = do
         Left $ ErrorTypes.GetNewsSQLRequestError $ ErrorTypes.SQLRequestError []
     _ -> do
       let categories = Prelude.map Category.toCategories res
-      Logger.logDebug (News.hLogHandle h''') "getCategoriesIO: OK! "
       return $ Right categories

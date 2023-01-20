@@ -70,7 +70,7 @@ checkLogicPathForAddCategory ::
         )
     )
 checkLogicPathForAddCategory _ _ (Left err) = return $ Left err
-checkLogicPathForAddCategory h r@DataTypes.CreateCategoryRequest {..} (Right categories) =
+checkLogicPathForAddCategory h r (Right categories) =
   if validLogicPathForAddCategory categories r
     then return $ Right (r, categories)
     else do
@@ -79,9 +79,7 @@ checkLogicPathForAddCategory h r@DataTypes.CreateCategoryRequest {..} (Right cat
         ( "ERROR "
             .< ErrorTypes.InvalidValuePath
               ( ErrorTypes.InvalidContent
-                  ( "checkLogicPath: BAD! Path is not valid! Must not hole in numbering! "
-                      ++ path
-                  )
+                  "checkLogicPath: BAD! Path is not valid! Must not hole in numbering! "
               )
         )
       return $ Left $ ErrorTypes.InvalidValuePath $ ErrorTypes.InvalidContent []
@@ -509,7 +507,7 @@ editCategoryRequests mapCategories =
     toEditCategoryRequest ::
       (DataTypes.Path, DataTypes.Id) -> CategoryHelpTypes.EditCategory
     toEditCategoryRequest (path, idCat) =
-      CategoryHelpTypes.EditCategory {_id = idCat, newPath = path}
+      CategoryHelpTypes.EditCategory {permanentId = idCat, newPath = path}
 
 wordsPath :: String -> [String]
 wordsPath s =
@@ -595,6 +593,6 @@ changePathResultReq old new =
     help2 [] = []
     help2 ((idCat, _, oldPath, newPath) : xs)
       | oldPath /= newPath =
-        (CategoryHelpTypes.EditCategory {_id = idCat, newPath = newPath}) :
+        (CategoryHelpTypes.EditCategory {permanentId = idCat, newPath = newPath}) :
         help2 xs
       | otherwise = help2 xs

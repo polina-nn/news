@@ -22,7 +22,7 @@ import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.News.NewsIO as NewsIO
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
-import Logger (logDebug, logError, (.<))
+import Logger (logDebug, logError, logInfo, (.<))
 import qualified News
 import Servant (Handler)
 import qualified System.Directory as SD
@@ -49,7 +49,7 @@ addNews ::
   (News.Handle IO, DataTypes.User, DataTypes.CreateNewsRequest) ->
   IO (Either ErrorTypes.AddEditNewsError DataTypes.News)
 addNews conn (h, user, r) = do
-  Logger.logDebug (News.hLogHandle h) $ T.pack "Request: Add One News"
+  Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add One News: \n", ToText.toText r, "by user: ", ToText.toText user]
   allCheck <-
     Lib.checkUserAuthor h user >>= checkImageFilesExistIO h r
       >>= checkCategoryIdIO conn h
@@ -70,7 +70,7 @@ addNews conn (h, user, r) = do
       let errMsg = displayException e
       Logger.logError
         (News.hLogHandle h)
-        (T.pack ("addNews:handleError:" ++ show errMsg))
+        ("addNews:handleError:" .< errMsg)
       throwIO e
 
 -- getNewsIdIO  get id for new news
@@ -84,8 +84,7 @@ getNewsIdIO conn h = do
   case resId of
     [val] -> do
       let idNews = SQL.fromOnly val
-      Logger.logDebug (News.hLogHandle h) $
-        T.pack ("getNewsIdIO: OK! News_id is " ++ show idNews)
+      Logger.logDebug (News.hLogHandle h) ("getNewsIdIO: OK! News_id is " .< idNews)
       return $ Right idNews
     _ -> do
       Logger.logError (News.hLogHandle h) $
@@ -112,15 +111,17 @@ addAllImagesIO conn h (DataTypes.CreateNewsRequest _ _ _ (Just req) _) (Right id
   let rez' = map help rez
   if 0 `notElem` rez' -- so all drawings are added
     then do
-      Logger.logDebug (News.hLogHandle h) $ T.pack "addAllImagesIO: OK!"
+      Logger.logDebug (News.hLogHandle h) "addAllImagesIO: OK!"
       return $ Right (idNews, rez')
     else do
-      Logger.logError (News.hLogHandle h) $
-        T.pack $
-          show $
-            ErrorTypes.AddEditNewsSQLRequestError $
-              ErrorTypes.SQLRequestError
-                ("addAllImagesIO:BAD! Don't add all images. Only" ++ show (length rez))
+      Logger.logError
+        (News.hLogHandle h)
+        ( "ERROR "
+            .< ErrorTypes.AddEditNewsSQLRequestError
+              ( ErrorTypes.SQLRequestError
+                  "addAllImagesIO:BAD! Don't add all images."
+              )
+        )
       return $
         Left $
           ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
@@ -166,14 +167,16 @@ addNewsIO conn h DataTypes.User {..} categories DataTypes.CreateNewsRequest {..}
                 newsImages = imageUris,
                 newsPublished = published
               }
-      Logger.logDebug (News.hLogHandle h) ("addNewsIO: OK!" .< ToText.toText news)
+      Logger.logInfo (News.hLogHandle h) $ T.concat ["addNewsIO: OK!", ToText.toText news]
       return $ Right news
     _ -> do
-      Logger.logError (News.hLogHandle h) $
-        T.pack $
-          show $
-            ErrorTypes.AddEditNewsSQLRequestError $
-              ErrorTypes.SQLRequestError "addNewsIO! Don't INSERT INTO  news table"
+      Logger.logError
+        (News.hLogHandle h)
+        ( "ERROR "
+            .< ErrorTypes.AddEditNewsSQLRequestError
+              ( ErrorTypes.SQLRequestError "addNewsIO! Don't INSERT INTO  news table"
+              )
+        )
       return $
         Left $
           ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
@@ -191,15 +194,17 @@ checkImageFilesExistIO h r@(DataTypes.CreateNewsRequest _ _ _ (Just req) _) (Rig
   rez <- mapM (SD.doesFileExist . DataTypes.image) req
   if and rez
     then do
-      Logger.logDebug (News.hLogHandle h) $ T.pack "checkImageFilesExist: OK!"
+      Logger.logDebug (News.hLogHandle h) "checkImageFilesExist: OK!"
       return $ Right r
     else do
-      Logger.logError (News.hLogHandle h) $
-        T.pack $
-          show $
-            ErrorTypes.NotExistImageFileAddEditNews $
-              ErrorTypes.InvalidContent
-                "checkImageFileExist: BAD!  File: does not exist (No such file or directory) "
+      Logger.logError
+        (News.hLogHandle h)
+        ( "ERROR "
+            .< ErrorTypes.NotExistImageFileAddEditNews
+              ( ErrorTypes.InvalidContent
+                  "checkImageFileExist: BAD!  File: does not exist (No such file or directory) "
+              )
+        )
       return . Left $
         ErrorTypes.NotExistImageFileAddEditNews $ ErrorTypes.InvalidContent []
 
@@ -227,15 +232,14 @@ checkCategoryIdIO conn h (Right DataTypes.CreateNewsRequest {..}) = do
       let categories = Prelude.map Category.toCategories result
       return $ Right categories
     _ -> do
-      Logger.logError (News.hLogHandle h) $
-        T.pack $
-          show $
-            ErrorTypes.InvalidCategoryIdAddEditNews $
-              ErrorTypes.InvalidContent
-                ( "checkCategoryIdIO: BAD! Category with id "
-                    ++ show newsCategoryId
-                    ++ " not exists"
-                )
+      Logger.logError
+        (News.hLogHandle h)
+        ( "ERROR "
+            .< ErrorTypes.InvalidCategoryIdAddEditNews
+              ( ErrorTypes.InvalidContent
+                  "checkCategoryIdIO: BAD! Category not exists"
+              )
+        )
       return $
         Left $
           ErrorTypes.InvalidCategoryIdAddEditNews $ ErrorTypes.InvalidContent []
@@ -251,14 +255,16 @@ checkPngImages _ (DataTypes.CreateNewsRequest _ _ _ Nothing _) (Right val) =
 checkPngImages h (DataTypes.CreateNewsRequest _ _ _ (Just req) _) (Right val) =
   if length (filter (\x -> DataTypes.format x == "png") req) == length req
     then do
-      Logger.logDebug (News.hLogHandle h) $ T.pack "checkPngImages: OK!"
+      Logger.logDebug (News.hLogHandle h) "checkPngImages: OK!"
       return $ Right val
     else do
-      Logger.logError (News.hLogHandle h) $
-        T.pack $
-          show $
-            ErrorTypes.NotPngImageAddEditNews $
-              ErrorTypes.InvalidContent "checkPngImages: BAD!"
+      Logger.logError
+        (News.hLogHandle h)
+        ( "ERROR "
+            .< ErrorTypes.NotPngImageAddEditNews
+              ( ErrorTypes.InvalidContent "checkPngImages: BAD!"
+              )
+        )
       return . Left $
         ErrorTypes.NotPngImageAddEditNews $ ErrorTypes.InvalidContent []
 
@@ -274,13 +280,15 @@ checkBase64ImagesIO h (DataTypes.CreateNewsRequest _ _ _ (Just req) _) (Right va
   imageFiles <- mapM (B.readFile . DataTypes.image) req
   if length (filter Base64.isBase64 imageFiles) == length req
     then do
-      Logger.logDebug (News.hLogHandle h) $ T.pack "checkBase64Image: OK!"
+      Logger.logDebug (News.hLogHandle h) "checkBase64Image: OK!"
       return (Right val)
     else do
-      Logger.logError (News.hLogHandle h) $
-        T.pack $
-          show $
-            ErrorTypes.NotBase64ImageAddEditNews $
-              ErrorTypes.InvalidContent "checkBase64Image: BAD!"
+      Logger.logError
+        (News.hLogHandle h)
+        ( "ERROR "
+            .< ErrorTypes.NotBase64ImageAddEditNews
+              ( ErrorTypes.InvalidContent "checkBase64Image: BAD!"
+              )
+        )
       return . Left $
         ErrorTypes.NotBase64ImageAddEditNews $ ErrorTypes.InvalidContent []

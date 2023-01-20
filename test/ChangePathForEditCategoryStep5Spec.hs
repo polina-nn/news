@@ -218,6 +218,6 @@ categoryAfterStepFour =
 editCategoryRequests :: Maybe [CategoryHelpTypes.EditCategory]
 editCategoryRequests =
   Just
-    [ CategoryHelpTypes.EditCategory {_id = 8, newPath = "1.1"},
-      CategoryHelpTypes.EditCategory {_id = 9, newPath = "3.3.1"}
+    [ CategoryHelpTypes.EditCategory {permanentId = 8, newPath = "1.1"},
+      CategoryHelpTypes.EditCategory {permanentId = 9, newPath = "3.3.1"}
     ]

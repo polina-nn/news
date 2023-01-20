@@ -1,6 +1,7 @@
 module Main
-  ( main
-  ) where
+  ( main,
+  )
+where
 
 import qualified Config
 import qualified Control.Exception as Exc
@@ -47,8 +48,8 @@ makeServerHandle conf logHandle = do
   putStrLn "getURIConfig OK!"
   pure
     News.Handle
-      { News.hLogHandle = logHandle
-      , News.hAppConfig = appConfig
-      , News.hDbConfig = dbConfig
-      , News.hURIConfig = uriConfig
+      { News.hLogHandle = logHandle,
+        News.hAppConfig = appConfig,
+        News.hDbConfig = dbConfig,
+        News.hURIConfig = uriConfig
       }

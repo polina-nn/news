@@ -1,0 +1,5 @@
+#HLint configuration file
+# https://github.com/ndmitchell/hlint
+##########################
+# errors "Parse error" are issued from the functions [sql| .. ] from Database.PostgreSQL.Simple.SqlQQ (sql) library
+- ignore: {name:  Parse error}

@@ -48,7 +48,7 @@ authorsNewsSearchList _ (h, _, Nothing, _, _) = do
   Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidSearchGetNews (ErrorTypes.InvalidRequest "authorsNewsSearchList: BAD! Not text for searching \n"))
   return $ Left $ ErrorTypes.InvalidSearchGetNews $ ErrorTypes.InvalidRequest []
 authorsNewsSearchList conn (h, user, Just search, mo, ml) = do
-  Logger.logInfo (News.hLogHandle h) "Request with authentication: Get News Search List "
+  Logger.logInfo (News.hLogHandle h) $ T.concat ["Request with authentication: Get News Search List ", search, " offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
   checkAuthor <- Lib.checkUserAuthor h user
   case checkAuthor of
     Left err -> return $ Left $ ErrorTypes.InvalidPermissionGetNews err
@@ -62,7 +62,7 @@ authorsNewsSearchList conn (h, user, Just search, mo, ml) = do
           case News.checkErrorsToNews news res of
             (True, news') -> do
               let toTextNews = T.concat $ map ToText.toText news'
-              Logger.logInfo (News.hLogHandle h) ("authorsNewsSearchList: OK! \n" .< toTextNews)
+              Logger.logInfo (News.hLogHandle h) $ T.concat ["authorsNewsSearchList: OK! \n", toTextNews]
               return $ Right news'
             _ ->
               return $

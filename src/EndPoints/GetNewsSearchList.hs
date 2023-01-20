@@ -44,7 +44,7 @@ newsSearchList _ (h, Nothing, _, _) = do
   Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidSearchGetNews (ErrorTypes.InvalidRequest "newsSearchList: BAD! Not text for searching \n"))
   return $ Left $ ErrorTypes.InvalidSearchGetNews $ ErrorTypes.InvalidRequest []
 newsSearchList conn (h, Just search, mo, ml) = do
-  Logger.logInfo (News.hLogHandle h) "Request: Get News Search List "
+  Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Get News Search List ", search, " offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
   checkRequest <- OffsetLimit.checkOffsetLimitNews h mo ml
   case checkRequest of
     Left err -> return $ Left err
@@ -54,7 +54,7 @@ newsSearchList conn (h, Just search, mo, ml) = do
       case News.checkErrorsToNews news res of
         (True, news') -> do
           let toTextNews = (T.concat $ map ToText.toText news') :: T.Text
-          Logger.logInfo (News.hLogHandle h) ("authorsNewsSearchList: OK! \n" .< toTextNews)
+          Logger.logInfo (News.hLogHandle h) $ T.concat ["newsSearchList: OK! \n", toTextNews]
           return $ Right news'
         _ ->
           return $

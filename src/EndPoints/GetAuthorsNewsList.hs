@@ -14,7 +14,7 @@ import qualified EndPoints.Lib.News.NewsHelpTypes as NewsHelpTypes
 import qualified EndPoints.Lib.News.NewsIO as NewsIO
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
-import Logger (logDebug, logError, logInfo, (.<))
+import Logger (logDebug, logError, logInfo)
 import qualified News
 import Servant (Handler)
 import qualified Types.DataTypes as DataTypes
@@ -54,8 +54,7 @@ authorsNewsList ::
   ) ->
   IO (Either ErrorTypes.GetNewsError [DataTypes.News])
 authorsNewsList conn (h, user, f, mSort, mo, ml) = do
-  Logger.logInfo (News.hLogHandle h) "Request with authentication: Get News List "
-  Logger.logDebug (News.hLogHandle h) $ "Use this filter \n " .< f
+  Logger.logInfo (News.hLogHandle h) $ T.concat ["Request with authentication: Get News List with filter ", ToText.toText f, " offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
   resAllCheck <- News.checkUserOffsetLimitFilter (h, user, f, mo, ml)
   case resAllCheck of
     Left err -> do
@@ -70,7 +69,7 @@ authorsNewsList conn (h, user, f, mSort, mo, ml) = do
       case News.checkErrorsToNews news res of
         (True, news') -> do
           let toTextNews = T.concat $ map ToText.toText news'
-          Logger.logInfo (News.hLogHandle h) ("authorsNewsList: OK! \n" .< toTextNews)
+          Logger.logInfo (News.hLogHandle h) $ T.concat ["newsList: OK! \n", toTextNews]
           return $ Right news'
         _ ->
           return $
@@ -87,7 +86,7 @@ authorsNewsList' ::
   IO [NewsHelpTypes.DbNews]
 authorsNewsList' conn user mo ml f@NewsHelpTypes.DbFilter {..}
   --  category specified in db_filer_category_id
-  | isJust dbFilerCategoryId = authorsNewsListCategory conn user mo ml f
+  | isJust dbFilterCategoryId = authorsNewsListCategory conn user mo ml f
   -- category not specified
   | otherwise = authorsNewsListNotCategory conn user mo ml f
 
@@ -114,12 +113,12 @@ authorsNewsListCategory conn DataTypes.User {..} off lim NewsHelpTypes.DbFilter 
             ORDER BY news_created DESC 
             LIMIT ?  OFFSET ?;|]
       ( userLogin,
-        dbFilerDayAt,
-        dbFilerDayUntil,
-        dbFilerDaySince,
-        dbFilerAuthor,
-        dbFilerTitle,
-        dbFilerContent,
+        dbFilterDayAt,
+        dbFilterDayUntil,
+        dbFilterDaySince,
+        dbFilterAuthor,
+        dbFilterTitle,
+        dbFilterContent,
         newsCat,
         lim,
         off
@@ -127,7 +126,7 @@ authorsNewsListCategory conn DataTypes.User {..} off lim NewsHelpTypes.DbFilter 
   let dbNews = Prelude.map News.toDbNews res
   return dbNews
   where
-    newsCat = fromMaybe 0 dbFilerCategoryId
+    newsCat = fromMaybe 0 dbFilterCategoryId
 
 authorsNewsListNotCategory ::
   SQL.Connection ->
@@ -151,12 +150,12 @@ authorsNewsListNotCategory conn DataTypes.User {..} off lim NewsHelpTypes.DbFilt
             ORDER BY news_created DESC 
             LIMIT ?  OFFSET ?;|]
       ( userLogin,
-        dbFilerDayAt,
-        dbFilerDayUntil,
-        dbFilerDaySince,
-        dbFilerAuthor,
-        dbFilerTitle,
-        dbFilerContent,
+        dbFilterDayAt,
+        dbFilterDayUntil,
+        dbFilterDaySince,
+        dbFilterAuthor,
+        dbFilterTitle,
+        dbFilterContent,
         lim,
         off
       )

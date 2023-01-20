@@ -70,13 +70,13 @@ instance FromHttpApiData SortBy where
     | otherwise = Left "Invalid sort_by value"
 
 data Filter = Filter
-  { filerDayAt :: Maybe DayAt,
-    filerDayUntil :: Maybe DayUntil,
-    filerDaySince :: Maybe DaySince,
-    filerAuthor :: Maybe T.Text,
-    filerCategoryId :: Maybe Int,
-    filerTitle :: Maybe T.Text,
-    filerContent :: Maybe T.Text
+  { filterDayAt :: Maybe DayAt,
+    filterDayUntil :: Maybe DayUntil,
+    filterDaySince :: Maybe DaySince,
+    filterAuthor :: Maybe T.Text,
+    filterCategoryId :: Maybe Int,
+    filterTitle :: Maybe T.Text,
+    filterContent :: Maybe T.Text
   }
   deriving (Show, Generic, Eq)
 

@@ -7,6 +7,7 @@ module EndPoints.Lib.OffsetLimit
   )
 where
 
+import qualified Data.Text as T
 import Logger (logDebug, logError, (.<))
 import qualified News
 import qualified Types.DataTypes as DataTypes
@@ -65,8 +66,6 @@ checkOffsetLimit ::
   Maybe DataTypes.Limit ->
   m (Either ErrorTypes.GetContentError (DataTypes.Offset, DataTypes.Limit))
 checkOffsetLimit h mo ml = do
-  Logger.logDebug (News.hLogHandle h) ("In request: offset = " .< mo)
-  Logger.logDebug (News.hLogHandle h) ("In request: limit = " .< ml)
   checkOff <- checkOffset h mo
   case checkOff of
     Left err -> return $ Left $ ErrorTypes.InvalidOffsetGetContent err
@@ -75,8 +74,7 @@ checkOffsetLimit h mo ml = do
       case checkLim of
         Left err -> return $ Left $ ErrorTypes.InvalidLimitGetContent err
         Right limit -> do
-          Logger.logDebug (News.hLogHandle h) ("checkOffsetLimit: OK! Offset = " .< offset)
-          Logger.logDebug (News.hLogHandle h) ("checkOffsetLimit: OK! Limit  = " .< limit)
+          Logger.logDebug (News.hLogHandle h) $ T.concat ["checkOffsetLimit: OK! Offset = ", T.pack $ show offset, "Limit  = ", T.pack $ show limit]
           return $ Right (offset, limit)
 
 checkOffsetLimitNews ::

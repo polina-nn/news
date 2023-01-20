@@ -13,11 +13,13 @@ import Control.Exception.Base
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base64 as Base64
+import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
-import Logger (logDebug, logError, (.<))
+import qualified EndPoints.Lib.ToText as ToText
+import Logger (logDebug, logError, logInfo, (.<))
 import qualified News
 import Servant (Handler)
 import qualified System.Directory as SD
@@ -42,7 +44,7 @@ addImage ::
   (News.Handle IO, DataTypes.User, DataTypes.CreateImageRequest) ->
   IO (Either ErrorTypes.AddImageError DataTypes.URI)
 addImage conn (h, user, createImage) = do
-  Logger.logDebug (News.hLogHandle h) "Request: Add One Image"
+  Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add One Image ", ToText.toText createImage, "\nby user: ", ToText.toText user]
   allCheck <-
     Lib.checkUserAuthor h user >>= checkImageFileExist h createImage
       >>= checkPngImage h
@@ -79,9 +81,7 @@ checkImageFileExist h r@DataTypes.CreateImageRequest {..} (Right _) = do
         ( "ERROR "
             .< ErrorTypes.NotExistImageFile
               ( ErrorTypes.InvalidContent
-                  ( "checkImageFileExist: BAD!  File: does not exist (No such file or directory) "
-                      ++ image
-                  )
+                  "checkImageFileExist: BAD!  File: does not exist (No such file or directory) "
               )
         )
       return . Left $
@@ -102,7 +102,7 @@ checkPngImage h (Right r@DataTypes.CreateImageRequest {..}) =
         (News.hLogHandle h)
         ( "ERROR "
             .< ErrorTypes.NotPngImage
-              ( ErrorTypes.InvalidContent ("checkPngImage: BAD! Format " ++ format)
+              ( ErrorTypes.InvalidContent "checkPngImage: BAD! Format "
               )
         )
       return . Left $ ErrorTypes.NotPngImage $ ErrorTypes.InvalidContent []

@@ -216,15 +216,15 @@ categoryAfterStepFour =
 editCategoryRequests :: Maybe [CategoryHelpTypes.EditCategory]
 editCategoryRequests =
   Just
-    [ CategoryHelpTypes.EditCategory {_id = 1, newPath = "3.3"},
-      CategoryHelpTypes.EditCategory {_id = 2, newPath = "2"},
-      CategoryHelpTypes.EditCategory {_id = 3, newPath = "4"},
-      CategoryHelpTypes.EditCategory {_id = 4, newPath = "5"},
-      CategoryHelpTypes.EditCategory {_id = 5, newPath = "3"},
-      CategoryHelpTypes.EditCategory {_id = 6, newPath = "3.1"},
-      CategoryHelpTypes.EditCategory {_id = 7, newPath = "3.2"},
-      CategoryHelpTypes.EditCategory {_id = 8, newPath = "3.2.1"},
-      CategoryHelpTypes.EditCategory {_id = 9, newPath = "3.2.2"},
-      CategoryHelpTypes.EditCategory {_id = 10, newPath = "6"},
-      CategoryHelpTypes.EditCategory {_id = 11, newPath = "1"}
+    [ CategoryHelpTypes.EditCategory {permanentId = 1, newPath = "3.3"},
+      CategoryHelpTypes.EditCategory {permanentId = 2, newPath = "2"},
+      CategoryHelpTypes.EditCategory {permanentId = 3, newPath = "4"},
+      CategoryHelpTypes.EditCategory {permanentId = 4, newPath = "5"},
+      CategoryHelpTypes.EditCategory {permanentId = 5, newPath = "3"},
+      CategoryHelpTypes.EditCategory {permanentId = 6, newPath = "3.1"},
+      CategoryHelpTypes.EditCategory {permanentId = 7, newPath = "3.2"},
+      CategoryHelpTypes.EditCategory {permanentId = 8, newPath = "3.2.1"},
+      CategoryHelpTypes.EditCategory {permanentId = 9, newPath = "3.2.2"},
+      CategoryHelpTypes.EditCategory {permanentId = 10, newPath = "6"},
+      CategoryHelpTypes.EditCategory {permanentId = 11, newPath = "1"}
     ]

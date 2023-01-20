@@ -65,15 +65,15 @@ curl -v "http://polina:polina@localhost:8080/login/news?sort_by=category&limit=1
 curl -v "http://polina:polina@localhost:8080/login/news?sort_by=data&limit=10"
 
 4. Sort news by category foto
-curl -v "http://polina:polina@localhost:8080/login/news?sort_by=foto&limit=25"
+curl -v "http://polina:polina@localhost:8080/login/news?sort_by=photo&limit=25"
 
 ----- Check filters & sort & limit  -----
 
 1. filter & sort & limit  
-curl -v "http://polina:polina@localhost:8080/login/news?content=Сергей&sort_by=foto&limit=10"
+curl -v "http://polina:polina@localhost:8080/login/news?content=Сергей&sort_by=photo&limit=10"
 
 2. filter & filters & sort
-curl -v "http://polina:polina@localhost:8080/login/news?title=Тандыр&content=Сергей&sort_by=foto"
+curl -v "http://polina:polina@localhost:8080/login/news?title=Тандыр&content=Сергей&sort_by=photo"
 
 3. filter & filter & filters & sort
-curl -v "http://polina:polina@localhost:8080/login/news?author=Егор&title=Тандыр&content=Сергей&sort_by=foto"
+curl -v "http://polina:polina@localhost:8080/login/news?author=Егор&title=Тандыр&content=Сергей&sort_by=photo"

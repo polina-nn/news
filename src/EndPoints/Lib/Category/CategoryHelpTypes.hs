@@ -5,8 +5,8 @@ import qualified Types.DataTypes as DataTypes
 
 -- | EditCategory - use in logic function for add or edit category
 data EditCategory = EditCategory
-  { -- | _id - never change
-    _id :: DataTypes.Id,
+  { -- | permanentId - never change category id
+    permanentId :: DataTypes.Id,
     -- | newPath - change path when moving categories (when edit or add category)
     newPath :: DataTypes.Path
   }

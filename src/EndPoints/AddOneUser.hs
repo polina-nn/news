@@ -11,6 +11,7 @@ import Control.Exception.Base
     throwIO,
   )
 import Control.Monad.IO.Class (MonadIO (liftIO))
+import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.Lib as Lib
@@ -38,7 +39,7 @@ addUser ::
   (News.Handle IO, DataTypes.User, DataTypes.CreateUserRequest) ->
   IO (Either ErrorTypes.AddUserError DataTypes.User)
 addUser conn (h, user, req) = do
-  Logger.logInfo (News.hLogHandle h) "Request: Add User "
+  Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add User: \n", ToText.toText req, "by user: ", ToText.toText user]
   allCheck <- Lib.checkUserAdmin h user >>= checkLogin conn h req
   case allCheck of
     Left err -> return $ Left err
@@ -46,7 +47,7 @@ addUser conn (h, user, req) = do
       rez <- catch (addUserIO conn h req) handleError
       case rez of
         (Right newUser) -> do
-          Logger.logInfo (News.hLogHandle h) ("addUser: OK! \n" .< ToText.toText newUser)
+          Logger.logInfo (News.hLogHandle h) $ T.concat ["addUser: OK! \n", ToText.toText newUser]
           return rez
         (Left newUserError) -> do
           Logger.logError
@@ -73,9 +74,6 @@ addUserIO conn h DataTypes.CreateUserRequest {..} = do
       [sql|INSERT INTO usr (usr_name, usr_login , usr_password, usr_created, usr_admin, usr_author )
              VALUES (?, ?, ?, ?, ?, ?) ;|]
       (name, login, Lib.hashed password, show created, admin, author)
-  Logger.logInfo
-    (News.hLogHandle h)
-    ("addUserIO: OK! INSERT INTO \n" .< res)
   case read (show res) :: Int of
     1 ->
       return
@@ -83,7 +81,7 @@ addUserIO conn h DataTypes.CreateUserRequest {..} = do
             DataTypes.User
               { userName = name,
                 userLogin = login,
-                userPassword = Nothing, -- Do not show password
+                userPassword = Nothing,
                 userCreated = created,
                 userAdmin = admin,
                 userAuthor = author
@@ -114,21 +112,13 @@ checkLogin conn h' r@DataTypes.CreateUserRequest {..} (Right _) = do
     [x] ->
       if not (SQL.fromOnly x)
         then do
-          Logger.logDebug (News.hLogHandle h') ("checkLogin: OK! Not exists user with login " .< show login)
+          Logger.logDebug (News.hLogHandle h') "checkLogin: OK!"
           return $ Right r
         else do
           Logger.logError
             (News.hLogHandle h')
-            ( "ERROR "
-                .< ErrorTypes.UserAlreadyExisted
-                  ( ErrorTypes.InvalidContent
-                      ( "checkLogin: BAD! Exists user with login "
-                          ++ show login
-                      )
-                  )
-            )
-          return $
-            Left $ ErrorTypes.UserAlreadyExisted $ ErrorTypes.InvalidContent []
+            ("ERROR " .< ErrorTypes.UserAlreadyExisted (ErrorTypes.InvalidContent "checkLogin: BAD! User with this login already exists "))
+          return $ Left $ ErrorTypes.UserAlreadyExisted $ ErrorTypes.InvalidContent []
     _ -> do
       Logger.logError
         (News.hLogHandle h')

@@ -1,6 +1,7 @@
 module MainCR
-  ( mainCR
-  ) where
+  ( mainCR,
+  )
+where
 
 import qualified Crypto.Hash
 import qualified Data.ByteArray.Encoding as BAE

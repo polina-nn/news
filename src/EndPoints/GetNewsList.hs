@@ -14,7 +14,7 @@ import qualified EndPoints.Lib.News.NewsHelpTypes as NewsHelpTypes
 import qualified EndPoints.Lib.News.NewsIO as NewsIO
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
-import Logger (logDebug, logError, logInfo, (.<))
+import Logger (logDebug, logError, logInfo)
 import qualified News
 import Servant (Handler)
 import qualified Types.DataTypes as DataTypes
@@ -52,20 +52,20 @@ newsList ::
   ) ->
   IO (Either ErrorTypes.GetNewsError [DataTypes.News])
 newsList conn (h, f, mSort, mo, ml) = do
-  Logger.logInfo (News.hLogHandle h) "Request: Get News List "
+  Logger.logInfo (News.hLogHandle h) $ T.concat ["Get News List with filter ", ToText.toText f, " offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
   resAllCheck <- News.checkOffsetLimitFilter (h, f, mo, ml)
   case resAllCheck of
     Left err -> do
-      Logger.logError (News.hLogHandle h) "All Check: BAD!  \n"
+      Logger.logError (News.hLogHandle h) "All Check: BAD!"
       return $ Left err
     Right (offset, limit, dbFiler) -> do
-      Logger.logDebug (News.hLogHandle h) "All Check: OK!  \n"
+      Logger.logDebug (News.hLogHandle h) "All Check: OK!"
       res <- newsList' conn offset limit dbFiler >>= News.sortNews h mSort
       news <- Prelude.mapM (NewsIO.toNews conn h) res
       case News.checkErrorsToNews news res of
         (True, news') -> do
           let toTextNews = T.concat $ map ToText.toText news'
-          Logger.logInfo (News.hLogHandle h) ("newsList: OK! \n" .< toTextNews)
+          Logger.logInfo (News.hLogHandle h) $ T.concat ["newsList: OK! \n", toTextNews]
           return $ Right news'
         _ ->
           return $
@@ -81,7 +81,7 @@ newsList' ::
   IO [NewsHelpTypes.DbNews]
 newsList' conn mo ml f@NewsHelpTypes.DbFilter {..}
   --  category specified in db_filer_category_id
-  | isJust dbFilerCategoryId = newsListCategory conn mo ml f
+  | isJust dbFilterCategoryId = newsListCategory conn mo ml f
   -- category not specified
   | otherwise = newsListNotCategory conn mo ml f
 
@@ -106,12 +106,12 @@ newsListCategory conn off lim NewsHelpTypes.DbFilter {..} = do
             AND news_category_id = ?
             ORDER BY news_created DESC 
             LIMIT ?  OFFSET ?;|]
-      ( dbFilerDayAt,
-        dbFilerDayUntil,
-        dbFilerDaySince,
-        dbFilerAuthor,
-        dbFilerTitle,
-        dbFilerContent,
+      ( dbFilterDayAt,
+        dbFilterDayUntil,
+        dbFilterDaySince,
+        dbFilterAuthor,
+        dbFilterTitle,
+        dbFilterContent,
         newsCat,
         lim,
         off
@@ -119,7 +119,7 @@ newsListCategory conn off lim NewsHelpTypes.DbFilter {..} = do
   let dbNews = Prelude.map News.toDbNews res
   return dbNews
   where
-    newsCat = fromMaybe 0 dbFilerCategoryId
+    newsCat = fromMaybe 0 dbFilterCategoryId
 
 newsListNotCategory ::
   SQL.Connection ->
@@ -141,12 +141,12 @@ newsListNotCategory conn off lim NewsHelpTypes.DbFilter {..} = do
             AND news_text LIKE ?
             ORDER BY news_created DESC 
             LIMIT ?  OFFSET ?;|]
-      ( dbFilerDayAt,
-        dbFilerDayUntil,
-        dbFilerDaySince,
-        dbFilerAuthor,
-        dbFilerTitle,
-        dbFilerContent,
+      ( dbFilterDayAt,
+        dbFilterDayUntil,
+        dbFilterDaySince,
+        dbFilterAuthor,
+        dbFilterTitle,
+        dbFilterContent,
         lim,
         off
       )

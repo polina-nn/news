@@ -53,7 +53,7 @@ editNews ::
   (News.Handle IO, DataTypes.User, IdNews, DataTypes.EditNewsRequest) ->
   IO (Either ErrorTypes.AddEditNewsError DataTypes.News)
 editNews conn (h, user, newsId, r) = do
-  Logger.logInfo (News.hLogHandle h) "Request: Edit One News"
+  Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Edit One News \n", ToText.toText r, "with news id ", T.pack $ show newsId, "\nby user: ", ToText.toText user]
   allCheck <-
     checkIdIO conn h newsId >>= checkUserThisNewsAuthorIO conn h user
       >>= checkImageFilesExistIO h r
@@ -188,7 +188,7 @@ newImagesIO conn h newsId (Right r@DataTypes.EditNewsRequest {newImages = Just r
               ErrorTypes.AddEditNewsSQLRequestError $
                 ErrorTypes.SQLRequestError []
     else do
-      Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.AddEditNewsSQLRequestError (ErrorTypes.SQLRequestError ("addImageNewsIO:BAD! Don't add all images. Only" ++ show (length rez))))
+      Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.AddEditNewsSQLRequestError (ErrorTypes.SQLRequestError "addImageNewsIO:BAD! Don't add all images."))
       return $
         Left $
           ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
@@ -362,7 +362,7 @@ getNewsIO conn h user idNews (Right (categories, imagesIds)) = do
   case res of
     [val] -> do
       let news = toNews val user categories imagesIds
-      Logger.logDebug (News.hLogHandle h) ("addNewsIO: OK!" .< ToText.toText news)
+      Logger.logDebug (News.hLogHandle h) $ T.concat ["addNewsIO: OK!", ToText.toText news]
       return $ Right news
     _ -> do
       Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.AddEditNewsSQLRequestError (ErrorTypes.SQLRequestError "addNewsIO! Don't INSERT INTO  news table"))
@@ -422,7 +422,7 @@ checkIdIO conn h newsId = do
           )
         else
           ( do
-              Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidNewsId (ErrorTypes.InvalidId ("checkIdIO: BAD! Not exists news with id " ++ show newsId)))
+              Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidNewsId (ErrorTypes.InvalidId "checkIdIO: BAD! Not exists news with id "))
               return $
                 Left $ ErrorTypes.InvalidNewsId $ ErrorTypes.InvalidId []
           )
@@ -501,7 +501,7 @@ checkCategoryIdIO conn h (Right r@DataTypes.EditNewsRequest {newCategoryId = Jus
         (News.hLogHandle h)
         ( "ERROR "
             .< ErrorTypes.InvalidCategoryIdAddEditNews
-              ( ErrorTypes.InvalidContent ("checkCategoryIdIO: BAD! Not exists category with id " ++ show categoryId)
+              ( ErrorTypes.InvalidContent "checkCategoryIdIO: BAD! Not exists category with id "
               )
         )
       return $

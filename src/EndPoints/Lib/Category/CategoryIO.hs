@@ -4,8 +4,8 @@ module EndPoints.Lib.Category.CategoryIO
   )
 where
 
+import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
-import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.Category.Category as Category
 import qualified EndPoints.Lib.Category.CategoryHelpTypes as CategoryHelpTypes
 import Logger (logDebug, logError, logInfo, (.<))
@@ -36,9 +36,7 @@ changePathCategoriesIO conn h rs = count
             ( "ERROR "
                 .< ErrorTypes.AddEditCategorySQLRequestError
                   ( ErrorTypes.SQLRequestError
-                      ( "changePathOneCategoryIO:BAD! Don't UPDATE  all categories. Update only"
-                          ++ show (length rez)
-                      )
+                      "changePathOneCategoryIO:BAD! Don't UPDATE  all categories."
                   )
             )
           return $
@@ -55,12 +53,11 @@ changePathOneCategoryIO conn h CategoryHelpTypes.EditCategory {..} = do
   res <-
     SQL.execute
       conn
-      [sql| UPDATE  category SET category_path = ? WHERE category_id = ? ;|]
-      (newPath, _id)
-  case read (show res) :: Int of
+      "UPDATE  category SET category_path = ? WHERE category_id = ? "
+      (newPath, permanentId)
+  case read $ show res :: Int of
     1 -> do
-      Logger.logDebug (News.hLogHandle h) ("changePathOneCategoryIO: OK! \n  id = " .< _id)
-      Logger.logDebug (News.hLogHandle h) ("changePathOneCategoryIO: OK! \n  path = " .< newPath)
+      Logger.logDebug (News.hLogHandle h) $ T.concat ["changePathOneCategoryIO: OK! \n  id = ", T.pack $ show permanentId, "path = ", T.pack $ show newPath]
       return $ Right 1
     _ -> do
       Logger.logError
@@ -89,9 +86,7 @@ getAllCategoriesIO conn _ (Right _) = do
   res <-
     SQL.query_
       conn
-      [sql| SELECT category_path, category_id, category_name
-                FROM category 
-                ORDER BY category_path |]
+      "SELECT category_path, category_id, category_name FROM category ORDER BY category_path "
   case res of
     [] -> return $ Right []
     _ -> return $ Right $ Prelude.map Category.toCategories res

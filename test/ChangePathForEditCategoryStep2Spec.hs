@@ -218,12 +218,12 @@ categoryAfterStepFour =
 editCategoryRequests :: Maybe [CategoryHelpTypes.EditCategory]
 editCategoryRequests =
   Just
-    [ CategoryHelpTypes.EditCategory {_id = 1, newPath = "2.3"},
-      CategoryHelpTypes.EditCategory {_id = 3, newPath = "3"},
-      CategoryHelpTypes.EditCategory {_id = 4, newPath = "4"},
-      CategoryHelpTypes.EditCategory {_id = 5, newPath = "2"},
-      CategoryHelpTypes.EditCategory {_id = 6, newPath = "2.1"},
-      CategoryHelpTypes.EditCategory {_id = 7, newPath = "2.2"},
-      CategoryHelpTypes.EditCategory {_id = 8, newPath = "2.2.1"},
-      CategoryHelpTypes.EditCategory {_id = 9, newPath = "2.2.2"}
+    [ CategoryHelpTypes.EditCategory {permanentId = 1, newPath = "2.3"},
+      CategoryHelpTypes.EditCategory {permanentId = 3, newPath = "3"},
+      CategoryHelpTypes.EditCategory {permanentId = 4, newPath = "4"},
+      CategoryHelpTypes.EditCategory {permanentId = 5, newPath = "2"},
+      CategoryHelpTypes.EditCategory {permanentId = 6, newPath = "2.1"},
+      CategoryHelpTypes.EditCategory {permanentId = 7, newPath = "2.2"},
+      CategoryHelpTypes.EditCategory {permanentId = 8, newPath = "2.2.1"},
+      CategoryHelpTypes.EditCategory {permanentId = 9, newPath = "2.2.2"}
     ]

@@ -1,38 +1,39 @@
 -- | The logger interface module. It should not define a specific
 -- implementation.
 module Logger
-  ( Handle(..)
-  , Level(..)
-  , logDebug
-  , logInfo
-  , logWarning
-  , logError
-  , (.<)
-  ) where
+  ( Handle (..),
+    Level (..),
+    logDebug,
+    logInfo,
+    logWarning,
+    logError,
+    (.<),
+  )
+where
 
 import qualified Data.Text as T
 
 -- | The logger handle. This is a public logger interface that can
 -- have different implementations. You can use it everywhere.
-newtype Handle m =
-  Handle
-    { hLowLevelLog :: Level -> T.Text -> m ()
-    }
+newtype Handle m = Handle
+  { hLowLevelLog :: Level -> T.Text -> m ()
+  }
 
 data Level
-  = Debug -- ^ Debug messages
-  | Info -- ^ Notable information that requires no immediate action.
-  | Warning -- ^ Something is probably wrong, and we should investigate.
-  | Error -- ^ Something is wrong and immediate action is required.
+  = -- | Debug messages
+    Debug
+  | -- | Notable information that requires no immediate action.
+    Info
+  | -- | Something is probably wrong, and we should investigate.
+    Warning
+  | -- | Something is wrong and immediate action is required.
+    Error
   deriving (Show, Eq, Ord)
 
 logDebug, logInfo, logWarning, logError :: Handle m -> T.Text -> m ()
 logDebug h = hLowLevelLog h Debug
-
 logInfo h = hLowLevelLog h Info
-
 logWarning h = hLowLevelLog h Warning
-
 logError h = hLowLevelLog h Error
 
 -- | Concatenates a text and an instance of 'Show'. This is a

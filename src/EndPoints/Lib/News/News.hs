@@ -30,7 +30,7 @@ toFilter ::
   Maybe T.Text ->
   Maybe T.Text ->
   DataTypes.Filter
-toFilter filerDayAt filerDayUntil filerDaySince filerAuthor filerCategoryId filerTitle filerContent =
+toFilter filterDayAt filterDayUntil filterDaySince filterAuthor filterCategoryId filterTitle filterContent =
   DataTypes.Filter {..}
 
 -- | checkUserOffsetLimitFilter - Check the validity of all data in the request. If ok, then a service DbFilter, otherwise an error
@@ -61,7 +61,8 @@ checkUserOffsetLimitFilter (h, user, f, mo, ml) = do
         Right (offset, limit) ->
           case checkFilter f of
             Left er -> return $ Left er
-            Right dbFilter -> return $ Right (offset, limit, dbFilter)
+            Right dbFilter ->
+              return $ Right (offset, limit, dbFilter)
 
 -- | checkOffsetLimitFilter - Check the validity of all data in the request. If ok, then a service DbFilter, otherwise an error
 -- the validity of SortBy is checked automatically by servant
@@ -97,23 +98,23 @@ checkFilter f@DataTypes.Filter {..} =
     Right _ ->
       Right
         NewsHelpTypes.DbFilter
-          { dbFilerDayAt = dayAt' filerDayAt,
-            dbFilerDayUntil = dayUntil' filerDayUntil,
-            dbFilerDaySince = daySince' filerDayAt filerDayUntil filerDaySince,
-            dbFilerAuthor = text' filerAuthor,
-            dbFilerCategoryId = filerCategoryId,
-            dbFilerTitle = text' filerTitle,
-            dbFilerContent = text' filerContent
+          { dbFilterDayAt = dayAt' filterDayAt,
+            dbFilterDayUntil = dayUntil' filterDayUntil,
+            dbFilterDaySince = daySince' filterDayAt filterDayUntil filterDaySince,
+            dbFilterAuthor = text' filterAuthor,
+            dbFilterCategoryId = filterCategoryId,
+            dbFilterTitle = text' filterTitle,
+            dbFilterContent = text' filterContent
           }
 
 dayAtOrUntilOrSince ::
   DataTypes.Filter -> Either ErrorTypes.GetNewsError DataTypes.Filter
 dayAtOrUntilOrSince fi@DataTypes.Filter {..}
-  | isNothing filerDayAt && isNothing filerDayUntil && isNothing filerDaySince =
+  | isNothing filterDayAt && isNothing filterDayUntil && isNothing filterDaySince =
     Right fi
-  | isNothing filerDayUntil && isNothing filerDaySince = Right fi
-  | isNothing filerDayAt && isNothing filerDaySince = Right fi
-  | isNothing filerDayAt && isNothing filerDayUntil = Right fi
+  | isNothing filterDayUntil && isNothing filterDaySince = Right fi
+  | isNothing filterDayAt && isNothing filterDaySince = Right fi
+  | isNothing filterDayAt && isNothing filterDayUntil = Right fi
   | otherwise =
     Left $ ErrorTypes.InvalidFilterGetNews $ ErrorTypes.InvalidRequest []
 
@@ -147,11 +148,10 @@ sortNews ::
   [NewsHelpTypes.DbNews] ->
   IO [NewsHelpTypes.DbNews]
 sortNews h Nothing dbNews = do
-  Logger.logDebug (News.hLogHandle h) $
-    T.pack "sortNews: default by data (latest news is the first) \n"
+  Logger.logDebug (News.hLogHandle h) "sortNews: default by data (latest news is the first)"
   return dbNews
 sortNews h (Just DataTypes.SortByAuthor) dbNews = do
-  Logger.logDebug (News.hLogHandle h) $ T.pack "sortNews: by author name \n"
+  Logger.logDebug (News.hLogHandle h) "sortNews: by author name "
   let rez =
         sortBy
           ( \x y ->
@@ -162,7 +162,7 @@ sortNews h (Just DataTypes.SortByAuthor) dbNews = do
           dbNews
   return rez
 sortNews h (Just DataTypes.SortByCategory) dbNews = do
-  Logger.logDebug (News.hLogHandle h) $ T.pack "sortNews: by category name \n"
+  Logger.logDebug (News.hLogHandle h) "sortNews: by category name "
   let rez =
         sortBy
           ( \x y ->
@@ -173,12 +173,10 @@ sortNews h (Just DataTypes.SortByCategory) dbNews = do
           dbNews
   return rez
 sortNews h (Just DataTypes.SortByData) dbNews = do
-  Logger.logDebug (News.hLogHandle h) $
-    T.pack "sortNews: by data, default by data (latest first) \n"
+  Logger.logDebug (News.hLogHandle h) "sortNews: by data, default by data (latest first)"
   return dbNews
 sortNews h (Just DataTypes.SortByPhoto) dbNews = do
-  Logger.logDebug (News.hLogHandle h) $
-    T.pack "sortNews: by number of photos \n"
+  Logger.logDebug (News.hLogHandle h) "sortNews: by number of photos"
   let rez =
         sortBy
           ( \x y ->

@@ -12,7 +12,7 @@ import qualified EndPoints.Lib.Category.Category as Category
 import qualified EndPoints.Lib.OffsetLimit as OffsetLimit
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
-import Logger (logDebug, logInfo, (.<))
+import Logger (logDebug, logInfo)
 import qualified News
 import Servant (Handler)
 import qualified Types.DataTypes as DataTypes
@@ -32,7 +32,7 @@ categoryList ::
   (News.Handle IO, Maybe DataTypes.Offset, Maybe DataTypes.Limit) ->
   IO (Either ErrorTypes.GetContentError [DataTypes.Category])
 categoryList conn (h, mo, ml) = do
-  Logger.logInfo (News.hLogHandle h) "Request: Get Category List "
+  Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Get Category List  with offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
   rezCheckOffsetLimit <- OffsetLimit.checkOffsetLimit h mo ml
   case rezCheckOffsetLimit of
     Left err -> return $ Left err
@@ -47,5 +47,5 @@ categoryList conn (h, mo, ml) = do
           (show l, show o)
       let categories = Prelude.map Category.toCategories res
       let toTextCategories = T.concat $ map ToText.toText categories
-      Logger.logDebug (News.hLogHandle h) ("categoryList: OK! \n" .< toTextCategories)
+      Logger.logDebug (News.hLogHandle h) $ T.concat ["categoryList: OK! \n", toTextCategories]
       return $ Right categories

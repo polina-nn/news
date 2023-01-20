@@ -41,10 +41,10 @@ req4 = DataTypes.CreateCategoryRequest {path = "1.1.3", category = ""}
 
 change4 :: [CategoryHelpTypes.EditCategory]
 change4 =
-  [ CategoryHelpTypes.EditCategory {_id = 5, newPath = "1.1.4"},
-    CategoryHelpTypes.EditCategory {_id = 6, newPath = "1.1.5"},
-    CategoryHelpTypes.EditCategory {_id = 7, newPath = "1.1.6"},
-    CategoryHelpTypes.EditCategory {_id = 8, newPath = "1.1.7"}
+  [ CategoryHelpTypes.EditCategory {permanentId = 5, newPath = "1.1.4"},
+    CategoryHelpTypes.EditCategory {permanentId = 6, newPath = "1.1.5"},
+    CategoryHelpTypes.EditCategory {permanentId = 7, newPath = "1.1.6"},
+    CategoryHelpTypes.EditCategory {permanentId = 8, newPath = "1.1.7"}
   ]
 
 req2 :: DataTypes.CreateCategoryRequest
@@ -52,19 +52,19 @@ req2 = DataTypes.CreateCategoryRequest {path = "2", category = ""}
 
 change2 :: [CategoryHelpTypes.EditCategory]
 change2 =
-  [ CategoryHelpTypes.EditCategory {newPath = "3", _id = 11},
-    CategoryHelpTypes.EditCategory {newPath = "3.1", _id = 12},
-    CategoryHelpTypes.EditCategory {newPath = "3.1.2", _id = 13},
-    CategoryHelpTypes.EditCategory {newPath = "3.1.2.1", _id = 14},
-    CategoryHelpTypes.EditCategory {newPath = "3.1.2.1.1", _id = 15},
-    CategoryHelpTypes.EditCategory {newPath = "3.1.2.1.2", _id = 16},
-    CategoryHelpTypes.EditCategory {newPath = "3.2", _id = 17},
-    CategoryHelpTypes.EditCategory {newPath = "3.3", _id = 18},
-    CategoryHelpTypes.EditCategory {newPath = "3.4", _id = 19},
-    CategoryHelpTypes.EditCategory {newPath = "3.5", _id = 20},
-    CategoryHelpTypes.EditCategory {newPath = "4", _id = 21},
-    CategoryHelpTypes.EditCategory {newPath = "5", _id = 22},
-    CategoryHelpTypes.EditCategory {newPath = "6", _id = 23}
+  [ CategoryHelpTypes.EditCategory {newPath = "3", permanentId = 11},
+    CategoryHelpTypes.EditCategory {newPath = "3.1", permanentId = 12},
+    CategoryHelpTypes.EditCategory {newPath = "3.1.2", permanentId = 13},
+    CategoryHelpTypes.EditCategory {newPath = "3.1.2.1", permanentId = 14},
+    CategoryHelpTypes.EditCategory {newPath = "3.1.2.1.1", permanentId = 15},
+    CategoryHelpTypes.EditCategory {newPath = "3.1.2.1.2", permanentId = 16},
+    CategoryHelpTypes.EditCategory {newPath = "3.2", permanentId = 17},
+    CategoryHelpTypes.EditCategory {newPath = "3.3", permanentId = 18},
+    CategoryHelpTypes.EditCategory {newPath = "3.4", permanentId = 19},
+    CategoryHelpTypes.EditCategory {newPath = "3.5", permanentId = 20},
+    CategoryHelpTypes.EditCategory {newPath = "4", permanentId = 21},
+    CategoryHelpTypes.EditCategory {newPath = "5", permanentId = 22},
+    CategoryHelpTypes.EditCategory {newPath = "6", permanentId = 23}
   ]
 
 req5 :: DataTypes.CreateCategoryRequest
@@ -72,10 +72,10 @@ req5 = DataTypes.CreateCategoryRequest {path = "2.1.2", category = ""}
 
 change5 :: [CategoryHelpTypes.EditCategory]
 change5 =
-  [ CategoryHelpTypes.EditCategory {newPath = "2.1.3", _id = 13},
-    CategoryHelpTypes.EditCategory {newPath = "2.1.3.1", _id = 14},
-    CategoryHelpTypes.EditCategory {newPath = "2.1.3.1.1", _id = 15},
-    CategoryHelpTypes.EditCategory {newPath = "2.1.3.1.2", _id = 16}
+  [ CategoryHelpTypes.EditCategory {newPath = "2.1.3", permanentId = 13},
+    CategoryHelpTypes.EditCategory {newPath = "2.1.3.1", permanentId = 14},
+    CategoryHelpTypes.EditCategory {newPath = "2.1.3.1.1", permanentId = 15},
+    CategoryHelpTypes.EditCategory {newPath = "2.1.3.1.2", permanentId = 16}
   ]
 
 myCategoryEmpty :: [DataTypes.Category]
