@@ -105,7 +105,7 @@ newsListCategory conn off lim NewsHelpTypes.DbFilter {..} = do
             AND news_text LIKE ?
             AND news_category_id = ?
             ORDER BY news_created DESC 
-            LIMIT ?  OFFSET ?;|]
+            LIMIT ?  OFFSET ?|]
       ( dbFilterDayAt,
         dbFilterDayUntil,
         dbFilterDaySince,
@@ -140,7 +140,7 @@ newsListNotCategory conn off lim NewsHelpTypes.DbFilter {..} = do
             AND news_title LIKE ?
             AND news_text LIKE ?
             ORDER BY news_created DESC 
-            LIMIT ?  OFFSET ?;|]
+            LIMIT ?  OFFSET ?|]
       ( dbFilterDayAt,
         dbFilterDayUntil,
         dbFilterDaySince,

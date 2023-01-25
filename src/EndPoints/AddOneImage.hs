@@ -130,14 +130,16 @@ addImageIO ::
   IO (Either ErrorTypes.AddImageError DataTypes.URI)
 addImageIO conn h DataTypes.CreateImageRequest {..} im = do
   resId <-
-    SQL.query_ conn [sql| select NEXTVAL('image_id_seq');|] :: IO [SQL.Only Int]
+    SQL.query_
+      conn
+      [sql| select NEXTVAL('image_id_seq')|]
   case resId of
     [val] -> do
       let idIm = SQL.fromOnly val
       res <-
         SQL.execute
           conn
-          "INSERT INTO image (image_id, image_name, image_type, image_content) VALUES (?,?,?,?)"
+          [sql| INSERT INTO image (image_id, image_name, image_type, image_content) VALUES (?,?,?,?) |]
           (idIm, file, format, show im)
       case res of
         1 -> do

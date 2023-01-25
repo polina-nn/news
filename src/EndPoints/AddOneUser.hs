@@ -72,7 +72,7 @@ addUserIO conn h DataTypes.CreateUserRequest {..} = do
     SQL.execute
       conn
       [sql|INSERT INTO usr (usr_name, usr_login , usr_password, usr_created, usr_admin, usr_author )
-             VALUES (?, ?, ?, ?, ?, ?) ;|]
+             VALUES (?, ?, ?, ?, ?, ?) |]
       (name, login, Lib.hashed password, show created, admin, author)
   case read (show res) :: Int of
     1 ->
@@ -106,8 +106,7 @@ checkLogin conn h' r@DataTypes.CreateUserRequest {..} (Right _) = do
     SQL.query
       conn
       [sql| SELECT EXISTS (SELECT usr_login  FROM usr WHERE usr_login = ?) |]
-      (SQL.Only login) ::
-      IO [SQL.Only Bool]
+      (SQL.Only login)
   case res of
     [x] ->
       if not (SQL.fromOnly x)

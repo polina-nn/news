@@ -116,16 +116,15 @@ addCategoryIO conn h DataTypes.CreateCategoryRequest {..} (Right _) = do
   res <-
     SQL.execute
       conn
-      [sql| INSERT INTO  category (category_path, category_name)  VALUES (?,?) ;|]
+      [sql| INSERT INTO  category (category_path, category_name)  VALUES (?,?) |]
       (path, category)
   case read (show res) :: Int of
     1 -> do
       resId <-
         SQL.query
           conn
-          [sql| SELECT category_id  FROM category WHERE category_path = ?; |]
-          (SQL.Only path) ::
-          IO [SQL.Only Int]
+          [sql| SELECT category_id  FROM category WHERE category_path = ? |]
+          (SQL.Only path)
       case resId of
         [val] -> do
           let rez = SQL.fromOnly val

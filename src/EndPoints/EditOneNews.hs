@@ -95,7 +95,7 @@ newTileIO conn h newsId r@DataTypes.EditNewsRequest {newTitle = Just title} = do
   res <-
     SQL.execute
       conn
-      [sql| UPDATE news SET news_title = ? WHERE news_id = ? ;|]
+      [sql| UPDATE news SET news_title = ? WHERE news_id = ? |]
       (title, newsId)
   case read (show res) :: Int of
     1 -> do
@@ -120,7 +120,7 @@ newCatIdIO conn h newsId (Right r@DataTypes.EditNewsRequest {newCategoryId = Jus
   res <-
     SQL.execute
       conn
-      [sql| UPDATE news SET news_category_id = ? WHERE news_id = ? ;|]
+      [sql| UPDATE news SET news_category_id = ? WHERE news_id = ? |]
       (catId, newsId)
   case read (show res) :: Int of
     1 -> do
@@ -145,7 +145,7 @@ newTextIO conn h newsId (Right r@DataTypes.EditNewsRequest {newText = Just text}
   res <-
     SQL.execute
       conn
-      [sql| UPDATE news SET news_text = ? WHERE news_id = ? ;|]
+      [sql| UPDATE news SET news_text = ? WHERE news_id = ? |]
       (text, newsId)
   case read (show res) :: Int of
     1 -> do
@@ -175,7 +175,7 @@ newImagesIO conn h newsId (Right r@DataTypes.EditNewsRequest {newImages = Just r
       res <-
         SQL.execute
           conn
-          [sql| UPDATE news SET news_images_id = ? WHERE news_id = ? ;|]
+          [sql| UPDATE news SET news_images_id = ? WHERE news_id = ? |]
           (SQLTypes.PGArray rez', newsId)
       case read (show res) :: Int of
         1 -> do
@@ -210,7 +210,7 @@ newPublishIO conn h newsId (Right r@DataTypes.EditNewsRequest {newPublished = Ju
   res <-
     SQL.execute
       conn
-      [sql| UPDATE news SET news_published = ? WHERE news_id = ? ;|]
+      [sql| UPDATE news SET news_published = ? WHERE news_id = ? |]
       (pub, newsId)
   case read (show res) :: Int of
     1 -> do
@@ -244,8 +244,7 @@ getNewsCategoryIO conn h idNews (Right _) =
         SQL.query
           conn'
           [sql| SELECT news_category_id   FROM news WHERE  news_id = ? |]
-          (SQL.Only idNews') ::
-          IO [SQL.Only Int]
+          (SQL.Only idNews')
       case res of
         [val] -> do
           let categoryId = SQL.fromOnly val
@@ -268,8 +267,7 @@ getNewsCategoryIO conn h idNews (Right _) =
         SQL.query
           conn''
           [sql| SELECT category_path  FROM category WHERE category_id = ?|]
-          (SQL.Only categoryId) ::
-          IO [SQL.Only String]
+          (SQL.Only categoryId)
       case res of
         [val] -> do
           let categoryPath = SQL.fromOnly val
@@ -291,7 +289,7 @@ getNewsCategoryIO conn h idNews (Right _) =
       res <-
         SQL.query
           con
-          [sql| SELECT category_path, category_id, category_name FROM category WHERE ? LIKE category_path||'%' ORDER BY category_path;|]
+          [sql| SELECT category_path, category_id, category_name FROM category WHERE ? LIKE category_path||'%' ORDER BY category_path|]
           (SQL.Only path)
       case res of
         [] -> do
@@ -319,8 +317,7 @@ getNewsImagesIO conn h idNews (Right cats) = do
     SQL.query
       conn
       [sql| SELECT EXISTS (SELECT news_images_id FROM news WHERE  news_id = ? AND news_images_id IS NOT NULL) |]
-      (SQL.Only idNews) ::
-      IO [SQL.Only Bool]
+      (SQL.Only idNews)
   case res of
     [val] ->
       if SQL.fromOnly val
@@ -329,9 +326,8 @@ getNewsImagesIO conn h idNews (Right cats) = do
               [ids] <-
                 SQL.query
                   conn
-                  " SELECT news_images_id    FROM news WHERE  news_id = ? "
-                  (SQL.Only idNews) ::
-                  IO [SQL.Only (SQLTypes.PGArray IdImage)]
+                  [sql| SELECT news_images_id    FROM news WHERE  news_id = ? |]
+                  (SQL.Only idNews)
               let idImages = SQLTypes.fromPGArray $ SQL.fromOnly ids
               return (Right (cats, idImages))
           )
@@ -405,8 +401,7 @@ checkIdIO conn h newsId = do
     SQL.query
       conn
       [sql| SELECT EXISTS (SELECT news_id  FROM news WHERE news_id = ?) |]
-      (SQL.Only newsId) ::
-      IO [SQL.Only Bool]
+      (SQL.Only newsId)
   case res of
     [] -> do
       Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.AddEditNewsSQLRequestError (ErrorTypes.SQLRequestError "checkIdIO! Don't checkId category"))
@@ -440,8 +435,7 @@ checkUserThisNewsAuthorIO conn h DataTypes.User {..} (Right newsId) = do
     SQL.query
       conn
       [sql| SELECT news_author_login  FROM news WHERE news_id = ? |]
-      (SQL.Only newsId) ::
-      IO [SQL.Only String]
+      (SQL.Only newsId)
   case res of
     [newsAuthorLogin] ->
       if SQL.fromOnly newsAuthorLogin == userLogin
