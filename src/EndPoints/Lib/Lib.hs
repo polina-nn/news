@@ -1,15 +1,13 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-
 -- |  EndPoints.Lib.Lib - library of helper pure functions for EndPoints
 module EndPoints.Lib.Lib
-  ( checkUserAdmin
-  , checkUserAuthor
-  , currentDay
-  , hashed
-  , imageIdToURI
-  , toUser
-  ) where
+  ( checkUserAdmin,
+    checkUserAuthor,
+    currentDay,
+    hashed,
+    imageIdToURI,
+    toUser,
+  )
+where
 
 import qualified Crypto.Hash
 import qualified Data.ByteArray.Encoding as BAE
@@ -17,45 +15,47 @@ import qualified Data.ByteString.Char8 as BSC8
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Data.Time as TIME
-import qualified Logger
+import Logger (logDebug, logError, (.<))
 import qualified News
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
 
 checkUserAdmin ::
-     Monad m
-  => News.Handle m
-  -> DataTypes.User
-  -> m (Either ErrorTypes.InvalidAdminPermission DataTypes.User)
+  Monad m =>
+  News.Handle m ->
+  DataTypes.User ->
+  m (Either ErrorTypes.InvalidAdminPermission DataTypes.User)
 checkUserAdmin h r@DataTypes.User {..} =
   if userAdmin
     then do
-      Logger.logDebug (News.hLogHandle h) $ T.pack "checkUserAdmin: OK!"
+      Logger.logDebug (News.hLogHandle h) "checkUserAdmin: OK!"
       return $ Right r
     else do
-      Logger.logError (News.hLogHandle h) $
-        T.pack $
-        show $
-        ErrorTypes.InvalidAdminPermission
-          "checkUserAdmin: BAD! User is not admin. Invalid Permission for this request."
+      Logger.logError
+        (News.hLogHandle h)
+        ( "ERROR "
+            .< ErrorTypes.InvalidAdminPermission
+              "checkUserAdmin: BAD! User is not admin. Invalid Permission for this request."
+        )
       return . Left $ ErrorTypes.InvalidAdminPermission []
 
 checkUserAuthor ::
-     Monad m
-  => News.Handle m
-  -> DataTypes.User
-  -> m (Either ErrorTypes.InvalidAuthorPermission DataTypes.User)
+  Monad m =>
+  News.Handle m ->
+  DataTypes.User ->
+  m (Either ErrorTypes.InvalidAuthorPermission DataTypes.User)
 checkUserAuthor h r@DataTypes.User {..} =
   if userAuthor
     then do
-      Logger.logDebug (News.hLogHandle h) $ T.pack "checkUserAuthor: OK!"
+      Logger.logDebug (News.hLogHandle h) "checkUserAuthor: OK!"
       return $ Right r
     else do
-      Logger.logError (News.hLogHandle h) $
-        T.pack $
-        show $
-        ErrorTypes.InvalidAuthorPermission
-          "checkUserAuthor: BAD! User is not author. Invalid Permission for this request."
+      Logger.logError
+        (News.hLogHandle h)
+        ( "ERROR "
+            .< ErrorTypes.InvalidAuthorPermission
+              "checkUserAuthor: BAD! User is not author. Invalid Permission for this request."
+        )
       return . Left $ ErrorTypes.InvalidAuthorPermission []
 
 imageIdToURI :: News.Handle IO -> Int -> DataTypes.URI

@@ -1,23 +1,10 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeOperators #-}
-
 module EndPoints.GetNewsSearchList
-  ( getNewsSearchList
-  , newsSearchList
-  ) where
+  ( getNewsSearchList,
+    newsSearchList,
+  )
+where
 
-import Control.Monad.IO.Class (MonadIO(liftIO))
+import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
@@ -27,40 +14,37 @@ import qualified EndPoints.Lib.News.NewsIO as NewsIO
 import qualified EndPoints.Lib.OffsetLimit as OffsetLimit
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
-import qualified Logger
+import Logger (logError, logInfo, (.<))
 import qualified News
 import Servant (Handler)
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
 
 getNewsSearchList ::
-     News.Handle IO
-  -> DataTypes.Db
-  -> Maybe T.Text
-  -> Maybe DataTypes.Offset
-  -> Maybe DataTypes.Limit
-  -> Handler [DataTypes.News]
+  News.Handle IO ->
+  DataTypes.Db ->
+  Maybe T.Text ->
+  Maybe DataTypes.Offset ->
+  Maybe DataTypes.Limit ->
+  Handler [DataTypes.News]
 getNewsSearchList h DataTypes.Db {..} mSearch mo ml =
   (>>=)
     (liftIO $ _newsSearchList (h, mSearch, mo, ml))
     ToHttpResponse.toHttpResponse
 
 newsSearchList ::
-     SQL.Connection
-  -> ( News.Handle IO
-     , Maybe T.Text
-     , Maybe DataTypes.Offset
-     , Maybe DataTypes.Limit)
-  -> IO (Either ErrorTypes.GetNewsError [DataTypes.News])
+  SQL.Connection ->
+  ( News.Handle IO,
+    Maybe T.Text,
+    Maybe DataTypes.Offset,
+    Maybe DataTypes.Limit
+  ) ->
+  IO (Either ErrorTypes.GetNewsError [DataTypes.News])
 newsSearchList _ (h, Nothing, _, _) = do
-  Logger.logError (News.hLogHandle h) $
-    T.pack $
-    show $
-    ErrorTypes.InvalidSearchGetNews $
-    ErrorTypes.InvalidRequest "newsSearchList: BAD! Not text for searching \n"
+  Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidSearchGetNews (ErrorTypes.InvalidRequest "newsSearchList: BAD! Not text for searching \n"))
   return $ Left $ ErrorTypes.InvalidSearchGetNews $ ErrorTypes.InvalidRequest []
 newsSearchList conn (h, Just search, mo, ml) = do
-  Logger.logInfo (News.hLogHandle h) $ T.pack "Request: Get News Search List "
+  Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Get News Search List ", search, " offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
   checkRequest <- OffsetLimit.checkOffsetLimitNews h mo ml
   case checkRequest of
     Left err -> return $ Left err
@@ -70,21 +54,20 @@ newsSearchList conn (h, Just search, mo, ml) = do
       case News.checkErrorsToNews news res of
         (True, news') -> do
           let toTextNews = (T.concat $ map ToText.toText news') :: T.Text
-          Logger.logInfo (News.hLogHandle h) $
-            T.concat [T.pack "authorsNewsSearchList: OK! \n", toTextNews]
+          Logger.logInfo (News.hLogHandle h) $ T.concat ["newsSearchList: OK! \n", toTextNews]
           return $ Right news'
         _ ->
           return $
-          Left $
-          ErrorTypes.GetNewsSQLRequestError $ ErrorTypes.SQLRequestError []
+            Left $
+              ErrorTypes.GetNewsSQLRequestError $ ErrorTypes.SQLRequestError []
 
 newsSearchList' ::
-     SQL.Connection
-  -> News.Handle IO
-  -> T.Text
-  -> DataTypes.Offset
-  -> DataTypes.Limit
-  -> IO [NewsHelpTypes.DbNews]
+  SQL.Connection ->
+  News.Handle IO ->
+  T.Text ->
+  DataTypes.Offset ->
+  DataTypes.Limit ->
+  IO [NewsHelpTypes.DbNews]
 newsSearchList' conn _ search off lim = do
   res <-
     SQL.query

@@ -1,16 +1,10 @@
--- it is necessary for Servant
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE RecordWildCards #-}
-
 module Server
-  ( server
-  , serviceApi
-  , Handle(..)
-  , run
-  ) where
+  ( server,
+    serviceApi,
+    Handle (..),
+    run,
+  )
+where
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BSC8
@@ -37,39 +31,38 @@ import qualified Logger
 import qualified Network.Wai.Handler.Warp
 import qualified News
 import Servant
-  ( (:<|>)((:<|>))
-  , Application
-  , BasicAuthCheck(..)
-  , BasicAuthData(..)
-  , BasicAuthResult(..)
-  , Context((:.), EmptyContext)
-  , Proxy(..)
-  , Server
-  , serveWithContext
+  ( Application,
+    BasicAuthCheck (..),
+    BasicAuthData (..),
+    BasicAuthResult (..),
+    Context (EmptyContext, (:.)),
+    Proxy (..),
+    Server,
+    serveWithContext,
+    (:<|>) ((:<|>)),
   )
 import qualified Types.ApiTypes as ApiTypes
 import qualified Types.DataTypes as DataTypes
 
-newtype Handle =
-  Handle
-    { hServerHandle :: News.Handle IO
-    }
+newtype Handle = Handle
+  { hServerHandle :: News.Handle IO
+  }
 
 server :: News.Handle IO -> DataTypes.Db -> Server ApiTypes.RestAPI
 server h db =
-  return (T.pack "Welcome to tiny news server") :<|> AddOneUser.addOneUser h db :<|>
-  AddOneCategory.addOneCategory h db :<|>
-  AddOneNews.addOneNews h db :<|>
-  AddOneImage.addOneImage h db :<|>
-  EditOneCategory.editOneCategory h db :<|>
-  EditOneNews.editOneNews h db :<|>
-  GetAuthorsNewsList.getAuthorsNewsList h db :<|>
-  GetAuthorsNewsSearchList.getAuthorsNewsSearchList h db :<|>
-  GetUserList.getUserList h db :<|>
-  GetOneImage.getOneImage h db :<|>
-  GetCategoryList.getCategoryList h db :<|>
-  GetNewsList.getNewsList h db :<|>
-  GetNewsSearchList.getNewsSearchList h db
+  return (T.pack "Welcome to tiny news server") :<|> AddOneUser.addOneUser h db
+    :<|> AddOneCategory.addOneCategory h db
+    :<|> AddOneNews.addOneNews h db
+    :<|> AddOneImage.addOneImage h db
+    :<|> EditOneCategory.editOneCategory h db
+    :<|> EditOneNews.editOneNews h db
+    :<|> GetAuthorsNewsList.getAuthorsNewsList h db
+    :<|> GetAuthorsNewsSearchList.getAuthorsNewsSearchList h db
+    :<|> GetUserList.getUserList h db
+    :<|> GetOneImage.getOneImage h db
+    :<|> GetCategoryList.getCategoryList h db
+    :<|> GetNewsList.getNewsList h db
+    :<|> GetNewsSearchList.getNewsSearchList h db
 
 serviceApi :: Proxy ApiTypes.RestAPI
 serviceApi = Proxy
@@ -89,7 +82,7 @@ run h = do
 app :: News.Handle IO -> POOL.Pool SQL.Connection -> Application
 app h connPool =
   serveWithContext Server.serviceApi ctx $
-  Server.server h $ DbServices.createDb connPool
+    Server.server h $ DbServices.createDb connPool
   where
     ctx = BasicAuthCheck authCfg :. EmptyContext
     authCfg = myAuthCheck h connPool
@@ -98,10 +91,10 @@ app h connPool =
 -- and password and return an value that indicate the status of authentication. Look in the 'app' function
 -- to see how it is used. The value returned can be one of: Unauthorized, BadPassword, NoSuchUser, Authorized usr
 myAuthCheck ::
-     News.Handle IO
-  -> POOL.Pool SQL.Connection
-  -> BasicAuthData
-  -> IO (BasicAuthResult DataTypes.User)
+  News.Handle IO ->
+  POOL.Pool SQL.Connection ->
+  BasicAuthData ->
+  IO (BasicAuthResult DataTypes.User)
 myAuthCheck h conns (BasicAuthData u p) = do
   isSuchUser <- withConnPool . flip suchUser $ u
   if isSuchUser == 0

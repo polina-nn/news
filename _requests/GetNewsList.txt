@@ -64,16 +64,16 @@ curl -v "http://localhost:8080/news?sort_by=category&limit=10"
 3. Sort news by category data (latest news is the first)
 curl -v "http://localhost:8080/news?sort_by=data&limit=10"
 
-4. Sort news by category foto
-curl -v "http://localhost:8080/news?sort_by=foto&limit=25"
+4. Sort news by category photo
+curl -v "http://localhost:8080/news?sort_by=photo&limit=25"
 
 ----- Check filters & sort & limit  -----
 
 1. filter & sort & limit  
-curl -v "http://localhost:8080/news?content=Сергей&sort_by=foto&limit=10"
+curl -v "http://localhost:8080/news?content=Сергей&sort_by=photo&limit=10"
 
 2. filter & filters & sort
-curl -v "http://localhost:8080/news?title=Тандыр&content=Сергей&sort_by=foto"
+curl -v "http://localhost:8080/news?title=Тандыр&content=Сергей&sort_by=photo"
 
 3. filter & filter & filters & sort
-curl -v "http://localhost:8080/news?author=Егор&title=Тандыр&content=Сергей&sort_by=foto"
+curl -v "http://localhost:8080/news?author=Егор&title=Тандыр&content=Сергей&sort_by=photo"
