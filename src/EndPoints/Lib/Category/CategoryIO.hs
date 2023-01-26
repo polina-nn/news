@@ -6,6 +6,7 @@ where
 
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
+import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.Category.Category as Category
 import qualified EndPoints.Lib.Category.CategoryHelpTypes as CategoryHelpTypes
 import Logger (logDebug, logError, logInfo, (.<))
@@ -53,7 +54,7 @@ changePathOneCategoryIO conn h CategoryHelpTypes.EditCategory {..} = do
   res <-
     SQL.execute
       conn
-      "UPDATE  category SET category_path = ? WHERE category_id = ? "
+      [sql| UPDATE  category SET category_path = ? WHERE category_id = ? |]
       (newPath, permanentId)
   case read $ show res :: Int of
     1 -> do
@@ -86,7 +87,7 @@ getAllCategoriesIO conn _ (Right _) = do
   res <-
     SQL.query_
       conn
-      "SELECT category_path, category_id, category_name FROM category ORDER BY category_path "
+      [sql| SELECT category_path, category_id, category_name FROM category ORDER BY category_path |]
   case res of
     [] -> return $ Right []
     _ -> return $ Right $ Prelude.map Category.toCategories res

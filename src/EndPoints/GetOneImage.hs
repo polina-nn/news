@@ -32,8 +32,7 @@ oneImage conn (h, id') = do
         SQL.query
           conn
           [sql|SELECT image_content FROM image WHERE image_id = ?|]
-          (SQL.Only id') ::
-          IO [SQL.Only String]
+          (SQL.Only id')
       let rez = SQL.fromOnly . head $ res
       Logger.logInfo
         (News.hLogHandle h)
@@ -50,8 +49,7 @@ checkId conn (h', id') = do
     SQL.query
       conn
       [sql|SELECT EXISTS (SELECT image_id  FROM image WHERE image_id = ?)|]
-      (SQL.Only id') ::
-      IO [SQL.Only Bool]
+      (SQL.Only id')
   if SQL.fromOnly $ head res
     then do
       Logger.logDebug (News.hLogHandle h') "checkId: OK!  Image exist "

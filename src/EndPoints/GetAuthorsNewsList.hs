@@ -111,7 +111,7 @@ authorsNewsListCategory conn DataTypes.User {..} off lim NewsHelpTypes.DbFilter 
             AND news_text LIKE ?
             AND news_category_id = ?
             ORDER BY news_created DESC 
-            LIMIT ?  OFFSET ?;|]
+            LIMIT ?  OFFSET ?|]
       ( userLogin,
         dbFilterDayAt,
         dbFilterDayUntil,
@@ -148,7 +148,7 @@ authorsNewsListNotCategory conn DataTypes.User {..} off lim NewsHelpTypes.DbFilt
             AND news_title LIKE ?
             AND news_text LIKE ?
             ORDER BY news_created DESC 
-            LIMIT ?  OFFSET ?;|]
+            LIMIT ?  OFFSET ?|]
       ( userLogin,
         dbFilterDayAt,
         dbFilterDayUntil,

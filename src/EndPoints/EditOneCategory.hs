@@ -106,8 +106,7 @@ checkIdIO conn h catId r (Right _) = do
     SQL.query
       conn
       [sql| SELECT EXISTS (SELECT category_id  FROM category WHERE category_id = ?) |]
-      (SQL.Only catId) ::
-      IO [SQL.Only Bool]
+      (SQL.Only catId)
   case res of
     [] -> do
       Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.AddEditCategorySQLRequestError (ErrorTypes.SQLRequestError "checkIdIO! Don't checkId category"))
@@ -168,7 +167,7 @@ editCategoryNameIO conn h CategoryHelpTypes.EditCategoryFullRequest {..} (Right 
   res <-
     SQL.execute
       conn
-      [sql| UPDATE category SET category_name = ? WHERE category_id = ? ;|]
+      [sql| UPDATE category SET category_name = ? WHERE category_id = ? |]
       (newCategory', id')
   case read (show res) :: Int of
     1 -> do

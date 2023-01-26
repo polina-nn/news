@@ -7,6 +7,7 @@ where
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base64 as Base64
 import qualified Database.PostgreSQL.Simple as SQL
+import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.Category.Category as Category
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.News.NewsHelpTypes as NewsHelpTypes
@@ -27,7 +28,10 @@ addImageNewsIO ::
   IO (Either ErrorTypes.AddEditNewsError IdImage)
 addImageNewsIO conn h DataTypes.CreateImageRequest {..} = do
   content <- B.readFile image
-  resId <- SQL.query_ conn "select NEXTVAL('image_id_seq')"
+  resId <-
+    SQL.query_
+      conn
+      [sql| select NEXTVAL('image_id_seq')|]
   case resId of
     [val] -> do
       let idIm = SQL.fromOnly val
@@ -35,7 +39,7 @@ addImageNewsIO conn h DataTypes.CreateImageRequest {..} = do
       res <-
         SQL.execute
           conn
-          "INSERT INTO image (image_id, image_name, image_type, image_content) VALUES (?,?,?,?)"
+          [sql| INSERT INTO image (image_id, image_name, image_type, image_content) VALUES (?,?,?,?)|]
           (idIm, file, format, show imageDecodeBase64ByteString)
       case res of
         1 -> do
@@ -90,7 +94,8 @@ getCategoriesIO con h''' path = do
   res <-
     SQL.query
       con
-      "SELECT category_path, category_id, category_name FROM category WHERE ? LIKE category_path||'%' ORDER BY category_path"
+      [sql| SELECT category_path, category_id, category_name FROM category 
+            WHERE ? LIKE category_path||'%' ORDER BY category_path |]
       (SQL.Only path)
   case res of
     [] -> do

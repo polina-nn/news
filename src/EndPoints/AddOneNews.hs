@@ -80,7 +80,9 @@ getNewsIdIO ::
   IO (Either ErrorTypes.AddEditNewsError IdNews)
 getNewsIdIO conn h = do
   resId <-
-    SQL.query_ conn [sql| select NEXTVAL('news_id_seq');|] :: IO [SQL.Only Int]
+    SQL.query_
+      conn
+      [sql| select NEXTVAL('news_id_seq')|]
   case resId of
     [val] -> do
       let idNews = SQL.fromOnly val
@@ -145,7 +147,7 @@ addNewsIO conn h DataTypes.User {..} categories DataTypes.CreateNewsRequest {..}
   res <-
     SQL.execute
       conn
-      "INSERT INTO news (news_images_id, news_id, news_title , news_created, news_author_login, news_category_id, news_text,  news_published ) VALUES (?, ?, ?, ?, ?, ?,?,? )"
+      [sql| INSERT INTO news (news_images_id, news_id, news_title , news_created, news_author_login, news_category_id, news_text,  news_published ) VALUES (?, ?, ?, ?, ?, ?,?,? ) |]
       ( SQLTypes.PGArray idImages,
         idNews,
         title,
@@ -227,7 +229,7 @@ checkCategoryIdIO conn h (Right DataTypes.CreateNewsRequest {..}) = do
       result <-
         SQL.query
           conn
-          [sql| SELECT category_path, category_id, category_name FROM category WHERE ? LIKE category_path||'%' ORDER BY category_path;|]
+          [sql| SELECT category_path, category_id, category_name FROM category WHERE ? LIKE category_path||'%' ORDER BY category_path |]
           (SQL.Only path)
       let categories = Prelude.map Category.toCategories result
       return $ Right categories
