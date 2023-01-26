@@ -35,7 +35,7 @@ editOneCategory ::
   Handler DataTypes.Category
 editOneCategory h DataTypes.Db {..} user catId r =
   (>>=)
-    (liftIO $ _editCategory (h, user, catId, r))
+    (liftIO $ dbEditCategory (h, user, catId, r))
     ToHttpResponse.toHttpResponse
 
 editCategory ::

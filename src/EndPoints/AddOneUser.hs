@@ -31,7 +31,7 @@ addOneUser ::
   Handler DataTypes.User
 addOneUser h DataTypes.Db {..} user createUserReq =
   (>>=)
-    (liftIO $ _addUser (h, user, createUserReq))
+    (liftIO $ dbAddUser (h, user, createUserReq))
     ToHttpResponse.toHttpResponse
 
 addUser ::

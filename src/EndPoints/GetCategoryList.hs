@@ -25,7 +25,7 @@ getCategoryList ::
   Maybe DataTypes.Limit ->
   Handler [DataTypes.Category]
 getCategoryList h DataTypes.Db {..} ma ml =
-  (>>=) (liftIO $ _categoryList (h, ma, ml)) ToHttpResponse.toHttpResponse
+  (>>=) (liftIO $ dbCategoryList (h, ma, ml)) ToHttpResponse.toHttpResponse
 
 categoryList ::
   SQL.Connection ->

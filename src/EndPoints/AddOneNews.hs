@@ -41,7 +41,7 @@ addOneNews ::
   Handler DataTypes.News
 addOneNews h DataTypes.Db {..} user createNewsReq =
   (>>=)
-    (liftIO $ _addNews (h, user, createNewsReq))
+    (liftIO $ dbAddNews (h, user, createNewsReq))
     ToHttpResponse.toHttpResponse
 
 addNews ::

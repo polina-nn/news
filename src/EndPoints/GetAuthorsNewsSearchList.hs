@@ -32,7 +32,7 @@ getAuthorsNewsSearchList ::
   Handler [DataTypes.News]
 getAuthorsNewsSearchList h DataTypes.Db {..} user search' mo ml =
   (>>=)
-    (liftIO $ _authorsNewsSearchList (h, user, search', mo, ml))
+    (liftIO $ dbAuthorsNewsSearchList (h, user, search', mo, ml))
     ToHttpResponse.toHttpResponse
 
 authorsNewsSearchList ::

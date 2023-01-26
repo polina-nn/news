@@ -465,11 +465,11 @@ pathFromWords (y : ys) = y ++ "." ++ pathFromWords ys
 mapCategory ::
   [DataTypes.Category] ->
   Map.Map DataTypes.Path (DataTypes.Id, DataTypes.Path)
-mapCategory xs = Map.fromList $ map help xs
+mapCategory xs = Map.fromList $ map keyAndValue xs
   where
-    help ::
+    keyAndValue ::
       DataTypes.Category -> (DataTypes.Path, (DataTypes.Id, DataTypes.Path))
-    help DataTypes.Category {..} = (categoryPath, (categoryId, []))
+    keyAndValue DataTypes.Category {..} = (categoryPath, (categoryId, []))
 
 toCategoriesEmptyName ::
   Map.Map DataTypes.Path (DataTypes.Id, DataTypes.Path) ->
@@ -569,30 +569,30 @@ changePathResultReq old new =
     && length
       ( filter
           filterById
-          (zipWith help1 (pairsSortById old) (pairsSortById new))
+          (zipWith helpForCompareCategoriesId (pairsSortById old) (pairsSortById new))
       )
     == length (pairsSortById new)
-    then Just (help2 (zipWith help1 (pairsSortById old) (pairsSortById new)))
+    then Just (onlyChangedPaths (zipWith helpForCompareCategoriesId (pairsSortById old) (pairsSortById new)))
     else Nothing
   where
     toPair :: DataTypes.Category -> (DataTypes.Id, DataTypes.Path)
     toPair DataTypes.Category {..} = (categoryId, categoryPath)
     pairsSortById :: [DataTypes.Category] -> [(DataTypes.Id, DataTypes.Path)]
     pairsSortById c = L.sortOn fst (map toPair c)
-    help1 ::
+    helpForCompareCategoriesId ::
       (DataTypes.Id, DataTypes.Path) ->
       (DataTypes.Id, DataTypes.Path) ->
       (DataTypes.Id, DataTypes.Id, DataTypes.Path, DataTypes.Path)
-    help1 (id1, oldPath) (id2, newPath) = (id1, id2, oldPath, newPath)
+    helpForCompareCategoriesId (id1, oldPath) (id2, newPath) = (id1, id2, oldPath, newPath)
     filterById ::
       (DataTypes.Id, DataTypes.Id, DataTypes.Path, DataTypes.Path) -> Bool
     filterById (id1, id2, _, _) = id1 == id2
-    help2 ::
+    onlyChangedPaths ::
       [(DataTypes.Id, DataTypes.Id, DataTypes.Path, DataTypes.Path)] ->
       [CategoryHelpTypes.EditCategory]
-    help2 [] = []
-    help2 ((idCat, _, oldPath, newPath) : xs)
+    onlyChangedPaths [] = []
+    onlyChangedPaths ((idCat, _, oldPath, newPath) : xs)
       | oldPath /= newPath =
         (CategoryHelpTypes.EditCategory {permanentId = idCat, newPath = newPath}) :
-        help2 xs
-      | otherwise = help2 xs
+        onlyChangedPaths xs
+      | otherwise = onlyChangedPaths xs

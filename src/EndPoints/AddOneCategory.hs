@@ -34,7 +34,7 @@ addOneCategory ::
   Handler DataTypes.Category
 addOneCategory h DataTypes.Db {..} user createCategoryReq =
   (>>=)
-    (liftIO $ _addCategory (h, user, createCategoryReq))
+    (liftIO $ dbAddCategory (h, user, createCategoryReq))
     ToHttpResponse.toHttpResponse
 
 addCategory ::

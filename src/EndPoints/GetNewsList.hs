@@ -36,7 +36,7 @@ getNewsList ::
   Handler [DataTypes.News]
 getNewsList h DataTypes.Db {..} da du ds ar i t c mSort mo ml =
   (>>=)
-    (liftIO $ _newsList (h, filter', mSort, mo, ml))
+    (liftIO $ dbNewsList (h, filter', mSort, mo, ml))
     ToHttpResponse.toHttpResponse
   where
     filter' :: DataTypes.Filter
