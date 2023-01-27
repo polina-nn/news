@@ -98,13 +98,13 @@ checkFilter f@DataTypes.Filter {..} =
     Right _ ->
       Right
         NewsHelpTypes.DbFilter
-          { dbFilterDayAt = dayAt' filterDayAt,
-            dbFilterDayUntil = dayUntil' filterDayUntil,
-            dbFilterDaySince = daySince' filterDayAt filterDayUntil filterDaySince,
-            dbFilterAuthor = textLike' filterAuthor,
+          { dbFilterDayAt = dayAt filterDayAt,
+            dbFilterDayUntil = dayUntil filterDayUntil,
+            dbFilterDaySince = daySince filterDayAt filterDayUntil filterDaySince,
+            dbFilterAuthor = textLike filterAuthor,
             dbFilterCategoryId = filterCategoryId,
-            dbFilterTitle = textLike' filterTitle,
-            dbFilterContent = textLike' filterContent
+            dbFilterTitle = textLike filterTitle,
+            dbFilterContent = textLike filterContent
           }
 
 -- | checkDayFilter - no more than one date filter in a request
@@ -119,35 +119,35 @@ checkDayFilter fi@DataTypes.Filter {..}
   | otherwise =
     Left $ ErrorTypes.InvalidFilterGetNews $ ErrorTypes.InvalidRequest []
 
--- | dayAt' -- return value for part "AND (news_created = dbFilterDayAt OR news_created < dbFilterDayUntil OR news_created > dbFilterDaySince)"  at select request
+-- | dayAt -- return value for part "AND (news_created = dbFilterDayAt OR news_created < dbFilterDayUntil OR news_created > dbFilterDaySince)"  at select request
 -- if filter dbFilterDayAt is not specified, use day before data base created ("2000 - 01 - 01")
-dayAt' :: Maybe DataTypes.DayAt -> TIME.Day
-dayAt' Nothing = TIME.fromGregorian 2000 01 01
-dayAt' (Just v) = v
+dayAt :: Maybe DataTypes.DayAt -> TIME.Day
+dayAt Nothing = TIME.fromGregorian 2000 01 01
+dayAt (Just v) = v
 
--- | dayUntil' -- return value for part "AND (news_created = dbFilterDayAt OR news_created < dbFilterDayUntil OR news_created > dbFilterDaySince)"  at select request
+-- | dayUntil -- return value for part "AND (news_created = dbFilterDayAt OR news_created < dbFilterDayUntil OR news_created > dbFilterDaySince)"  at select request
 -- if filter dbFilterDayUntil is not specified, use day before data base created ("2000 - 01 - 01")
-dayUntil' :: Maybe DataTypes.DayUntil -> TIME.Day
-dayUntil' Nothing = TIME.fromGregorian 2000 01 01
-dayUntil' (Just v) = v
+dayUntil :: Maybe DataTypes.DayUntil -> TIME.Day
+dayUntil Nothing = TIME.fromGregorian 2000 01 01
+dayUntil (Just v) = v
 
--- | daySince'  if all "Days" are nothing, then set the date to the day before the creation of the database ("2000 - 01 - 01") so that everything is shown, else use a big day after creation ("2100-01-01")
-daySince' ::
+-- | daySince  if all "Days" are nothing, then set the date to the day before the creation of the database ("2000 - 01 - 01") so that everything is shown, else use a big day after creation ("2100-01-01")
+daySince ::
   Maybe DataTypes.DayAt ->
   Maybe DataTypes.DayUntil ->
   Maybe DataTypes.DaySince ->
   TIME.Day
-daySince' _ _ (Just v) = v
-daySince' dayAt dayUntil daySince
-  | isNothing dayAt && isNothing dayUntil && isNothing daySince =
+daySince _ _ (Just v) = v
+daySince dayAt' dayUntil' daySince'
+  | isNothing dayAt' && isNothing dayUntil' && isNothing daySince' =
     TIME.fromGregorian 2000 01 01
   | otherwise = TIME.fromGregorian 2100 01 01
 
--- textLike' - return value (instead of "?" ) for part  "AND news_title LIKE ?" at select request
+-- textLike - return value (instead of "?" ) for part  "AND news_title LIKE ?" at select request
 -- LIKE pattern matching always covers the entire string. Therefore, if it's desired to match a sequence anywhere within a string, the pattern must start and end with a percent sign.
-textLike' :: Maybe T.Text -> T.Text
-textLike' Nothing = "%"
-textLike' (Just v) = T.concat ["%", v, "%"]
+textLike :: Maybe T.Text -> T.Text
+textLike Nothing = "%"
+textLike (Just v) = T.concat ["%", v, "%"]
 
 sortNews ::
   News.Handle IO ->
