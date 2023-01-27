@@ -36,7 +36,7 @@ addOneImage ::
   Handler DataTypes.URI
 addOneImage h DataTypes.Db {..} user createImageReq =
   (>>=)
-    (liftIO $ _addImage (h, user, createImageReq))
+    (liftIO $ dbAddImage (h, user, createImageReq))
     ToHttpResponse.toHttpResponse
 
 addImage ::

@@ -29,7 +29,7 @@ getNewsSearchList ::
   Handler [DataTypes.News]
 getNewsSearchList h DataTypes.Db {..} mSearch mo ml =
   (>>=)
-    (liftIO $ _newsSearchList (h, mSearch, mo, ml))
+    (liftIO $ dbNewsSearchList (h, mSearch, mo, ml))
     ToHttpResponse.toHttpResponse
 
 newsSearchList ::

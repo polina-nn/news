@@ -12,13 +12,13 @@ import qualified Types.ErrorTypes as ErrorTypes
 
 -- | data Db used in module DbServices
 data Db = Db
-  { _addUser :: (News.Handle IO, User, CreateUserRequest) -> IO (Either ErrorTypes.AddUserError User),
-    _addCategory :: (News.Handle IO, User, CreateCategoryRequest) -> IO (Either ErrorTypes.AddEditCategoryError Category),
-    _addNews :: (News.Handle IO, User, CreateNewsRequest) -> IO (Either ErrorTypes.AddEditNewsError News),
-    _addImage :: (News.Handle IO, User, CreateImageRequest) -> IO (Either ErrorTypes.AddImageError URI),
-    _editCategory :: (News.Handle IO, User, Int, EditCategoryRequest) -> IO (Either ErrorTypes.AddEditCategoryError Category),
-    _editNews :: (News.Handle IO, User, Int, EditNewsRequest) -> IO (Either ErrorTypes.AddEditNewsError News),
-    _authorsNewsList ::
+  { dbAddUser :: (News.Handle IO, User, CreateUserRequest) -> IO (Either ErrorTypes.AddUserError User),
+    dbAddCategory :: (News.Handle IO, User, CreateCategoryRequest) -> IO (Either ErrorTypes.AddEditCategoryError Category),
+    dbAddNews :: (News.Handle IO, User, CreateNewsRequest) -> IO (Either ErrorTypes.AddEditNewsError News),
+    dbAddImage :: (News.Handle IO, User, CreateImageRequest) -> IO (Either ErrorTypes.AddImageError URI),
+    dbEditCategory :: (News.Handle IO, User, Int, EditCategoryRequest) -> IO (Either ErrorTypes.AddEditCategoryError Category),
+    dbEditNews :: (News.Handle IO, User, Int, EditNewsRequest) -> IO (Either ErrorTypes.AddEditNewsError News),
+    dbAuthorsNewsList ::
       ( News.Handle IO,
         User,
         Filter,
@@ -27,7 +27,7 @@ data Db = Db
         Maybe Limit
       ) ->
       IO (Either ErrorTypes.GetNewsError [News]),
-    _authorsNewsSearchList ::
+    dbAuthorsNewsSearchList ::
       ( News.Handle IO,
         User,
         Maybe T.Text,
@@ -35,10 +35,10 @@ data Db = Db
         Maybe Limit
       ) ->
       IO (Either ErrorTypes.GetNewsError [News]),
-    _userList :: (News.Handle IO, Maybe Offset, Maybe Limit) -> IO (Either ErrorTypes.GetContentError [User]),
-    _oneImage :: (News.Handle IO, Integer) -> IO (Either ErrorTypes.GetImageError B.ByteString),
-    _categoryList :: (News.Handle IO, Maybe Offset, Maybe Limit) -> IO (Either ErrorTypes.GetContentError [Category]),
-    _newsList ::
+    dbUserList :: (News.Handle IO, Maybe Offset, Maybe Limit) -> IO (Either ErrorTypes.GetContentError [User]),
+    dbOneImage :: (News.Handle IO, Integer) -> IO (Either ErrorTypes.GetImageError B.ByteString),
+    dbCategoryList :: (News.Handle IO, Maybe Offset, Maybe Limit) -> IO (Either ErrorTypes.GetContentError [Category]),
+    dbNewsList ::
       ( News.Handle IO,
         Filter,
         Maybe SortBy,
@@ -46,7 +46,7 @@ data Db = Db
         Maybe Limit
       ) ->
       IO (Either ErrorTypes.GetNewsError [News]),
-    _newsSearchList ::
+    dbNewsSearchList ::
       ( News.Handle IO,
         Maybe T.Text,
         Maybe Offset,

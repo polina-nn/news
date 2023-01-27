@@ -46,7 +46,7 @@ editOneNews ::
   DataTypes.EditNewsRequest ->
   Handler DataTypes.News
 editOneNews h DataTypes.Db {..} user catId r =
-  (>>=) (liftIO $ _editNews (h, user, catId, r)) ToHttpResponse.toHttpResponse
+  (>>=) (liftIO $ dbEditNews (h, user, catId, r)) ToHttpResponse.toHttpResponse
 
 editNews ::
   SQL.Connection ->

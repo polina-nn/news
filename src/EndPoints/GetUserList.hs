@@ -25,7 +25,7 @@ getUserList ::
   Maybe DataTypes.Limit ->
   Handler [DataTypes.User]
 getUserList h DataTypes.Db {..} ma ml =
-  (>>=) (liftIO $ _userList (h, ma, ml)) ToHttpResponse.toHttpResponse
+  (>>=) (liftIO $ dbUserList (h, ma, ml)) ToHttpResponse.toHttpResponse
 
 userList ::
   SQL.Connection ->

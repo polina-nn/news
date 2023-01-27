@@ -25,7 +25,6 @@ import qualified EndPoints.GetOneImage as GetOneImage
 import qualified EndPoints.GetUserList as GetUserList
 import Logger (logDebug, (.<))
 import qualified News
-import Types.DataTypes (Db (_addCategory))
 import qualified Types.DataTypes as DataTypes
 
 initConnPool :: News.DbConfig -> IO (POOL.Pool SQL.Connection)
@@ -53,20 +52,20 @@ initConnPool News.DbConfig {..} =
 createDb :: POOL.Pool SQL.Connection -> DataTypes.Db
 createDb pool =
   DataTypes.Db
-    { _addUser = withConnPool . flip AddOneUser.addUser,
-      _addCategory = withConnPool . flip AddOneCategory.addCategory,
-      _addNews = withConnPool . flip AddOneNews.addNews,
-      _addImage = withConnPool . flip AddOneImage.addImage,
-      _editCategory = withConnPool . flip EditOneCategory.editCategory,
-      _editNews = withConnPool . flip EditOneNews.editNews,
-      _authorsNewsList = withConnPool . flip GetAuthorsNewsList.authorsNewsList,
-      _authorsNewsSearchList =
+    { dbAddUser = withConnPool . flip AddOneUser.addUser,
+      dbAddCategory = withConnPool . flip AddOneCategory.addCategory,
+      dbAddNews = withConnPool . flip AddOneNews.addNews,
+      dbAddImage = withConnPool . flip AddOneImage.addImage,
+      dbEditCategory = withConnPool . flip EditOneCategory.editCategory,
+      dbEditNews = withConnPool . flip EditOneNews.editNews,
+      dbAuthorsNewsList = withConnPool . flip GetAuthorsNewsList.authorsNewsList,
+      dbAuthorsNewsSearchList =
         withConnPool . flip GetAuthorsNewsSearchList.authorsNewsSearchList,
-      _userList = withConnPool . flip GetUserList.userList,
-      _oneImage = withConnPool . flip GetOneImage.oneImage,
-      _categoryList = withConnPool . flip GetCategoryList.categoryList,
-      _newsList = withConnPool . flip GetNewsList.newsList,
-      _newsSearchList = withConnPool . flip GetNewsSearchList.newsSearchList
+      dbUserList = withConnPool . flip GetUserList.userList,
+      dbOneImage = withConnPool . flip GetOneImage.oneImage,
+      dbCategoryList = withConnPool . flip GetCategoryList.categoryList,
+      dbNewsList = withConnPool . flip GetNewsList.newsList,
+      dbNewsSearchList = withConnPool . flip GetNewsSearchList.newsSearchList
     }
   where
     withConnPool = POOL.withResource pool

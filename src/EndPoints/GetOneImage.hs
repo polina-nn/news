@@ -17,7 +17,7 @@ import qualified Types.ErrorTypes as ErrorTypes
 
 getOneImage :: News.Handle IO -> DataTypes.Db -> Integer -> Handler B.ByteString
 getOneImage h DataTypes.Db {..} idImage =
-  (>>=) (liftIO $ _oneImage (h, idImage)) ToHttpResponse.toHttpResponse
+  (>>=) (liftIO $ dbOneImage (h, idImage)) ToHttpResponse.toHttpResponse
 
 oneImage ::
   SQL.Connection ->
