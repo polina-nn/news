@@ -11,6 +11,7 @@ import Control.Exception.Base
     throwIO,
   )
 import Control.Monad.IO.Class (MonadIO (liftIO))
+import Control.Monad.Trans.Class (MonadTrans (lift))
 import qualified Control.Monad.Trans.Except as EX
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base64 as Base64
@@ -46,7 +47,7 @@ addImage ::
   IO (Either ErrorTypes.AddImageError DataTypes.URI)
 addImage conn (h, user, createImage) = do
   Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add One Image ", ToText.toText createImage, "\nby user: ", ToText.toText user]
-  allCheckAndDecodeBase64ByteString <- allCheck (h, user, createImage) >>= EX.runExceptT
+  allCheckAndDecodeBase64ByteString <- EX.runExceptT $ allCheck (h, user, createImage)
   case allCheckAndDecodeBase64ByteString of
     Left err -> return $ Left err
     Right imageDecodeBase64ByteString ->
@@ -60,6 +61,7 @@ addImage conn (h, user, createImage) = do
       Logger.logError (News.hLogHandle h) ("addImage:handleError: throwIO is unknown error" .< displayException e)
       throwIO e
 
+{--
 allCheck :: (News.Handle IO, DataTypes.User, DataTypes.CreateImageRequest) -> IO (EX.ExceptT ErrorTypes.AddImageError IO ImageDecodeBase64ByteString)
 allCheck (h, user, createImage) = do
   checkUserAuthor'' <- EX.withExceptT ErrorTypes.InvalidPermissionAddImage <$> Lib.checkUserAuthor' h user
@@ -67,7 +69,18 @@ allCheck (h, user, createImage) = do
   checkPngImage' <- checkPngImage h createImage
   checkAndDecodeBase64Image' <- checkAndDecodeBase64Image h createImage
   let checkAndDecodeBase64Image'' = do { checkUserAuthor'' >> checkImageFileExist' >> checkPngImage' >> checkAndDecodeBase64Image' } `EX.catchE` EX.throwE
-  return checkAndDecodeBase64Image''
+  return checkAndDecodeBase64Image'' --}
+
+allCheck :: (News.Handle IO, DataTypes.User, DataTypes.CreateImageRequest) -> EX.ExceptT ErrorTypes.AddImageError IO ImageDecodeBase64ByteString
+allCheck (h, user, createImage) = do
+  checkUserAuthor'' <- lift (EX.withExceptT ErrorTypes.InvalidPermissionAddImage <$> Lib.checkUserAuthor' h user)
+  checkImageFileExist' <- lift $ checkImageFileExist h createImage
+  checkPngImage' <- lift $ checkPngImage h createImage
+  checkAndDecodeBase64Image' <- lift $ checkAndDecodeBase64Image h createImage
+  checkUserAuthor'' `EX.catchE` EX.throwE
+  checkImageFileExist' `EX.catchE` EX.throwE
+  checkPngImage' `EX.catchE` EX.throwE
+  checkAndDecodeBase64Image' `EX.catchE` EX.throwE
 
 checkImageFileExist ::
   News.Handle IO ->
