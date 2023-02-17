@@ -84,8 +84,6 @@ checkOffsetLimitNews ::
   Maybe DataTypes.Limit ->
   m (Either ErrorTypes.GetNewsError (DataTypes.Offset, DataTypes.Limit))
 checkOffsetLimitNews h mo ml = do
-  Logger.logDebug (News.hLogHandle h) ("In request: offset = " .< mo)
-  Logger.logDebug (News.hLogHandle h) ("In request: limit = " .< ml)
   checkOff <- checkOffset h mo
   case checkOff of
     Left err -> return $ Left $ ErrorTypes.InvalidOffsetGetNews err

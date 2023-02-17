@@ -86,7 +86,7 @@ All migrations are at  [migrations](migrations).
 Before starting the server, you need to create a new empty database in the Postgres DB.
 During migrations, a user with login "polina" and password "polina" is automatically created (Author and administrator).
 You can create other administrators and authors, if you login as "polina", password "polina". 
-You can change in [_migrations/01.sql](_migrations/01.sql) the login and password. You must generating a password hash by [app/MainBase64.hs] (app/MainBase64.hs). 
+You can change in [_migrations/01.sql](_migrations/01.sql) the login and password. You must generating a password hash by [app/MainBase64.hs](app/MainBase64.hs). 
 
 The name of the database and the owner put in the config:
 ```
@@ -105,7 +105,7 @@ Schema is at [DatabaseSchema](_docs/DatabaseSchema.md)
 # Project structure 
 ------
 I explain only content of some folders and files. In other places content is standard.
-Folders with prefixed are used for documentation and running/testing server (examples requests or content and do not contain haskell code). 
+Folders with prefixed "_" are used for documentation and running/testing server (examples requests or content and do not contain haskell code). 
 
 ```
 news/
@@ -113,7 +113,7 @@ news/
 │ │
 │ _image/ # Images in png and base64 for example
 │ │
-│ _migrations/ # Contain two schemes: with data and empty for Data Base
+│ _migrations/ # Contain empty scheme for Data Base
 │ │
 │ _scripts/ # One request for each endpoint
 │ │

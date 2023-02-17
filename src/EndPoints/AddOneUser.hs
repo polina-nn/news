@@ -11,6 +11,7 @@ import Control.Exception.Base
     throwIO,
   )
 import Control.Monad.IO.Class (MonadIO (liftIO))
+import qualified Control.Monad.Trans.Except as EX
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
@@ -40,8 +41,8 @@ addUser ::
   IO (Either ErrorTypes.AddUserError DataTypes.User)
 addUser conn (h, user, req) = do
   Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add User: \n", ToText.toText req, "by user: ", ToText.toText user]
-  allCheck <- Lib.checkUserAdmin h user >>= checkLogin conn h req
-  case allCheck of
+  allCheck' <- allCheck conn (h, user, req) >>= EX.runExceptT
+  case allCheck' of
     Left err -> return $ Left err
     Right _ -> do
       rez <- catch (addUserIO conn h req) handleError
@@ -92,16 +93,21 @@ addUserIO conn h DataTypes.CreateUserRequest {..} = do
       return $
         Left $ ErrorTypes.AddUserSQLRequestError $ ErrorTypes.SQLRequestError []
 
+-- | allCheck  -  check permission for add user; check the existence of the login. Duplication of login is not allowed
+allCheck :: SQL.Connection -> (News.Handle IO, DataTypes.User, DataTypes.CreateUserRequest) -> IO (EX.ExceptT ErrorTypes.AddUserError IO DataTypes.CreateUserRequest)
+allCheck conn (h, user, createUser) = do
+  checkUserAdmin'' <- EX.withExceptT ErrorTypes.InvalidPermissionAddUser <$> Lib.checkUserAdmin' h user
+  checkLogin' <- checkLogin conn h createUser
+  let checkLogin'' = do { checkUserAdmin'' >> checkLogin' } `EX.catchE` EX.throwE
+  return checkLogin''
+
 -- | checkLogin - check the existence of the login. Duplication of login is not allowed
 checkLogin ::
   SQL.Connection ->
   News.Handle IO ->
   DataTypes.CreateUserRequest ->
-  Either ErrorTypes.InvalidAdminPermission DataTypes.User ->
-  IO (Either ErrorTypes.AddUserError DataTypes.CreateUserRequest)
-checkLogin _ _ _ (Left err) =
-  return $ Left $ ErrorTypes.InvalidPermissionAddUser err
-checkLogin conn h' r@DataTypes.CreateUserRequest {..} (Right _) = do
+  IO (EX.ExceptT ErrorTypes.AddUserError IO DataTypes.CreateUserRequest)
+checkLogin conn h' r@DataTypes.CreateUserRequest {..} = do
   res <-
     SQL.query
       conn
@@ -112,12 +118,12 @@ checkLogin conn h' r@DataTypes.CreateUserRequest {..} (Right _) = do
       if not (SQL.fromOnly x)
         then do
           Logger.logDebug (News.hLogHandle h') "checkLogin: OK!"
-          return $ Right r
+          return $ pure r
         else do
           Logger.logError
             (News.hLogHandle h')
             ("ERROR " .< ErrorTypes.UserAlreadyExisted (ErrorTypes.InvalidContent "checkLogin: BAD! User with this login already exists "))
-          return $ Left $ ErrorTypes.UserAlreadyExisted $ ErrorTypes.InvalidContent []
+          return . EX.throwE $ ErrorTypes.UserAlreadyExisted $ ErrorTypes.InvalidContent []
     _ -> do
       Logger.logError
         (News.hLogHandle h')
@@ -126,5 +132,4 @@ checkLogin conn h' r@DataTypes.CreateUserRequest {..} (Right _) = do
               ( ErrorTypes.SQLRequestError "checkLogin: BAD! Logic error!"
               )
         )
-      return $
-        Left $ ErrorTypes.AddUserSQLRequestError $ ErrorTypes.SQLRequestError []
+      return . EX.throwE $ ErrorTypes.AddUserSQLRequestError $ ErrorTypes.SQLRequestError []

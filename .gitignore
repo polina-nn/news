@@ -25,7 +25,6 @@ cabal.project.local~
 
 .history
 .vscode
-
 .stack-work/
 /news.cabal
 logs.txt
