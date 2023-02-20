@@ -116,13 +116,13 @@ checkAndDecodeBase64Image ::
   DataTypes.CreateImageRequest ->
   EX.ExceptT ErrorTypes.AddImageError IO ImageDecodeBase64ByteString
 checkAndDecodeBase64Image h DataTypes.CreateImageRequest {..} = do
-  imageFile <- lift $ B.readFile image
+  imageFile <- liftIO $ B.readFile image
   case Base64.decodeBase64 imageFile of
     Right val -> do
-      lift $ Logger.logDebug (News.hLogHandle h) "checkBase64Image: OK!"
+      liftIO $ Logger.logDebug (News.hLogHandle h) "checkBase64Image: OK!"
       return val
     Left err -> do
-      lift $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.NotBase64Image (ErrorTypes.InvalidContent ("checkBase64Image: BAD!" ++ show err)))
+      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.NotBase64Image (ErrorTypes.InvalidContent ("checkBase64Image: BAD!" ++ show err)))
       EX.throwE $ ErrorTypes.NotBase64Image $ ErrorTypes.InvalidContent []
 
 addImageIO ::
