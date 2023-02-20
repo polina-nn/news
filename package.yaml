@@ -60,7 +60,7 @@ default-extensions:
 - DeriveGeneric 
 - FlexibleContexts
 - FlexibleInstances
-- GeneralizedNewtypeDeriving
+# - GeneralizedNewtypeDeriving
 - MultiParamTypeClasses
 - OverloadedStrings
 - QuasiQuotes

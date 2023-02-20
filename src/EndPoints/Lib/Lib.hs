@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-deprecations #-}
+
 -- |  EndPoints.Lib.Lib - library of helper pure functions for EndPoints
 module EndPoints.Lib.Lib
   ( checkUserAdmin,
@@ -11,6 +13,7 @@ module EndPoints.Lib.Lib
   )
 where
 
+import Control.Monad.Trans.Class (MonadTrans (lift))
 import qualified Control.Monad.Trans.Except as EX
 import qualified Crypto.Hash
 import qualified Data.ByteArray.Encoding as BAE
@@ -65,20 +68,21 @@ checkUserAuthor' ::
   Monad m =>
   News.Handle m ->
   DataTypes.User ->
-  m (EX.ExceptT ErrorTypes.InvalidAuthorPermission m DataTypes.User)
+  EX.ExceptT ErrorTypes.InvalidAuthorPermission m DataTypes.User
 checkUserAuthor' h r@DataTypes.User {..} =
   if userAuthor
     then do
-      Logger.logDebug (News.hLogHandle h) "checkUserAuthor: OK!"
-      return $ pure r
+      lift $ Logger.logDebug (News.hLogHandle h) "checkUserAuthor: OK!"
+      EX.except (Right r)
     else do
-      Logger.logError
-        (News.hLogHandle h)
-        ( "ERROR "
-            .< ErrorTypes.InvalidAuthorPermission
-              "checkUserAuthor: BAD! User is not author. Invalid Permission for this request."
-        )
-      return . EX.throwE $ ErrorTypes.InvalidAuthorPermission []
+      lift $
+        Logger.logError
+          (News.hLogHandle h)
+          ( "ERROR "
+              .< ErrorTypes.InvalidAuthorPermission
+                "checkUserAuthor: BAD! User is not author. Invalid Permission for this request."
+          )
+      EX.throwE $ ErrorTypes.InvalidAuthorPermission []
 
 checkUserAuthor ::
   Monad m =>
