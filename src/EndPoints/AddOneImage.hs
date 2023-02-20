@@ -66,20 +66,20 @@ addImage conn (h, user, createImage) = do
 allCheck :: (News.Handle IO, DataTypes.User, DataTypes.CreateImageRequest) -> EX.ExceptT ErrorTypes.AddImageError IO ImageDecodeBase64ByteString
 allCheck (h, user, createImage) = do
   let checkUserAuthor = EX.withExceptT ErrorTypes.InvalidPermissionAddImage (Lib.checkUserAuthor' h user)
-  (checkUserAuthor >> checkImageFileExist h createImage >> checkPngImage h createImage >> checkAndDecodeBase64Image h createImage) `EX.catchE` EX.throwE
+  checkUserAuthor >> checkImageFileExist h createImage >> checkPngImage h createImage >> checkAndDecodeBase64Image h createImage
 
 checkImageFileExist ::
   News.Handle IO ->
   DataTypes.CreateImageRequest ->
   EX.ExceptT ErrorTypes.AddImageError IO DataTypes.CreateImageRequest
 checkImageFileExist h r@DataTypes.CreateImageRequest {..} = do
-  rez <- lift $ SD.doesFileExist image
+  rez <- liftIO $ SD.doesFileExist image
   if rez
     then do
-      lift $ Logger.logDebug (News.hLogHandle h) "checkImageFileExist: OK!"
-      EX.except (Right r)
+      liftIO $ Logger.logDebug (News.hLogHandle h) "checkImageFileExist: OK!"
+      return r
     else do
-      lift $
+      liftIO $
         Logger.logError
           (News.hLogHandle h)
           ( "ERROR "
@@ -99,7 +99,7 @@ checkPngImage h r@DataTypes.CreateImageRequest {..} =
   if format == "png"
     then do
       lift $ Logger.logDebug (News.hLogHandle h) "checkPngImage: OK!"
-      EX.except (Right r)
+      return r
     else do
       lift $
         Logger.logError
@@ -120,7 +120,7 @@ checkAndDecodeBase64Image h DataTypes.CreateImageRequest {..} = do
   case Base64.decodeBase64 imageFile of
     Right val -> do
       lift $ Logger.logDebug (News.hLogHandle h) "checkBase64Image: OK!"
-      EX.except (Right val)
+      return val
     Left err -> do
       lift $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.NotBase64Image (ErrorTypes.InvalidContent ("checkBase64Image: BAD!" ++ show err)))
       EX.throwE $ ErrorTypes.NotBase64Image $ ErrorTypes.InvalidContent []
