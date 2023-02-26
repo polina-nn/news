@@ -4,13 +4,9 @@ module EndPoints.EditOneCategory
   )
 where
 
-import Control.Exception.Base
-  ( Exception (displayException),
-    SomeException (SomeException),
-    catch,
-    throwIO,
-  )
 import Control.Monad.IO.Class (MonadIO (liftIO))
+import Control.Monad.Trans.Class (MonadTrans (lift))
+import qualified Control.Monad.Trans.Except as EX
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
@@ -42,149 +38,119 @@ editCategory ::
   SQL.Connection ->
   (News.Handle IO, DataTypes.User, Int, DataTypes.EditCategoryRequest) ->
   IO (Either ErrorTypes.AddEditCategoryError DataTypes.Category)
-editCategory conn (h, user, catId, r) = do
-  Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Edit Category: \n", ToText.toText r, "with category id ", T.pack $ show catId, "\nby user: ", ToText.toText user]
-  allCheck <-
-    Lib.checkUserAdmin h user >>= checkIdIO conn h catId r >>= checkSyntaxPath h
-      >>= CategoryIO.getAllCategoriesIO conn h
-      >>= Category.checkLogicPathForEditCategory h catId r
-  case allCheck ::
-         Either
-           ErrorTypes.AddEditCategoryError
-           ( CategoryHelpTypes.EditCategoryFullRequest,
-             [DataTypes.Category]
-           ) of
-    Left err -> return $ Left err
-    Right (editCategoryFullReq, categories) -> do
-      let newCategories = T.concat $ Prelude.map ToText.toText categories
-      Logger.logDebug (News.hLogHandle h) $ T.concat ["editCategory:allCheck: OK!  \n", ToText.toText editCategoryFullReq]
-      Logger.logDebug (News.hLogHandle h) $ T.concat ["categories ", newCategories]
-      case Category.changePathsForEditCategory editCategoryFullReq categories of
-        Nothing -> do
-          Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidValuePath (ErrorTypes.InvalidContent "check Developer Error, then update categories table"))
-          return $
-            Left $ ErrorTypes.InvalidValuePath $ ErrorTypes.InvalidContent []
-        Just toChangePaths -> do
-          rez <-
-            catch
-              ( CategoryIO.changePathCategoriesIO conn h toChangePaths
-                  >>= editCategoryNameIO conn h editCategoryFullReq
-              )
-              handleError
-          case rez of
-            (Right newCategory) -> do
-              Logger.logInfo (News.hLogHandle h) $ T.concat ["editCategory: OK!  \n", ToText.toText newCategory]
-              return rez
-            (Left newCategoryError) -> do
-              Logger.logInfo
-                (News.hLogHandle h)
-                ("editCategory: BAD! " .< show newCategoryError)
-              return rez
-  where
-    handleError ::
-      SomeException ->
-      IO (Either ErrorTypes.AddEditCategoryError DataTypes.Category)
-    handleError (SomeException e) = do
-      let errMsg = displayException e
-      Logger.logError
-        (News.hLogHandle h)
-        ("editCategory:handleError:" .< show errMsg)
-      throwIO e
+editCategory conn (h, user, catId, r) = EX.runExceptT $ editCategoryExcept conn (h, user, catId, r)
+
+editCategoryExcept ::
+  SQL.Connection ->
+  (News.Handle IO, DataTypes.User, Int, DataTypes.EditCategoryRequest) ->
+  EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.Category
+editCategoryExcept conn (h, user, catId, r) = do
+  liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Edit Category: \n", ToText.toText r, "with category id ", T.pack $ show catId, "\nby user: ", ToText.toText user]
+  categories <- CategoryIO.getAllCategories conn
+  editCategoryFullRequest <- allCheck conn (h, user, catId, r, categories)
+  liftIO $ Logger.logDebug (News.hLogHandle h) $ T.concat ["editCategoryExcept:allCheck: OK!  \n", ToText.toText editCategoryFullRequest]
+  case Category.changePathsForEditCategory editCategoryFullRequest categories of
+    Nothing -> do
+      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidValuePath (ErrorTypes.InvalidContent "check Developer Error, then update categories table"))
+      EX.throwE $ ErrorTypes.InvalidValuePath $ ErrorTypes.InvalidContent []
+    Just toChangePaths -> do
+      _ <- CategoryIO.changePathCategories conn h toChangePaths
+      editCategoryName conn h editCategoryFullRequest
+
+allCheck ::
+  SQL.Connection ->
+  (News.Handle IO, DataTypes.User, Int, DataTypes.EditCategoryRequest, [DataTypes.Category]) ->
+  EX.ExceptT ErrorTypes.AddEditCategoryError IO CategoryHelpTypes.EditCategoryFullRequest
+allCheck conn (h, user, catId, r, categories) = do
+  let checkUserAdmin'' = EX.withExceptT ErrorTypes.InvalidPermissionAddEditCategory (Lib.checkUserAdmin h user)
+  checkUserAdmin'' >> checkId conn h catId >> checkSyntaxPath h r >> Category.checkLogicPathForEditCategory h catId r categories
 
 -- | checkIdIO  - check if there is a record with the given category id in the database ( id = 7 in http://localhost:8080/category/7 )
-checkIdIO ::
+checkId ::
   SQL.Connection ->
   News.Handle IO ->
   Int ->
-  DataTypes.EditCategoryRequest ->
-  Either ErrorTypes.InvalidAdminPermission DataTypes.User ->
-  IO (Either ErrorTypes.AddEditCategoryError DataTypes.EditCategoryRequest)
-checkIdIO _ _ _ _ (Left err) =
-  return $ Left $ ErrorTypes.InvalidPermissionAddEditCategory err
-checkIdIO conn h catId r (Right _) = do
+  EX.ExceptT ErrorTypes.AddEditCategoryError IO Int
+checkId conn h catId = do
   res <-
-    SQL.query
-      conn
-      [sql| SELECT EXISTS (SELECT category_id  FROM category WHERE category_id = ?) |]
-      (SQL.Only catId)
+    liftIO
+      ( SQL.query
+          conn
+          [sql| SELECT EXISTS (SELECT category_id  FROM category WHERE category_id = ?) |]
+          (SQL.Only catId)
+      )
   case res of
     [] -> do
-      Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.AddEditCategorySQLRequestError (ErrorTypes.SQLRequestError "checkIdIO! Don't checkId category"))
-      return $
-        Left $
-          ErrorTypes.AddEditCategorySQLRequestError $
-            ErrorTypes.SQLRequestError []
+      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.AddEditCategorySQLRequestError (ErrorTypes.SQLRequestError "checkId! Don't checkId category"))
+      EX.throwE $
+        ErrorTypes.AddEditCategorySQLRequestError $
+          ErrorTypes.SQLRequestError []
     _ ->
       if SQL.fromOnly $ head res
         then
           ( do
-              Logger.logDebug (News.hLogHandle h) "checkId: OK! Exists category"
-              return $ Right r
+              liftIO $ Logger.logDebug (News.hLogHandle h) "checkId: OK! Exists category"
+              return catId
           )
         else
           ( do
-              Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidCategoryId (ErrorTypes.InvalidId "checkId: BAD! Not exists category with id "))
-              return $
-                Left $ ErrorTypes.InvalidCategoryId $ ErrorTypes.InvalidId []
+              liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidCategoryId (ErrorTypes.InvalidId "checkId: BAD! Not exists category with id "))
+              EX.throwE $ ErrorTypes.InvalidCategoryId $ ErrorTypes.InvalidId []
           )
 
 checkSyntaxPath ::
-  News.Handle IO ->
-  Either ErrorTypes.AddEditCategoryError DataTypes.EditCategoryRequest ->
-  IO (Either ErrorTypes.AddEditCategoryError DataTypes.EditCategoryRequest)
-checkSyntaxPath _ (Left er) = return $ Left er
+  Monad m =>
+  News.Handle m ->
+  DataTypes.EditCategoryRequest ->
+  EX.ExceptT ErrorTypes.AddEditCategoryError m DataTypes.EditCategoryRequest
 checkSyntaxPath
   _
-  r@( Right
-        DataTypes.EditCategoryRequest
-          { DataTypes.newPath = Nothing,
-            DataTypes.newCategory = _
-          }
+  r@( DataTypes.EditCategoryRequest
+        { DataTypes.newPath = Nothing,
+          DataTypes.newCategory = _
+        }
       ) = return r
 checkSyntaxPath
   h
-  r@( Right
-        DataTypes.EditCategoryRequest
-          { DataTypes.newPath = Just path,
-            DataTypes.newCategory = _
-          }
+  r@( DataTypes.EditCategoryRequest
+        { DataTypes.newPath = Just path,
+          DataTypes.newCategory = _
+        }
       ) =
     if Category.validSyntaxPath path
       then return r
       else do
-        Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidSyntaxPath (ErrorTypes.InvalidContent "checkSyntaxPath: BAD! Path is not valid! Only digits(not zero begin) and points must have! "))
-        return $
-          Left $ ErrorTypes.InvalidSyntaxPath $ ErrorTypes.InvalidContent []
+        lift $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidSyntaxPath (ErrorTypes.InvalidContent "checkSyntaxPath: BAD! Path is not valid! Only digits(not zero begin) and points must have! "))
+        EX.throwE $ ErrorTypes.InvalidSyntaxPath $ ErrorTypes.InvalidContent []
 
-editCategoryNameIO ::
+editCategoryName ::
   SQL.Connection ->
   News.Handle IO ->
   CategoryHelpTypes.EditCategoryFullRequest ->
-  Either ErrorTypes.AddEditCategoryError Int ->
-  IO (Either ErrorTypes.AddEditCategoryError DataTypes.Category)
-editCategoryNameIO _ _ _ (Left er) = return $ Left er
-editCategoryNameIO conn h CategoryHelpTypes.EditCategoryFullRequest {..} (Right _) = do
+  EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.Category
+editCategoryName conn h CategoryHelpTypes.EditCategoryFullRequest {..} = do
   res <-
-    SQL.execute
-      conn
-      [sql| UPDATE category SET category_name = ? WHERE category_id = ? |]
-      (newCategory', id')
+    liftIO $
+      SQL.execute
+        conn
+        [sql| UPDATE category SET category_name = ? WHERE category_id = ? |]
+        (newCategory', id')
   case read (show res) :: Int of
     1 -> do
       rez_new_path <-
-        SQL.query
-          conn
-          [sql| SELECT category_path FROM category WHERE category_id = ? |]
-          (SQL.Only id')
+        liftIO $
+          SQL.query
+            conn
+            [sql| SELECT category_path FROM category WHERE category_id = ? |]
+            (SQL.Only id')
       let rez_new_path' = SQL.fromOnly . head $ rez_new_path :: String
       let editedCategory =
             Category.toCategories (rez_new_path', id', newCategory')
-      Logger.logInfo (News.hLogHandle h) $ T.concat ["editCategoryIO: OK! UPDATE  category: ", ToText.toText editedCategory]
+      liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["editCategoryIO: OK! UPDATE  category: ", ToText.toText editedCategory]
 
-      return $ Right editedCategory
+      return editedCategory
     _ -> do
-      Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.AddEditCategorySQLRequestError (ErrorTypes.SQLRequestError "editCategoryIO: BAD! Don't UPDATE  category"))
-      return $
-        Left $
-          ErrorTypes.AddEditCategorySQLRequestError $
-            ErrorTypes.SQLRequestError []
+      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.AddEditCategorySQLRequestError (ErrorTypes.SQLRequestError "editCategoryIO: BAD! Don't UPDATE  category"))
+      EX.throwE $
+        ErrorTypes.AddEditCategorySQLRequestError $
+          ErrorTypes.SQLRequestError []

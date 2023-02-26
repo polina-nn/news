@@ -198,6 +198,7 @@ data News = News
     newsCategory :: [Category],
     newsText :: T.Text,
     newsImages :: [URI],
-    newsPublished :: Bool
+    newsPublished :: Bool,
+    newsId :: Int
   }
   deriving (Show, Generic, Eq, A.ToJSON, A.FromJSON)

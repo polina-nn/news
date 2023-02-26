@@ -1,14 +1,11 @@
-{-# OPTIONS_GHC -Wno-deprecations #-}
-
 -- |  EndPoints.Lib.Lib - library of helper pure functions for EndPoints
 module EndPoints.Lib.Lib
   ( checkUserAdmin,
-    checkUserAdmin',
     checkUserAuthor,
-    checkUserAuthor',
     currentDay,
     hashed,
     imageIdToURI,
+    imagesURIs,
     toUser,
   )
 where
@@ -26,50 +23,32 @@ import qualified News
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
 
-checkUserAdmin' ::
-  Monad m =>
-  News.Handle m ->
-  DataTypes.User ->
-  m (EX.ExceptT ErrorTypes.InvalidAdminPermission m DataTypes.User)
-checkUserAdmin' h r@DataTypes.User {..} =
-  if userAdmin
-    then do
-      Logger.logDebug (News.hLogHandle h) "checkUserAdmin: OK!"
-      return $ pure r
-    else do
-      Logger.logError
-        (News.hLogHandle h)
-        ( "ERROR "
-            .< ErrorTypes.InvalidAdminPermission
-              "checkUserAdmin: BAD! User is not admin. Invalid Permission for this request."
-        )
-      return . EX.throwE $ ErrorTypes.InvalidAdminPermission []
-
 checkUserAdmin ::
   Monad m =>
   News.Handle m ->
   DataTypes.User ->
-  m (Either ErrorTypes.InvalidAdminPermission DataTypes.User)
+  EX.ExceptT ErrorTypes.InvalidAdminPermission m DataTypes.User
 checkUserAdmin h r@DataTypes.User {..} =
   if userAdmin
     then do
-      Logger.logDebug (News.hLogHandle h) "checkUserAdmin: OK!"
-      return $ Right r
+      lift $ Logger.logDebug (News.hLogHandle h) "checkUserAdmin: OK!"
+      return r
     else do
-      Logger.logError
-        (News.hLogHandle h)
-        ( "ERROR "
-            .< ErrorTypes.InvalidAdminPermission
-              "checkUserAdmin: BAD! User is not admin. Invalid Permission for this request."
-        )
-      return . Left $ ErrorTypes.InvalidAdminPermission []
+      lift $
+        Logger.logError
+          (News.hLogHandle h)
+          ( "ERROR "
+              .< ErrorTypes.InvalidAdminPermission
+                "checkUserAdmin: BAD! User is not admin. Invalid Permission for this request."
+          )
+      EX.throwE $ ErrorTypes.InvalidAdminPermission []
 
-checkUserAuthor' ::
+checkUserAuthor ::
   Monad m =>
   News.Handle m ->
   DataTypes.User ->
   EX.ExceptT ErrorTypes.InvalidAuthorPermission m DataTypes.User
-checkUserAuthor' h r@DataTypes.User {..} =
+checkUserAuthor h r@DataTypes.User {..} =
   if userAuthor
     then do
       lift $ Logger.logDebug (News.hLogHandle h) "checkUserAuthor: OK!"
@@ -84,30 +63,17 @@ checkUserAuthor' h r@DataTypes.User {..} =
           )
       EX.throwE $ ErrorTypes.InvalidAuthorPermission []
 
-checkUserAuthor ::
-  Monad m =>
-  News.Handle m ->
-  DataTypes.User ->
-  m (Either ErrorTypes.InvalidAuthorPermission DataTypes.User)
-checkUserAuthor h r@DataTypes.User {..} =
-  if userAuthor
-    then do
-      Logger.logDebug (News.hLogHandle h) "checkUserAuthor: OK!"
-      return $ Right r
-    else do
-      Logger.logError
-        (News.hLogHandle h)
-        ( "ERROR "
-            .< ErrorTypes.InvalidAuthorPermission
-              "checkUserAuthor: BAD! User is not author. Invalid Permission for this request."
-        )
-      return . Left $ ErrorTypes.InvalidAuthorPermission []
-
+-- | imageIdToURI - create URI of one image
 imageIdToURI :: News.Handle IO -> Int -> DataTypes.URI
 imageIdToURI h idIm = show uriBegin ++ show uriEnd
   where
     uriBegin = News.hURIConfig h
     uriEnd = DataTypes.URI' {uriPath = "image", uriId = idIm}
+
+-- | imagesURIs - create URI of images
+imagesURIs :: News.Handle IO -> [Int] -> [DataTypes.URI]
+imagesURIs _ [] = []
+imagesURIs h xs = map (imageIdToURI h) xs
 
 -- | currentDay -- return current data, used when creating user or news
 currentDay :: IO TIME.Day

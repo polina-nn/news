@@ -3,7 +3,7 @@ module CheckLogicPathForEditCategorySpec
   )
 where
 
-import Control.Monad.Identity (Identity (Identity))
+import qualified Control.Monad.Trans.Except as EX
 import qualified EndPoints.Lib.Category.Category as Category
 import qualified EndPoints.Lib.Category.CategoryHelpTypes as CategoryHelpTypes
 import Handle (handleSpec)
@@ -23,71 +23,71 @@ spec =
           handleSpec
           1
           req1
-          (Right myCategory)
-          `shouldBe` Identity (Right (fullReq1, myCategory))
+          myCategory
+          `shouldBe` EX.except (Right fullReq1)
       it
         "Step2 Valid Logic Path For Edit Category : edit cur_path' = 4 to newPath = 2"
         $ Category.checkLogicPathForEditCategory
           handleSpec
           5
           req2
-          (Right myCategoryAfterStep1)
-          `shouldBe` Identity (Right (fullReq2, myCategoryAfterStep1))
+          myCategoryAfterStep1
+          `shouldBe` EX.except (Right fullReq2)
       it
         "Step3 Valid Logic Path For Edit Category : edit cur_path' = 6 to newPath = 1"
         $ Category.checkLogicPathForEditCategory
           handleSpec
           11
           req3
-          (Right myCategoryAfterStep2)
-          `shouldBe` Identity (Right (fullReq3, myCategoryAfterStep2))
+          myCategoryAfterStep2
+          `shouldBe` EX.except (Right fullReq3)
       it
         "Step4 Valid Logic Path For Edit Category : edit cur_path' = 7 to newPath = 3.1"
         $ Category.checkLogicPathForEditCategory
           handleSpec
           12
           req4
-          (Right myCategoryAfterStep3)
-          `shouldBe` Identity (Right (fullReq4, myCategoryAfterStep3))
+          myCategoryAfterStep3
+          `shouldBe` EX.except (Right fullReq4)
       it
         "Step5 Valid Logic Path For Edit Category : edit cur_path' = 3.3.1 to newPath = 1.1"
         $ Category.checkLogicPathForEditCategory
           handleSpec
           8
           req5
-          (Right myCategoryAfterStep4)
-          `shouldBe` Identity (Right (fullReq5, myCategoryAfterStep4))
+          myCategoryAfterStep4
+          `shouldBe` EX.except (Right fullReq5)
       it
         "Step6 Valid Logic Path For Edit Category : edit cur_path' = 7 to newPath = 3.3.1"
         $ Category.checkLogicPathForEditCategory
           handleSpec
           13
           req6
-          (Right myCategoryAfterStep5)
-          `shouldBe` Identity (Right (fullReq6, myCategoryAfterStep5))
+          myCategoryAfterStep5
+          `shouldBe` EX.except (Right fullReq6)
       it
         "Step6 Valid Logic Path For Edit Category : edit cur_path' = 3.3.2 to newPath = 3.3.1.1"
         $ Category.checkLogicPathForEditCategory
           handleSpec
           9
           req7
-          (Right myCategoryAfterStep6)
-          `shouldBe` Identity (Right (fullReq7, myCategoryAfterStep6))
+          myCategoryAfterStep6
+          `shouldBe` EX.except (Right fullReq7)
       it
         "Invalid Logic Path For Edit Category : Parent DOES NOT become a child of himself"
         $ Category.checkLogicPathForEditCategory
           handleSpec
           5
           req11
-          (Right myCategory)
-          `shouldBe` Identity (Left error5)
+          myCategory
+          `shouldBe` EX.throwE error5
       it "Invalid  Logic Path For Edit Category : Don`t do a hole in numbering" $
         Category.checkLogicPathForEditCategory
           handleSpec
           1
           req12
-          (Right myCategory)
-          `shouldBe` Identity (Left error6)
+          myCategory
+          `shouldBe` EX.throwE error6
 
 myCategory :: [DataTypes.Category]
 myCategory =

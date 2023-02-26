@@ -5,6 +5,7 @@ module EndPoints.GetNewsSearchList
 where
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
+import qualified Control.Monad.Trans.Except as EX
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
@@ -40,45 +41,46 @@ newsSearchList ::
     Maybe DataTypes.Limit
   ) ->
   IO (Either ErrorTypes.GetNewsError [DataTypes.News])
-newsSearchList _ (h, Nothing, _, _) = do
-  Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidSearchGetNews (ErrorTypes.InvalidRequest "newsSearchList: BAD! Not text for searching \n"))
-  return $ Left $ ErrorTypes.InvalidSearchGetNews $ ErrorTypes.InvalidRequest []
-newsSearchList conn (h, Just search, mo, ml) = do
-  Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Get News Search List ", search, " offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
-  checkRequest <- OffsetLimit.checkOffsetLimitNews h mo ml
-  case checkRequest of
-    Left err -> return $ Left err
-    Right (offset, limit) -> do
-      res <- newsSearchList' conn h search offset limit
-      news <- Prelude.mapM (NewsIO.toNews conn h) res
-      case News.checkErrorsToNews news res of
-        (True, news') -> do
-          let toTextNews = (T.concat $ map ToText.toText news') :: T.Text
-          Logger.logInfo (News.hLogHandle h) $ T.concat ["newsSearchList: OK! \n", toTextNews]
-          return $ Right news'
-        _ ->
-          return $
-            Left $
-              ErrorTypes.GetNewsSQLRequestError $ ErrorTypes.SQLRequestError []
+newsSearchList conn (h, search, mo, ml) = do EX.runExceptT $ newsSearchListExcept conn (h, search, mo, ml)
 
-newsSearchList' ::
+newsSearchListExcept ::
+  SQL.Connection ->
+  ( News.Handle IO,
+    Maybe T.Text,
+    Maybe DataTypes.Offset,
+    Maybe DataTypes.Limit
+  ) ->
+  EX.ExceptT ErrorTypes.GetNewsError IO [DataTypes.News]
+newsSearchListExcept _ (h, Nothing, _, _) = do
+  liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidSearchGetNews (ErrorTypes.InvalidRequest "newsSearchListExcept: BAD! Not text for searching \n"))
+  EX.throwE $ ErrorTypes.InvalidSearchGetNews $ ErrorTypes.InvalidRequest []
+newsSearchListExcept conn (h, Just search, mo, ml) = do
+  liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Get News Search List ", search, " offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
+  (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetNews $ OffsetLimit.checkOffsetLimit h mo ml
+  res <- newsSearchListAtDb conn h search offset limit
+  news <- Prelude.mapM (NewsIO.toNews conn h) res
+  let toTextNews = T.concat $ map ToText.toText news
+  liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["newsSearchListExcept: OK! \n", toTextNews]
+  return news
+
+newsSearchListAtDb ::
   SQL.Connection ->
   News.Handle IO ->
   T.Text ->
   DataTypes.Offset ->
   DataTypes.Limit ->
-  IO [NewsHelpTypes.DbNews]
-newsSearchList' conn _ search off lim = do
+  EX.ExceptT ErrorTypes.GetNewsError IO [NewsHelpTypes.DbNews]
+newsSearchListAtDb conn _ search off lim = do
   res <-
-    SQL.query
-      conn
-      [sql| SELECT news_title, news_created, usr_name, category_path, category_name, news_text, news_images_id, cardinality (news_images_id), news_published
+    liftIO $
+      SQL.query
+        conn
+        [sql| SELECT news_title, news_created, usr_name, category_path, category_name, news_text, news_images_id, cardinality (news_images_id), news_published, news_id
             FROM news
             INNER JOIN usr ON news.news_author_login = usr.usr_login INNER JOIN category ON news.news_category_id = category.category_id
             where (news_published = true) and (to_tsvector(news_title) || to_tsvector(usr_name) || to_tsvector(category_name) || to_tsvector(news_text) @@ plainto_tsquery(?))
             ORDER BY news_created DESC 
             LIMIT ?  OFFSET ? |]
-      (search, show lim, show off)
-  print res
+        (search, show lim, show off)
   let dbNews = Prelude.map News.toDbNews res
   return dbNews

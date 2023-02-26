@@ -87,9 +87,7 @@ instance ToHttpResponse ErrorTypes.GetNewsError [DataTypes.News] where
     throwError err500 {errReasonPhrase = show a}
   toHttpResponse (Left (ErrorTypes.InvalidPermissionGetNews a)) =
     throwError err403 {errReasonPhrase = show a}
-  toHttpResponse (Left (ErrorTypes.InvalidLimitGetNews a)) =
-    throwError err400 {errReasonPhrase = show a}
-  toHttpResponse (Left (ErrorTypes.InvalidOffsetGetNews a)) =
+  toHttpResponse (Left (ErrorTypes.InvalidOffsetOrLimitGetNews a)) =
     throwError err400 {errReasonPhrase = show a}
   toHttpResponse (Left (ErrorTypes.InvalidFilterGetNews a)) =
     throwError err400 {errReasonPhrase = show a}
@@ -102,18 +100,14 @@ instance ToHttpResponse ErrorTypes.GetContentError [DataTypes.Category] where
   toHttpResponse (Right cat) = return cat
   toHttpResponse (Left (ErrorTypes.GetContentSQLRequestError a)) =
     throwError err500 {errReasonPhrase = show a}
-  toHttpResponse (Left (ErrorTypes.InvalidLimitGetContent a)) =
-    throwError err400 {errReasonPhrase = show a}
-  toHttpResponse (Left (ErrorTypes.InvalidOffsetGetContent a)) =
+  toHttpResponse (Left (ErrorTypes.InvalidOffsetOrLimitGetContent a)) =
     throwError err400 {errReasonPhrase = show a}
 
 instance ToHttpResponse ErrorTypes.GetContentError [DataTypes.User] where
   toHttpResponse (Right cat) = return cat
   toHttpResponse (Left (ErrorTypes.GetContentSQLRequestError a)) =
     throwError err500 {errReasonPhrase = show a}
-  toHttpResponse (Left (ErrorTypes.InvalidLimitGetContent a)) =
-    throwError err400 {errReasonPhrase = show a}
-  toHttpResponse (Left (ErrorTypes.InvalidOffsetGetContent a)) =
+  toHttpResponse (Left (ErrorTypes.InvalidOffsetOrLimitGetContent a)) =
     throwError err400 {errReasonPhrase = show a}
 
 -- | 7

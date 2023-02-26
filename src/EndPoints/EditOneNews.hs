@@ -4,13 +4,9 @@ module EndPoints.EditOneNews
   )
 where
 
-import Control.Exception.Base
-  ( Exception (displayException),
-    SomeException (SomeException),
-    catch,
-    throwIO,
-  )
 import Control.Monad.IO.Class (MonadIO (liftIO))
+import Control.Monad.Trans.Class (MonadTrans (lift))
+import qualified Control.Monad.Trans.Except as EX
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.Text as T
@@ -52,487 +48,439 @@ editNews ::
   SQL.Connection ->
   (News.Handle IO, DataTypes.User, IdNews, DataTypes.EditNewsRequest) ->
   IO (Either ErrorTypes.AddEditNewsError DataTypes.News)
-editNews conn (h, user, newsId, r) = do
-  Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Edit One News \n", ToText.toText r, "with news id ", T.pack $ show newsId, "\nby user: ", ToText.toText user]
-  allCheck <-
-    checkIdIO conn h newsId >>= checkUserThisNewsAuthorIO conn h user
-      >>= checkImageFilesExistIO h r
-      >>= checkCategoryIdIO conn h
-      >>= checkPngImages h
-      >>= checkBase64ImagesIO h
-  case allCheck :: Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest of
-    Left err -> return $ Left err
-    Right _ ->
-      catch
-        ( newTileIO conn h newsId r >>= newCatIdIO conn h newsId
-            >>= newTextIO conn h newsId
-            >>= newImagesIO conn h newsId
-            >>= newPublishIO conn h newsId
-            >>= getNewsCategoryIO conn h newsId
-            >>= getNewsImagesIO conn h newsId
-            >>= getNewsIO conn h user newsId
-        )
-        handleError
-  where
-    handleError ::
-      SomeException -> IO (Either ErrorTypes.AddEditNewsError DataTypes.News)
-    handleError (SomeException e) = do
-      let errMsg = displayException e
-      Logger.logError
-        (News.hLogHandle h)
-        ("editNews:handleError:" .< errMsg)
-      throwIO e
+editNews conn (h, user, newsId, r) = do EX.runExceptT $ editNewsExcept conn (h, user, newsId, r)
 
-newTileIO ::
+editNewsExcept ::
+  SQL.Connection ->
+  (News.Handle IO, DataTypes.User, IdNews, DataTypes.EditNewsRequest) ->
+  EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.News
+editNewsExcept conn (h, user, newsId, r) = do
+  liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Edit One News \n", ToText.toText r, "with news id ", T.pack $ show newsId, "\nby user: ", ToText.toText user]
+  newsCategory <-
+    allCheck conn (h, user, newsId, r) >> newTitle conn h newsId r >> newCatId conn h newsId r >> newText conn h newsId r
+      >> newImages conn h r
+      >> newPublish conn h newsId r
+      >> getNewsCategory conn h newsId
+  idImages <- getNewsImages conn h newsId
+  getNews conn h user newsId newsCategory idImages
+
+allCheck ::
+  SQL.Connection ->
+  (News.Handle IO, DataTypes.User, IdNews, DataTypes.EditNewsRequest) ->
+  EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.EditNewsRequest
+allCheck conn (h, user, newsId, r) = do
+  checkId conn h newsId >> checkUserThisNewsAuthor conn h user newsId >> checkImageFilesExist h r >>= checkCategoryId conn h >> checkPngImages h r >> checkBase64Images h r
+
+newTitle ::
   SQL.Connection ->
   News.Handle IO ->
   IdNews ->
   DataTypes.EditNewsRequest ->
-  IO (Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest)
-newTileIO _ _ _ r@DataTypes.EditNewsRequest {newTitle = Nothing} =
-  return $ Right r
-newTileIO conn h newsId r@DataTypes.EditNewsRequest {newTitle = Just title} = do
+  EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.EditNewsRequest
+newTitle _ _ _ r@DataTypes.EditNewsRequest {newTitle = Nothing} =
+  return r
+newTitle conn h newsId r@DataTypes.EditNewsRequest {newTitle = Just title} = do
   res <-
-    SQL.execute
-      conn
-      [sql| UPDATE news SET news_title = ? WHERE news_id = ? |]
-      (title, newsId)
+    liftIO $
+      SQL.execute
+        conn
+        [sql| UPDATE news SET news_title = ? WHERE news_id = ? |]
+        (title, newsId)
   case read (show res) :: Int of
     1 -> do
-      Logger.logDebug (News.hLogHandle h) "newTileIO: OK! UPDATE news "
-      return $ Right r
+      liftIO $ Logger.logDebug (News.hLogHandle h) "newTile: OK! UPDATE news "
+      return r
     _ -> do
-      Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.AddEditNewsSQLRequestError (ErrorTypes.SQLRequestError "newTileIO: BAD! Don't UPDATE  news"))
-      return $
-        Left $
-          ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
+      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.AddEditNewsSQLRequestError (ErrorTypes.SQLRequestError "newTile: BAD! Don't UPDATE  news"))
+      EX.throwE $
+        ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
 
-newCatIdIO ::
+newCatId ::
   SQL.Connection ->
   News.Handle IO ->
   IdNews ->
-  Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest ->
-  IO (Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest)
-newCatIdIO _ _ _ (Left err) = return (Left err)
-newCatIdIO _ _ _ (Right r@DataTypes.EditNewsRequest {newCategoryId = Nothing}) =
-  return $ Right r
-newCatIdIO conn h newsId (Right r@DataTypes.EditNewsRequest {newCategoryId = Just catId}) = do
+  DataTypes.EditNewsRequest ->
+  EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.EditNewsRequest
+newCatId _ _ _ r@DataTypes.EditNewsRequest {newCategoryId = Nothing} =
+  return r
+newCatId conn h newsId r@DataTypes.EditNewsRequest {newCategoryId = Just catId} = do
   res <-
-    SQL.execute
-      conn
-      [sql| UPDATE news SET news_category_id = ? WHERE news_id = ? |]
-      (catId, newsId)
+    liftIO $
+      SQL.execute
+        conn
+        [sql| UPDATE news SET news_category_id = ? WHERE news_id = ? |]
+        (catId, newsId)
   case read (show res) :: Int of
     1 -> do
-      Logger.logDebug (News.hLogHandle h) "newCatIdIO: OK! UPDATE news "
-      return $ Right r
+      liftIO $ Logger.logDebug (News.hLogHandle h) "newCatId: OK! UPDATE news "
+      return r
     _ -> do
-      Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.AddEditNewsSQLRequestError (ErrorTypes.SQLRequestError "newCatIdIO: BAD! Don't UPDATE  news"))
-      return $
-        Left $
-          ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
+      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.AddEditNewsSQLRequestError (ErrorTypes.SQLRequestError "newCatId: BAD! Don't UPDATE  news"))
+      EX.throwE $
+        ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
 
-newTextIO ::
+newText ::
   SQL.Connection ->
   News.Handle IO ->
   IdNews ->
-  Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest ->
-  IO (Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest)
-newTextIO _ _ _ (Left err) = return (Left err)
-newTextIO _ _ _ (Right r@DataTypes.EditNewsRequest {newText = Nothing}) =
-  return $ Right r
-newTextIO conn h newsId (Right r@DataTypes.EditNewsRequest {newText = Just text}) = do
+  DataTypes.EditNewsRequest ->
+  EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.EditNewsRequest
+newText _ _ _ r@DataTypes.EditNewsRequest {newText = Nothing} =
+  return r
+newText conn h newsId r@DataTypes.EditNewsRequest {newText = Just text} = do
   res <-
-    SQL.execute
-      conn
-      [sql| UPDATE news SET news_text = ? WHERE news_id = ? |]
-      (text, newsId)
+    liftIO $
+      SQL.execute
+        conn
+        [sql| UPDATE news SET news_text = ? WHERE news_id = ? |]
+        (text, newsId)
   case read (show res) :: Int of
     1 -> do
-      Logger.logDebug (News.hLogHandle h) "newTextIO: OK! UPDATE news "
-      return $ Right r
+      liftIO $ Logger.logDebug (News.hLogHandle h) "newText: OK! UPDATE news "
+      return r
     _ -> do
-      Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.AddEditNewsSQLRequestError (ErrorTypes.SQLRequestError "newTextIO: BAD! Don't UPDATE  news"))
-      return $
-        Left $
-          ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
+      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.AddEditNewsSQLRequestError (ErrorTypes.SQLRequestError "newText: BAD! Don't UPDATE  news"))
+      EX.throwE $
+        ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
 
-newImagesIO ::
+newImages ::
+  SQL.Connection ->
+  News.Handle IO ->
+  DataTypes.EditNewsRequest ->
+  EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.EditNewsRequest
+newImages _ _ r@DataTypes.EditNewsRequest {newImages = Nothing} =
+  return r
+newImages conn h r@DataTypes.EditNewsRequest {newImages = Just req} = do
+  mapM_ (NewsIO.addImageNews conn h) req
+  return r
+
+newPublish ::
   SQL.Connection ->
   News.Handle IO ->
   IdNews ->
-  Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest ->
-  IO (Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest)
-newImagesIO _ _ _ (Left err) = return (Left err)
-newImagesIO _ _ _ (Right r@DataTypes.EditNewsRequest {newImages = Nothing}) =
-  return $ Right r
-newImagesIO conn h newsId (Right r@DataTypes.EditNewsRequest {newImages = Just req}) = do
-  rez <- mapM (NewsIO.addImageNewsIO conn h) req
-  let rez' = map help rez
-  if 0 `notElem` rez'
-    then do
-      Logger.logDebug (News.hLogHandle h) "addImageNewsIO: OK!"
-      res <-
-        SQL.execute
-          conn
-          [sql| UPDATE news SET news_images_id = ? WHERE news_id = ? |]
-          (SQLTypes.PGArray rez', newsId)
-      case read (show res) :: Int of
-        1 -> do
-          Logger.logDebug (News.hLogHandle h) "newImagesIO: OK! UPDATE news "
-          return $ Right r
-        _ -> do
-          Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.AddEditNewsSQLRequestError (ErrorTypes.SQLRequestError "newImagesIO: BAD! Don't UPDATE  news"))
-          return $
-            Left $
-              ErrorTypes.AddEditNewsSQLRequestError $
-                ErrorTypes.SQLRequestError []
-    else do
-      Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.AddEditNewsSQLRequestError (ErrorTypes.SQLRequestError "addImageNewsIO:BAD! Don't add all images."))
-      return $
-        Left $
-          ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
+  DataTypes.EditNewsRequest ->
+  EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.EditNewsRequest
+newPublish _ _ _ r@DataTypes.EditNewsRequest {newPublished = Nothing} =
+  return r
+newPublish conn h newsId r@DataTypes.EditNewsRequest {newPublished = Just pub} = do
+  res <-
+    liftIO $
+      SQL.execute
+        conn
+        [sql| UPDATE news SET news_published = ? WHERE news_id = ? |]
+        (pub, newsId)
+  case read (show res) :: Int of
+    1 -> do
+      liftIO $ Logger.logDebug (News.hLogHandle h) "newPublish: OK! UPDATE news "
+      return r
+    _ -> do
+      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.AddEditNewsSQLRequestError (ErrorTypes.SQLRequestError "newPublish: BAD! Don't UPDATE  news"))
+      EX.throwE $
+        ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
+
+getNewsCategory ::
+  SQL.Connection ->
+  News.Handle IO ->
+  IdNews ->
+  EX.ExceptT ErrorTypes.AddEditNewsError IO [DataTypes.Category]
+getNewsCategory conn h idNews = do
+  idCategory <- getNewsCategoryId conn h idNews
+  categoryPath <- getCategoryPath conn h idCategory
+  getCategories conn h categoryPath
   where
-    help :: Either ErrorTypes.AddEditNewsError IdImage -> IdImage
-    help (Left _) = 0
-    help (Right val) = val
-
-newPublishIO ::
-  SQL.Connection ->
-  News.Handle IO ->
-  IdNews ->
-  Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest ->
-  IO (Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest)
-newPublishIO _ _ _ (Left err) = return (Left err)
-newPublishIO _ _ _ (Right r@DataTypes.EditNewsRequest {newPublished = Nothing}) =
-  return $ Right r
-newPublishIO conn h newsId (Right r@DataTypes.EditNewsRequest {newPublished = Just pub}) = do
-  res <-
-    SQL.execute
-      conn
-      [sql| UPDATE news SET news_published = ? WHERE news_id = ? |]
-      (pub, newsId)
-  case read (show res) :: Int of
-    1 -> do
-      Logger.logDebug (News.hLogHandle h) "newPublishIO: OK! UPDATE news "
-      return $ Right r
-    _ -> do
-      Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.AddEditNewsSQLRequestError (ErrorTypes.SQLRequestError "newPublishIO: BAD! Don't UPDATE  news"))
-      return $
-        Left $
-          ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
-
---
-getNewsCategoryIO ::
-  SQL.Connection ->
-  News.Handle IO ->
-  IdNews ->
-  Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest ->
-  IO (Either ErrorTypes.AddEditNewsError [DataTypes.Category])
-getNewsCategoryIO _ _ _ (Left err) = return $ Left err
-getNewsCategoryIO conn h idNews (Right _) =
-  getNewsCategoryIdIO conn h idNews >>= getCategoryPathIO conn h
-    >>= getCategoriesIO conn h
-  where
-    getNewsCategoryIdIO ::
+    getNewsCategoryId ::
       SQL.Connection ->
       News.Handle IO ->
       IdNews ->
-      IO (Either ErrorTypes.AddEditNewsError IdCategory)
-    getNewsCategoryIdIO conn' h' idNews' = do
+      EX.ExceptT ErrorTypes.AddEditNewsError IO IdCategory
+    getNewsCategoryId conn' h' idNews' = do
       res <-
-        SQL.query
-          conn'
-          [sql| SELECT news_category_id   FROM news WHERE  news_id = ? |]
-          (SQL.Only idNews')
+        liftIO $
+          SQL.query
+            conn'
+            [sql| SELECT news_category_id   FROM news WHERE  news_id = ? |]
+            (SQL.Only idNews')
       case res of
         [val] -> do
           let categoryId = SQL.fromOnly val
-          Logger.logDebug (News.hLogHandle h) ("getNewsCategoryIdIO: OK! " .< categoryId)
-          return $ Right categoryId
+          liftIO $ Logger.logDebug (News.hLogHandle h) ("getNewsCategoryId: OK! " .< categoryId)
+          return categoryId
         _ -> do
-          Logger.logError (News.hLogHandle h') ("ERROR " .< ErrorTypes.AddEditNewsSQLRequestError (ErrorTypes.SQLRequestError "getNewsCategoryIO: getNewsCategoryIdIO : BAD!"))
-          return $
-            Left $
-              ErrorTypes.AddEditNewsSQLRequestError $
-                ErrorTypes.SQLRequestError []
-    getCategoryPathIO ::
+          liftIO $ Logger.logError (News.hLogHandle h') ("ERROR " .< ErrorTypes.AddEditNewsSQLRequestError (ErrorTypes.SQLRequestError "getNewsCategory: getNewsCategoryId : BAD!"))
+          EX.throwE $
+            ErrorTypes.AddEditNewsSQLRequestError $
+              ErrorTypes.SQLRequestError []
+    getCategoryPath ::
       SQL.Connection ->
       News.Handle IO ->
-      Either ErrorTypes.AddEditNewsError IdCategory ->
-      IO (Either ErrorTypes.AddEditNewsError CategoryPath)
-    getCategoryPathIO _ _ (Left err) = return $ Left err
-    getCategoryPathIO conn'' h'' (Right categoryId) = do
+      IdCategory ->
+      EX.ExceptT ErrorTypes.AddEditNewsError IO CategoryPath
+    getCategoryPath conn'' h'' categoryId = do
       res <-
-        SQL.query
-          conn''
-          [sql| SELECT category_path  FROM category WHERE category_id = ?|]
-          (SQL.Only categoryId)
+        liftIO $
+          SQL.query
+            conn''
+            [sql| SELECT category_path  FROM category WHERE category_id = ?|]
+            (SQL.Only categoryId)
       case res of
         [val] -> do
           let categoryPath = SQL.fromOnly val
-          Logger.logDebug (News.hLogHandle h) ("getCategoryPathIO: OK! " .< categoryPath)
-          return $ Right categoryPath
+          liftIO $ Logger.logDebug (News.hLogHandle h) ("getCategoryPath: OK! " .< categoryPath)
+          return categoryPath
         _ -> do
-          Logger.logError (News.hLogHandle h'') ("ERROR " .< ErrorTypes.AddEditNewsSQLRequestError (ErrorTypes.SQLRequestError "getNewsCategoryIO: getCategoryPathIO : BAD "))
-          return $
-            Left $
-              ErrorTypes.AddEditNewsSQLRequestError $
-                ErrorTypes.SQLRequestError []
-    getCategoriesIO ::
+          liftIO $ Logger.logError (News.hLogHandle h'') ("ERROR " .< ErrorTypes.AddEditNewsSQLRequestError (ErrorTypes.SQLRequestError "getNewsCategory: getCategoryPath : BAD "))
+          EX.throwE $
+            ErrorTypes.AddEditNewsSQLRequestError $
+              ErrorTypes.SQLRequestError []
+    getCategories ::
       SQL.Connection ->
       News.Handle IO ->
-      Either ErrorTypes.AddEditNewsError CategoryPath ->
-      IO (Either ErrorTypes.AddEditNewsError [DataTypes.Category])
-    getCategoriesIO _ _ (Left err) = return $ Left err
-    getCategoriesIO con h''' (Right path) = do
+      CategoryPath ->
+      EX.ExceptT ErrorTypes.AddEditNewsError IO [DataTypes.Category]
+    getCategories con h''' path = do
       res <-
-        SQL.query
-          con
-          [sql| SELECT category_path, category_id, category_name FROM category WHERE ? LIKE category_path||'%' ORDER BY category_path|]
-          (SQL.Only path)
+        liftIO $
+          SQL.query
+            con
+            [sql| SELECT category_path, category_id, category_name FROM category WHERE ? LIKE category_path||'%' ORDER BY category_path|]
+            (SQL.Only path)
       case res of
         [] -> do
-          Logger.logError
-            (News.hLogHandle h''')
-            ("ERROR " .< ErrorTypes.AddEditNewsSQLRequestError (ErrorTypes.SQLRequestError "getNewsCategoryIO: getCategoriesIO : BAD "))
-          return $
-            Left $
-              ErrorTypes.AddEditNewsSQLRequestError $
-                ErrorTypes.SQLRequestError []
+          liftIO $
+            Logger.logError
+              (News.hLogHandle h''')
+              ("ERROR " .< ErrorTypes.AddEditNewsSQLRequestError (ErrorTypes.SQLRequestError "getNewsCategory: getCategories : BAD "))
+          EX.throwE $
+            ErrorTypes.AddEditNewsSQLRequestError $
+              ErrorTypes.SQLRequestError []
         _ -> do
           let categories = Prelude.map Category.toCategories res
-          Logger.logDebug (News.hLogHandle h) "getCategoriesIO: OK! "
-          return $ Right categories
+          liftIO $ Logger.logDebug (News.hLogHandle h) "getCategories: OK! "
+          return categories
 
-getNewsImagesIO ::
+getNewsImages ::
   SQL.Connection ->
   News.Handle IO ->
   IdNews ->
-  Either ErrorTypes.AddEditNewsError [DataTypes.Category] ->
-  IO (Either ErrorTypes.AddEditNewsError ([DataTypes.Category], [IdImage]))
-getNewsImagesIO _ _ _ (Left err) = return $ Left err
-getNewsImagesIO conn h idNews (Right cats) = do
+  EX.ExceptT ErrorTypes.AddEditNewsError IO [IdImage]
+getNewsImages conn h idNews = do
   res <-
-    SQL.query
-      conn
-      [sql| SELECT EXISTS (SELECT news_images_id FROM news WHERE  news_id = ? AND news_images_id IS NOT NULL) |]
-      (SQL.Only idNews)
+    liftIO
+      ( SQL.query
+          conn
+          [sql| SELECT EXISTS (SELECT news_images_id FROM news WHERE  news_id = ? AND news_images_id IS NOT NULL) |]
+          (SQL.Only idNews)
+      )
   case res of
     [val] ->
       if SQL.fromOnly val
         then
           ( do
               [ids] <-
-                SQL.query
-                  conn
-                  [sql| SELECT news_images_id    FROM news WHERE  news_id = ? |]
-                  (SQL.Only idNews)
+                liftIO $
+                  SQL.query
+                    conn
+                    [sql| SELECT news_images_id    FROM news WHERE  news_id = ? |]
+                    (SQL.Only idNews)
               let idImages = SQLTypes.fromPGArray $ SQL.fromOnly ids
-              return (Right (cats, idImages))
+              return idImages
           )
-        else return (Right (cats, []))
+        else return []
     _ -> do
-      Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.AddEditNewsSQLRequestError (ErrorTypes.SQLRequestError "checkIdIO! Don't checkId category"))
-      return $
-        Left $
-          ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
+      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.AddEditNewsSQLRequestError (ErrorTypes.SQLRequestError "checkId! Don't checkId category"))
+      EX.throwE $
+        ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
 
-getNewsIO ::
+getNews ::
   SQL.Connection ->
   News.Handle IO ->
   DataTypes.User ->
   IdNews ->
-  Either ErrorTypes.AddEditNewsError ([DataTypes.Category], [IdImage]) ->
-  IO (Either ErrorTypes.AddEditNewsError DataTypes.News)
-getNewsIO _ _ _ _ (Left err) = return $ Left err
-getNewsIO conn h user idNews (Right (categories, imagesIds)) = do
+  [DataTypes.Category] ->
+  [IdImage] ->
+  EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.News
+getNews conn h user idNews categories imagesIds = do
   res <-
-    SQL.query
-      conn
-      [sql| SELECT news_title , news_created, news_text,  news_published 
+    liftIO
+      ( SQL.query
+          conn
+          [sql| SELECT news_title , news_created, news_text,  news_published 
                 FROM news 
                 WHERE  news_id = ? |]
-      (SQL.Only idNews) ::
-      IO [(T.Text, TIME.Day, T.Text, Bool)]
+          (SQL.Only idNews) ::
+          IO [(T.Text, TIME.Day, T.Text, Bool)]
+      )
   case res of
     [val] -> do
-      let news = toNews val user categories imagesIds
-      Logger.logDebug (News.hLogHandle h) $ T.concat ["addNewsIO: OK!", ToText.toText news]
-      return $ Right news
+      let news = toNews val user categories imagesIds idNews
+      liftIO $ Logger.logDebug (News.hLogHandle h) $ T.concat ["addNews: OK!", ToText.toText news]
+      return news
     _ -> do
-      Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.AddEditNewsSQLRequestError (ErrorTypes.SQLRequestError "addNewsIO! Don't INSERT INTO  news table"))
-      return $
-        Left $
-          ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
+      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.AddEditNewsSQLRequestError (ErrorTypes.SQLRequestError "addNews! Don't INSERT INTO  news table"))
+      EX.throwE $
+        ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
   where
     toNews ::
       (T.Text, TIME.Day, T.Text, Bool) ->
       DataTypes.User ->
       [DataTypes.Category] ->
       [IdImage] ->
+      IdNews ->
       DataTypes.News
-    toNews (news_title, news_created, news_text, news_published) DataTypes.User {..} cats imagesId =
+    toNews (news_title, news_created, news_text, news_published) DataTypes.User {..} cats imagesId idNews' =
       DataTypes.News
         { newsTitle = news_title,
           newsCreated = news_created,
           newsAuthor = userName,
           newsCategory = cats,
           newsText = news_text,
-          newsImages = imageUris imagesId,
-          newsPublished = news_published
+          newsImages = Lib.imagesURIs h imagesId,
+          newsPublished = news_published,
+          newsId = idNews'
         }
-      where
-        imageUris :: [IdImage] -> [DataTypes.URI]
-        imageUris xs
-          | null xs = []
-          | otherwise = map (Lib.imageIdToURI h) xs
 
 ----- All checks ----
 
--- | checkIdIO - check news Id  (  id = 7 in  http://localhost:8080/news/7 )
-checkIdIO ::
+-- | checkId - check news Id  (  id = 7 in  http://localhost:8080/news/7 )
+checkId ::
   SQL.Connection ->
   News.Handle IO ->
   IdNews ->
-  IO (Either ErrorTypes.AddEditNewsError IdNews)
-checkIdIO conn h newsId = do
+  EX.ExceptT ErrorTypes.AddEditNewsError IO IdNews
+checkId conn h newsId = do
   res <-
-    SQL.query
-      conn
-      [sql| SELECT EXISTS (SELECT news_id  FROM news WHERE news_id = ?) |]
-      (SQL.Only newsId)
+    liftIO $
+      SQL.query
+        conn
+        [sql| SELECT EXISTS (SELECT news_id  FROM news WHERE news_id = ?) |]
+        (SQL.Only newsId)
   case res of
     [] -> do
-      Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.AddEditNewsSQLRequestError (ErrorTypes.SQLRequestError "checkIdIO! Don't checkId category"))
-      return $
-        Left $
-          ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
+      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.AddEditNewsSQLRequestError (ErrorTypes.SQLRequestError "checkId! Don't checkId category"))
+      EX.throwE $
+        ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
     _ ->
       if SQL.fromOnly $ head res
         then
           ( do
-              Logger.logDebug (News.hLogHandle h) ("checkIdIO: OK! Exists news with id " .< newsId)
-              return $ Right newsId
+              liftIO $ Logger.logDebug (News.hLogHandle h) ("checkId: OK! Exists news with id " .< newsId)
+              return newsId
           )
         else
           ( do
-              Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidNewsId (ErrorTypes.InvalidId "checkIdIO: BAD! Not exists news with id "))
-              return $
-                Left $ ErrorTypes.InvalidNewsId $ ErrorTypes.InvalidId []
+              liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidNewsId (ErrorTypes.InvalidId "checkId: BAD! Not exists news with id "))
+              EX.throwE $
+                ErrorTypes.InvalidNewsId $ ErrorTypes.InvalidId []
           )
 
--- | checkUserThisNewsAuthorIO - Is he the author of this news?
-checkUserThisNewsAuthorIO ::
+-- | checkUserThisNewsAuthor - Is he the author of this news?
+checkUserThisNewsAuthor ::
   SQL.Connection ->
   News.Handle IO ->
   DataTypes.User ->
-  Either ErrorTypes.AddEditNewsError IdNews ->
-  IO (Either ErrorTypes.AddEditNewsError IdNews)
-checkUserThisNewsAuthorIO _ _ _ (Left err) = return $ Left err
-checkUserThisNewsAuthorIO conn h DataTypes.User {..} (Right newsId) = do
+  IdNews ->
+  EX.ExceptT ErrorTypes.AddEditNewsError IO IdNews
+checkUserThisNewsAuthor conn h DataTypes.User {..} newsId = do
   res <-
-    SQL.query
-      conn
-      [sql| SELECT news_author_login  FROM news WHERE news_id = ? |]
-      (SQL.Only newsId)
+    liftIO $
+      SQL.query
+        conn
+        [sql| SELECT news_author_login  FROM news WHERE news_id = ? |]
+        (SQL.Only newsId)
   case res of
     [newsAuthorLogin] ->
       if SQL.fromOnly newsAuthorLogin == userLogin
         then do
-          Logger.logDebug (News.hLogHandle h) "checkUserThisNewsAuthorIO: OK!"
-          return $ Right newsId
+          liftIO $ Logger.logDebug (News.hLogHandle h) "checkUserThisNewsAuthor: OK!"
+          return newsId
         else do
-          Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidPermissionAddEditNews (ErrorTypes.InvalidAuthorPermission "checkUserThisNewsAuthorIO: BAD! User is not this news author. Invalid Permission for this request."))
-          return . Left $
+          liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidPermissionAddEditNews (ErrorTypes.InvalidAuthorPermission "checkUserThisNewsAuthor: BAD! User is not this news author. Invalid Permission for this request."))
+          EX.throwE $
             ErrorTypes.InvalidPermissionAddEditNews $
               ErrorTypes.InvalidAuthorPermission []
     _ -> do
-      Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.AddEditNewsSQLRequestError (ErrorTypes.SQLRequestError "checkUserThisNewsAuthorIO: BAD!"))
-      return $
-        Left $
-          ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
+      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.AddEditNewsSQLRequestError (ErrorTypes.SQLRequestError "checkUserThisNewsAuthor: BAD!"))
+      EX.throwE $
+        ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
 
-checkImageFilesExistIO ::
+checkImageFilesExist ::
   News.Handle IO ->
   DataTypes.EditNewsRequest ->
-  Either ErrorTypes.AddEditNewsError IdNews ->
-  IO (Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest)
-checkImageFilesExistIO _ _ (Left err) = return $ Left err
-checkImageFilesExistIO _ r@DataTypes.EditNewsRequest {newImages = Nothing} (Right _) =
-  return $ Right r
-checkImageFilesExistIO h r@DataTypes.EditNewsRequest {newImages = Just req} (Right _) = do
-  rez <- mapM (SD.doesFileExist . DataTypes.image) req
+  EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.EditNewsRequest
+checkImageFilesExist _ r@DataTypes.EditNewsRequest {newImages = Nothing} =
+  return r
+checkImageFilesExist h r@DataTypes.EditNewsRequest {newImages = Just req} = do
+  rez <- liftIO $ mapM (SD.doesFileExist . DataTypes.image) req
   if and rez
     then do
-      Logger.logDebug (News.hLogHandle h) "checkImageFilesExistIO: OK!"
-      return $ Right r
+      liftIO $ Logger.logDebug (News.hLogHandle h) "checkImageFilesExist: OK!"
+      return r
     else do
-      Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.NotExistImageFileAddEditNews (ErrorTypes.InvalidContent "checkImageFileExistIO: BAD!  File: does not exist (No such file or directory) "))
-      return . Left $
+      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.NotExistImageFileAddEditNews (ErrorTypes.InvalidContent "checkImageFileExist: BAD!  File: does not exist (No such file or directory) "))
+      EX.throwE $
         ErrorTypes.NotExistImageFileAddEditNews $ ErrorTypes.InvalidContent []
 
--- | checkCategoryIdIO  check if there is a record with a given category id in the database ( only for the case with an editable category)
-checkCategoryIdIO ::
+-- | checkCategoryId check if there is a record with a given category id in the database ( only for the case with an editable category)
+checkCategoryId ::
   SQL.Connection ->
   News.Handle IO ->
-  Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest ->
-  IO (Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest)
-checkCategoryIdIO _ _ (Left err) = return $ Left err
-checkCategoryIdIO _ _ (Right r@DataTypes.EditNewsRequest {newCategoryId = Nothing}) =
-  return $ Right r
-checkCategoryIdIO conn h (Right r@DataTypes.EditNewsRequest {newCategoryId = Just categoryId}) = do
+  DataTypes.EditNewsRequest ->
+  EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.EditNewsRequest
+checkCategoryId _ _ r@DataTypes.EditNewsRequest {newCategoryId = Nothing} =
+  return r
+checkCategoryId conn h r@DataTypes.EditNewsRequest {newCategoryId = Just categoryId} = do
   res <-
-    SQL.query
-      conn
-      [sql| SELECT category_path  FROM category WHERE category_id = ?|]
-      (SQL.Only categoryId) ::
-      IO [SQL.Only String]
+    liftIO
+      ( SQL.query
+          conn
+          [sql| SELECT category_path  FROM category WHERE category_id = ?|]
+          (SQL.Only categoryId) ::
+          IO [SQL.Only String]
+      )
   case res of
-    [_] -> return $ Right r
+    [_] -> return r
     _ -> do
-      Logger.logError
-        (News.hLogHandle h)
-        ( "ERROR "
-            .< ErrorTypes.InvalidCategoryIdAddEditNews
-              ( ErrorTypes.InvalidContent "checkCategoryIdIO: BAD! Not exists category with id "
-              )
-        )
-      return $
-        Left $
-          ErrorTypes.InvalidCategoryIdAddEditNews $ ErrorTypes.InvalidContent []
+      liftIO $
+        Logger.logError
+          (News.hLogHandle h)
+          ( "ERROR "
+              .< ErrorTypes.InvalidCategoryIdAddEditNews
+                ( ErrorTypes.InvalidContent "checkCategoryId: BAD! Not exists category with id "
+                )
+          )
+      EX.throwE $
+        ErrorTypes.InvalidCategoryIdAddEditNews $ ErrorTypes.InvalidContent []
 
 checkPngImages ::
-  News.Handle IO ->
-  Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest ->
-  IO (Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest)
-checkPngImages _ (Left err) = return $ Left err
-checkPngImages _ (Right r@DataTypes.EditNewsRequest {newImages = Nothing}) =
-  return $ Right r
-checkPngImages h (Right r@DataTypes.EditNewsRequest {newImages = Just req}) =
+  Monad m =>
+  News.Handle m ->
+  DataTypes.EditNewsRequest ->
+  EX.ExceptT ErrorTypes.AddEditNewsError m DataTypes.EditNewsRequest
+checkPngImages _ r@DataTypes.EditNewsRequest {newImages = Nothing} =
+  return r
+checkPngImages h r@DataTypes.EditNewsRequest {newImages = Just req} =
   if length (filter (\x -> DataTypes.format x == "png") req) == length req
     then do
-      Logger.logDebug (News.hLogHandle h) "checkPngImages: OK!"
-      return $ Right r
+      lift $ Logger.logDebug (News.hLogHandle h) "checkPngImages: OK!"
+      return r
     else do
-      Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.NotPngImageAddEditNews (ErrorTypes.InvalidContent "checkPngImages: BAD!"))
-      return . Left $
+      lift $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.NotPngImageAddEditNews (ErrorTypes.InvalidContent "checkPngImages: BAD!"))
+      EX.throwE $
         ErrorTypes.NotPngImageAddEditNews $ ErrorTypes.InvalidContent []
 
-checkBase64ImagesIO ::
+checkBase64Images ::
   News.Handle IO ->
-  Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest ->
-  IO (Either ErrorTypes.AddEditNewsError DataTypes.EditNewsRequest)
-checkBase64ImagesIO _ (Left err) = return $ Left err
-checkBase64ImagesIO _ (Right r@DataTypes.EditNewsRequest {newImages = Nothing}) =
-  return $ Right r
-checkBase64ImagesIO h (Right r@DataTypes.EditNewsRequest {newImages = Just req}) = do
-  imageFiles <- mapM (B.readFile . DataTypes.image) req
+  DataTypes.EditNewsRequest ->
+  EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.EditNewsRequest
+checkBase64Images _ r@DataTypes.EditNewsRequest {newImages = Nothing} =
+  return r
+checkBase64Images h r@DataTypes.EditNewsRequest {newImages = Just req} = do
+  imageFiles <- liftIO $ mapM (B.readFile . DataTypes.image) req
   if length (filter Base64.isBase64 imageFiles) == length req
     then do
-      Logger.logDebug (News.hLogHandle h) "checkBase64Image: OK!"
-      return (Right r)
+      liftIO $ Logger.logDebug (News.hLogHandle h) "checkBase64Image: OK!"
+      return r
     else do
-      Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.NotBase64ImageAddEditNews (ErrorTypes.InvalidContent "checkBase64Image: BAD!"))
-      return . Left $
+      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.NotBase64ImageAddEditNews (ErrorTypes.InvalidContent "checkBase64Image: BAD!"))
+      EX.throwE $
         ErrorTypes.NotBase64ImageAddEditNews $ ErrorTypes.InvalidContent []

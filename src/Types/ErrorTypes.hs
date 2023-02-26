@@ -17,21 +17,13 @@ error403 = "403 Forbidden Error"
 -- | COMMON ERROR LIST -- In these cases I return Error for user and LogMessage for admin
 -- | 1
 -- | InvalidOffset - if offset is less then 0.
-newtype InvalidOffset
-  = InvalidOffset String
+-- | InvalidLimit - if limit is less or equal the  0
+data InvalidOffsetOrLimit = InvalidOffset String | InvalidLimit String
   deriving (Eq)
 
-instance Show InvalidOffset where
+instance Show InvalidOffsetOrLimit where
   show (InvalidOffset []) = show error400
   show (InvalidOffset a) = show a
-
--- | 2
--- | InvalidLimit - if limit is less or equal the  0
-newtype InvalidLimit
-  = InvalidLimit String
-  deriving (Eq)
-
-instance Show InvalidLimit where
   show (InvalidLimit []) = show error400
   show (InvalidLimit a) = show a
 
@@ -157,8 +149,7 @@ data AddUserError
 -- | 5
 -- | GetNewsError - get news list error
 data GetNewsError
-  = InvalidLimitGetNews InvalidLimit
-  | InvalidOffsetGetNews InvalidOffset
+  = InvalidOffsetOrLimitGetNews InvalidOffsetOrLimit
   | -- | InvalidFilterGetNews - only in queries with filters
     InvalidFilterGetNews InvalidRequest
   | -- | InvalidSearchGetNews  - only in search queries. Then error in uri ( no word "text" in request news/search?offset=2&limit=3)
@@ -171,8 +162,7 @@ data GetNewsError
 -- | 6
 -- | GetContentError - get users or category list error
 data GetContentError
-  = InvalidLimitGetContent InvalidLimit
-  | InvalidOffsetGetContent InvalidOffset
+  = InvalidOffsetOrLimitGetContent InvalidOffsetOrLimit
   | GetContentSQLRequestError SQLRequestError
   deriving (Show, Eq)
 

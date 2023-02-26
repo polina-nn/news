@@ -15,7 +15,8 @@ data DbNews = DbNews
     dbNewsText :: T.Text,
     dbNewsImagesId :: [Int],
     dbNewsImagesQuantity :: Int,
-    dbNewsPublished :: Bool
+    dbNewsPublished :: Bool,
+    dbNewsId :: Int
   }
   deriving (Show, Eq)
 
