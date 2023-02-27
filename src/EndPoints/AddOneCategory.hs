@@ -45,17 +45,11 @@ addCategoryExcept ::
 addCategoryExcept conn (h, user, r) =
   do
     liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add Category: \n", ToText.toText r, "by user: ", ToText.toText user]
+    _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditCategory (Lib.checkUserAdmin h user)
     categories <- CategoryIO.getAllCategories conn
-    _ <- allCheck (h, user, r, categories)
+    _ <- checkSyntaxPath h r >> Category.checkLogicPathForAddCategory h r categories
     _ <- CategoryIO.changePathCategories conn h $ Category.changePathForAddCategory r categories
     addCategoryToDb conn h r
-
-allCheck ::
-  (News.Handle IO, DataTypes.User, DataTypes.CreateCategoryRequest, [DataTypes.Category]) ->
-  EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.CreateCategoryRequest
-allCheck (h, user, r, categories) = do
-  let checkUserAdmin'' = EX.withExceptT ErrorTypes.InvalidPermissionAddEditCategory (Lib.checkUserAdmin h user)
-  checkUserAdmin'' >> checkSyntaxPath h r >> Category.checkLogicPathForAddCategory h r categories
 
 checkSyntaxPath ::
   Monad m =>

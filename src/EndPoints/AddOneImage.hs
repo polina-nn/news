@@ -1,5 +1,3 @@
-{-# OPTIONS_GHC -Wno-deprecations #-}
-
 module EndPoints.AddOneImage
   ( addImage,
     addOneImage,
@@ -49,13 +47,9 @@ addImageExcept ::
   EX.ExceptT ErrorTypes.AddImageError IO DataTypes.URI
 addImageExcept conn (h, user, createImage) = do
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add One Image ", ToText.toText createImage, "\nby user: ", ToText.toText user]
-  allCheckAndDecodeBase64ByteString <- allCheck (h, user, createImage)
+  _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddImage (Lib.checkUserAuthor h user)
+  allCheckAndDecodeBase64ByteString <- checkImageFileExist h createImage >> checkPngImage h createImage >> checkAndDecodeBase64Image h createImage
   addImageToDB conn h createImage allCheckAndDecodeBase64ByteString
-
-allCheck :: (News.Handle IO, DataTypes.User, DataTypes.CreateImageRequest) -> EX.ExceptT ErrorTypes.AddImageError IO ImageDecodeBase64ByteString
-allCheck (h, user, createImage) = do
-  let checkUserAuthor = EX.withExceptT ErrorTypes.InvalidPermissionAddImage (Lib.checkUserAuthor h user)
-  checkUserAuthor >> checkImageFileExist h createImage >> checkPngImage h createImage >> checkAndDecodeBase64Image h createImage
 
 checkImageFileExist ::
   News.Handle IO ->

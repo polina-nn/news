@@ -46,9 +46,11 @@ editCategoryExcept ::
   EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.Category
 editCategoryExcept conn (h, user, catId, r) = do
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Edit Category: \n", ToText.toText r, "with category id ", T.pack $ show catId, "\nby user: ", ToText.toText user]
+  _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditCategory (Lib.checkUserAdmin h user)
+  _ <- checkId conn h catId >> checkSyntaxPath h r
   categories <- CategoryIO.getAllCategories conn
-  editCategoryFullRequest <- allCheck conn (h, user, catId, r, categories)
-  liftIO $ Logger.logDebug (News.hLogHandle h) $ T.concat ["editCategoryExcept:allCheck: OK!  \n", ToText.toText editCategoryFullRequest]
+  editCategoryFullRequest <- Category.checkLogicPathForEditCategory h catId r categories
+  liftIO $ Logger.logDebug (News.hLogHandle h) $ T.concat ["editCategoryExcept: allCheck: OK!  \n", ToText.toText editCategoryFullRequest]
   case Category.changePathsForEditCategory editCategoryFullRequest categories of
     Nothing -> do
       liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidValuePath (ErrorTypes.InvalidContent "check Developer Error, then update categories table"))
@@ -56,14 +58,6 @@ editCategoryExcept conn (h, user, catId, r) = do
     Just toChangePaths -> do
       _ <- CategoryIO.changePathCategories conn h toChangePaths
       editCategoryName conn h editCategoryFullRequest
-
-allCheck ::
-  SQL.Connection ->
-  (News.Handle IO, DataTypes.User, Int, DataTypes.EditCategoryRequest, [DataTypes.Category]) ->
-  EX.ExceptT ErrorTypes.AddEditCategoryError IO CategoryHelpTypes.EditCategoryFullRequest
-allCheck conn (h, user, catId, r, categories) = do
-  let checkUserAdmin'' = EX.withExceptT ErrorTypes.InvalidPermissionAddEditCategory (Lib.checkUserAdmin h user)
-  checkUserAdmin'' >> checkId conn h catId >> checkSyntaxPath h r >> Category.checkLogicPathForEditCategory h catId r categories
 
 -- | checkIdIO  - check if there is a record with the given category id in the database ( id = 7 in http://localhost:8080/category/7 )
 checkId ::

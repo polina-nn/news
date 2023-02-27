@@ -41,13 +41,9 @@ addUserExcept ::
   EX.ExceptT ErrorTypes.AddUserError IO DataTypes.User
 addUserExcept conn (h, user, req) = do
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add User: \n", ToText.toText req, "by user: ", ToText.toText user]
-  allCheck conn (h, user, req) >> addUserToDB conn h req
-
--- | allCheck  -  check permission for add user; check the existence of the login. Duplication of login is not allowed
-allCheck :: SQL.Connection -> (News.Handle IO, DataTypes.User, DataTypes.CreateUserRequest) -> EX.ExceptT ErrorTypes.AddUserError IO DataTypes.CreateUserRequest
-allCheck conn (h, user, createUser) = do
-  let checkUserAdmin'' = EX.withExceptT ErrorTypes.InvalidPermissionAddUser (Lib.checkUserAdmin h user)
-  checkUserAdmin'' >> checkLogin conn h createUser
+  _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddUser (Lib.checkUserAdmin h user)
+  _ <- checkLogin conn h req
+  addUserToDB conn h req
 
 -- | checkLogin - check the existence of the login. Duplication of login is not allowed
 checkLogin ::

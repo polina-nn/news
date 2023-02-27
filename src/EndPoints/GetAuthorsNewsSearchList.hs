@@ -61,25 +61,13 @@ authorsNewsSearchListExcept _ (h, _, Nothing, _, _) = do
   EX.throwE $ ErrorTypes.InvalidSearchGetNews $ ErrorTypes.InvalidRequest []
 authorsNewsSearchListExcept conn (h, user, Just search, mo, ml) = do
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request with authentication: Get News Search List ", search, " offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
-  (offset, limit) <- allCheck (h, user, mo, ml)
+  _ <- EX.withExceptT ErrorTypes.InvalidPermissionGetNews (Lib.checkUserAuthor h user)
+  (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetNews $ OffsetLimit.checkOffsetLimit h mo ml
   dbNews <- authorsNewsSearchListFromDb conn h user search offset limit
   news <- Prelude.mapM (NewsIO.toNews conn h) dbNews
   let toTextNews = T.concat $ map ToText.toText news
   liftIO $ Logger.logDebug (News.hLogHandle h) $ T.concat ["authorsNewsSearchListExcept: OK! \n", toTextNews]
   return news
-
-allCheck ::
-  Monad m =>
-  ( News.Handle m,
-    DataTypes.User,
-    Maybe DataTypes.Offset,
-    Maybe DataTypes.Limit
-  ) ->
-  EX.ExceptT ErrorTypes.GetNewsError m (DataTypes.Offset, DataTypes.Limit)
-allCheck (h, user, mo, ml) = do
-  let checkUserAuthor = EX.withExceptT ErrorTypes.InvalidPermissionGetNews (Lib.checkUserAuthor h user)
-      checkOffsetLimit = EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetNews $ OffsetLimit.checkOffsetLimit h mo ml
-  checkUserAuthor >> checkOffsetLimit
 
 authorsNewsSearchListFromDb ::
   SQL.Connection ->

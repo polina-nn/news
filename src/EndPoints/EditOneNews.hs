@@ -56,20 +56,14 @@ editNewsExcept ::
   EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.News
 editNewsExcept conn (h, user, newsId, r) = do
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Edit One News \n", ToText.toText r, "with news id ", T.pack $ show newsId, "\nby user: ", ToText.toText user]
+  _ <- checkId conn h newsId >> checkUserThisNewsAuthor conn h user newsId >> checkImageFilesExist h r >>= checkCategoryId conn h >> checkPngImages h r >> checkBase64Images h r
   newsCategory <-
-    allCheck conn (h, user, newsId, r) >> newTitle conn h newsId r >> newCatId conn h newsId r >> newText conn h newsId r
+    newTitle conn h newsId r >> newCatId conn h newsId r >> newText conn h newsId r
       >> newImages conn h r
       >> newPublish conn h newsId r
       >> getNewsCategory conn h newsId
   idImages <- getNewsImages conn h newsId
   getNews conn h user newsId newsCategory idImages
-
-allCheck ::
-  SQL.Connection ->
-  (News.Handle IO, DataTypes.User, IdNews, DataTypes.EditNewsRequest) ->
-  EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.EditNewsRequest
-allCheck conn (h, user, newsId, r) = do
-  checkId conn h newsId >> checkUserThisNewsAuthor conn h user newsId >> checkImageFilesExist h r >>= checkCategoryId conn h >> checkPngImages h r >> checkBase64Images h r
 
 newTitle ::
   SQL.Connection ->
