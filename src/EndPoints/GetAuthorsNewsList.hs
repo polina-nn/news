@@ -69,8 +69,9 @@ authorsNewsListExcept ::
 authorsNewsListExcept conn (h, user, f, mSort, mo, ml) = do
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request with authentication: Get News List with filter ", ToText.toText f, " offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
   (offset, limit, dbFiler) <- News.checkUserOffsetLimitFilter (h, user, f, mo, ml)
-  dbNews <- authorsNewsListFromDb conn user offset limit dbFiler >>= News.sortNews h mSort
-  news <- Prelude.mapM (NewsIO.toNews conn h) dbNews
+  dbNews <- authorsNewsListFromDb conn user offset limit dbFiler
+  sortedDbNews <- News.sortNews h mSort dbNews
+  news <- Prelude.mapM (NewsIO.toNews conn h) sortedDbNews
   let toTextNews = T.concat $ map ToText.toText news
   liftIO $ Logger.logDebug (News.hLogHandle h) $ T.concat ["authorsNewsSearchListExcept: OK! \n", toTextNews]
   return news

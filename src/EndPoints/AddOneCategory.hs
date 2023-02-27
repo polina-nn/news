@@ -46,8 +46,9 @@ addCategoryExcept conn (h, user, r) =
   do
     liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add Category: \n", ToText.toText r, "by user: ", ToText.toText user]
     _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditCategory (Lib.checkUserAdmin h user)
+    _ <- checkSyntaxPath h r
     categories <- CategoryIO.getAllCategories conn
-    _ <- checkSyntaxPath h r >> Category.checkLogicPathForAddCategory h r categories
+    _ <- Category.checkLogicPathForAddCategory h r categories
     _ <- CategoryIO.changePathCategories conn h $ Category.changePathForAddCategory r categories
     addCategoryToDb conn h r
 

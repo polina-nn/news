@@ -56,12 +56,18 @@ editNewsExcept ::
   EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.News
 editNewsExcept conn (h, user, newsId, r) = do
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Edit One News \n", ToText.toText r, "with news id ", T.pack $ show newsId, "\nby user: ", ToText.toText user]
-  _ <- checkId conn h newsId >> checkUserThisNewsAuthor conn h user newsId >> checkImageFilesExist h r >>= checkCategoryId conn h >> checkPngImages h r >> checkBase64Images h r
-  newsCategory <-
-    newTitle conn h newsId r >> newCatId conn h newsId r >> newText conn h newsId r
-      >> newImages conn h r
-      >> newPublish conn h newsId r
-      >> getNewsCategory conn h newsId
+  _ <- checkUserThisNewsAuthor conn h user newsId
+  _ <- checkImageFilesExist h r
+  _ <- checkPngImages h r
+  _ <- checkBase64Images h r
+  _ <- checkId conn h newsId
+  _ <- checkCategoryId conn h r
+  _ <- newTitle conn h newsId r
+  _ <- newCatId conn h newsId r
+  _ <- newText conn h newsId r
+  _ <- newImages conn h r
+  _ <- newPublish conn h newsId r
+  newsCategory <- getNewsCategory conn h newsId
   idImages <- getNewsImages conn h newsId
   getNews conn h user newsId newsCategory idImages
 

@@ -48,7 +48,9 @@ addImageExcept ::
 addImageExcept conn (h, user, createImage) = do
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add One Image ", ToText.toText createImage, "\nby user: ", ToText.toText user]
   _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddImage (Lib.checkUserAuthor h user)
-  allCheckAndDecodeBase64ByteString <- checkImageFileExist h createImage >> checkPngImage h createImage >> checkAndDecodeBase64Image h createImage
+  _ <- checkPngImage h createImage
+  _ <- checkImageFileExist h createImage
+  allCheckAndDecodeBase64ByteString <- checkAndDecodeBase64Image h createImage
   addImageToDB conn h createImage allCheckAndDecodeBase64ByteString
 
 checkImageFileExist ::

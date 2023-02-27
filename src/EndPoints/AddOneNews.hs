@@ -53,7 +53,10 @@ addNewsExcept ::
 addNewsExcept conn (h, user, r) = do
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add One News: \n", ToText.toText r, "by user: ", ToText.toText user]
   _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditNews (Lib.checkUserAuthor h user)
-  categories' <- checkImageFilesExist h r >> checkPngImages h r >> checkBase64Images h r >> checkCategoryId conn h r
+  _ <- checkImageFilesExist h r
+  _ <- checkPngImages h r
+  _ <- checkBase64Images h r
+  categories' <- checkCategoryId conn h r
   newsId' <- getNewsId conn h
   images' <- addAllImages conn h r
   addNewsToDB conn h user categories' r newsId' images'

@@ -67,8 +67,9 @@ newsListExcept conn (h, f, mSort, mo, ml) = do
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Get News List with filter ", ToText.toText f, " offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
   (offset, limit, dbFilter) <- News.checkOffsetLimitFilter (h, f, mo, ml)
   liftIO $ Logger.logDebug (News.hLogHandle h) $ T.concat ["dbFilter: OK! \n", T.pack $ show dbFilter]
-  dbNews <- newsListFromDb conn offset limit dbFilter >>= News.sortNews h mSort
-  news <- Prelude.mapM (NewsIO.toNews conn h) dbNews
+  dbNews <- newsListFromDb conn offset limit dbFilter
+  sortedDbNews <- News.sortNews h mSort dbNews
+  news <- Prelude.mapM (NewsIO.toNews conn h) sortedDbNews
   let toTextNews = T.concat $ map ToText.toText news
   liftIO $ Logger.logDebug (News.hLogHandle h) $ T.concat ["newsListExcept: OK! \n", toTextNews]
   return news

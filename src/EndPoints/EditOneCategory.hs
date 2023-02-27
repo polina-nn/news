@@ -47,7 +47,8 @@ editCategoryExcept ::
 editCategoryExcept conn (h, user, catId, r) = do
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Edit Category: \n", ToText.toText r, "with category id ", T.pack $ show catId, "\nby user: ", ToText.toText user]
   _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditCategory (Lib.checkUserAdmin h user)
-  _ <- checkId conn h catId >> checkSyntaxPath h r
+  _ <- checkId conn h catId
+  _ <- checkSyntaxPath h r
   categories <- CategoryIO.getAllCategories conn
   editCategoryFullRequest <- Category.checkLogicPathForEditCategory h catId r categories
   liftIO $ Logger.logDebug (News.hLogHandle h) $ T.concat ["editCategoryExcept: allCheck: OK!  \n", ToText.toText editCategoryFullRequest]
