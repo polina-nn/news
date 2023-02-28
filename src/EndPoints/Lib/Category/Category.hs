@@ -13,6 +13,8 @@ module EndPoints.Lib.Category.Category
   )
 where
 
+import Control.Monad.Trans.Class (MonadTrans (lift))
+import qualified Control.Monad.Trans.Except as EX
 import qualified Data.Char as Char
 import qualified Data.List as L
 import qualified Data.Map as Map
@@ -61,28 +63,22 @@ checkLogicPathForAddCategory ::
   Monad m =>
   News.Handle m ->
   DataTypes.CreateCategoryRequest ->
-  Either ErrorTypes.AddEditCategoryError [DataTypes.Category] ->
-  m
-    ( Either
-        ErrorTypes.AddEditCategoryError
-        ( DataTypes.CreateCategoryRequest,
-          [DataTypes.Category]
-        )
-    )
-checkLogicPathForAddCategory _ _ (Left err) = return $ Left err
-checkLogicPathForAddCategory h r (Right categories) =
+  [DataTypes.Category] ->
+  EX.ExceptT ErrorTypes.AddEditCategoryError m DataTypes.CreateCategoryRequest
+checkLogicPathForAddCategory h r categories =
   if validLogicPathForAddCategory categories r
-    then return $ Right (r, categories)
+    then return r
     else do
-      Logger.logError
-        (News.hLogHandle h)
-        ( "ERROR "
-            .< ErrorTypes.InvalidValuePath
-              ( ErrorTypes.InvalidContent
-                  "checkLogicPath: BAD! Path is not valid! Must not hole in numbering! "
-              )
-        )
-      return $ Left $ ErrorTypes.InvalidValuePath $ ErrorTypes.InvalidContent []
+      lift $
+        Logger.logError
+          (News.hLogHandle h)
+          ( "ERROR "
+              .< ErrorTypes.InvalidValuePath
+                ( ErrorTypes.InvalidContent
+                    "checkLogicPath: BAD! Path is not valid! Must not hole in numbering! "
+                )
+          )
+      EX.throwE $ ErrorTypes.InvalidValuePath $ ErrorTypes.InvalidContent []
 
 -- | checkLogicPathForEditCategory. If Path For Add Category not valid return Error, else  return (EditCategoryFullRequest , [DataTypes.Category])
 checkLogicPathForEditCategory ::
@@ -90,27 +86,16 @@ checkLogicPathForEditCategory ::
   News.Handle m ->
   Int ->
   DataTypes.EditCategoryRequest ->
-  Either ErrorTypes.AddEditCategoryError [DataTypes.Category] ->
-  m
-    ( Either
-        ErrorTypes.AddEditCategoryError
-        ( CategoryHelpTypes.EditCategoryFullRequest,
-          [DataTypes.Category]
-        )
-    )
-checkLogicPathForEditCategory _ _ _ (Left err) = return $ Left err
-checkLogicPathForEditCategory h idCat r (Right categories) = do
-  rez <- toFullRequest h idCat r categories
-  case rez of
-    Left err -> return $ Left err
-    Right editCatFullReq ->
-      if checkParentChild editCatFullReq
-        then return $ Right (editCatFullReq, categories)
-        else do
-          Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidValuePath (ErrorTypes.InvalidContent "checkParentChild: BAD! Parent DOES NOT become a child of himself "))
-          Logger.logDebug (News.hLogHandle h) $ ToText.toText editCatFullReq
-          return $
-            Left $ ErrorTypes.InvalidValuePath $ ErrorTypes.InvalidContent []
+  [DataTypes.Category] ->
+  EX.ExceptT ErrorTypes.AddEditCategoryError m CategoryHelpTypes.EditCategoryFullRequest
+checkLogicPathForEditCategory h idCat r categories = do
+  editCatFullReq <- toFullRequest h idCat r categories
+  if checkParentChild editCatFullReq
+    then return editCatFullReq
+    else do
+      lift $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidValuePath (ErrorTypes.InvalidContent "checkParentChild: BAD! Parent DOES NOT become a child of himself "))
+      lift $ Logger.logDebug (News.hLogHandle h) $ ToText.toText editCatFullReq
+      EX.throwE $ ErrorTypes.InvalidValuePath $ ErrorTypes.InvalidContent []
   where
     checkParentChild :: CategoryHelpTypes.EditCategoryFullRequest -> Bool
     checkParentChild req
@@ -333,7 +318,7 @@ toFullRequest ::
   DataTypes.Id ->
   DataTypes.EditCategoryRequest ->
   [DataTypes.Category] ->
-  m (Either ErrorTypes.AddEditCategoryError CategoryHelpTypes.EditCategoryFullRequest)
+  EX.ExceptT ErrorTypes.AddEditCategoryError m CategoryHelpTypes.EditCategoryFullRequest
 toFullRequest
   h
   idCat
@@ -346,31 +331,31 @@ toFullRequest
       Just (curPath, curName) ->
         case newPathStayAfter (new curPath mustBePath) categories of
           Nothing -> do
-            Logger.logError
-              (News.hLogHandle h)
-              ( "ERROR "
-                  .< ErrorTypes.InvalidValuePath
-                    ( ErrorTypes.InvalidContent
-                        "toFullRequest BAD! Don`t do a hole in numbering"
-                    )
-              )
-            return $
-              Left $ ErrorTypes.InvalidValuePath $ ErrorTypes.InvalidContent []
-          Just idNewPathStayAfter ->
-            return $ Right $ rez curPath curName idNewPathStayAfter
-      Nothing -> do
-        Logger.logError
-          (News.hLogHandle h)
-          ( "ERROR "
-              .< ErrorTypes.InvalidValuePath
-                ( ErrorTypes.InvalidContent
-                    "toFullRequest BAD! LOGIC ERROR Id in TABLE category is not PRIMARY KEY"
+            lift $
+              Logger.logError
+                (News.hLogHandle h)
+                ( "ERROR "
+                    .< ErrorTypes.InvalidValuePath
+                      ( ErrorTypes.InvalidContent
+                          "toFullRequest BAD! Don`t do a hole in numbering"
+                      )
                 )
-          )
-        return $ Left $ ErrorTypes.InvalidValuePath $ ErrorTypes.InvalidContent []
+            EX.throwE $ ErrorTypes.InvalidValuePath $ ErrorTypes.InvalidContent []
+          Just idNewPathStayAfter ->
+            return $ rez curPath curName idNewPathStayAfter
+      Nothing -> do
+        lift $
+          Logger.logError
+            (News.hLogHandle h)
+            ( "ERROR "
+                .< ErrorTypes.InvalidValuePath
+                  ( ErrorTypes.InvalidContent
+                      "toFullRequest BAD! LOGIC ERROR Id in TABLE category is not PRIMARY KEY"
+                  )
+            )
+        EX.throwE $ ErrorTypes.InvalidValuePath $ ErrorTypes.InvalidContent []
     where
       -- new - if path or name don't change in request, new is equal current value
-
       new :: a -> Maybe a -> a
       new val Nothing = val
       new _ (Just val) = val

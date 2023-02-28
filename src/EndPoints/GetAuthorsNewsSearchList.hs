@@ -5,6 +5,7 @@ module EndPoints.GetAuthorsNewsSearchList
 where
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
+import qualified Control.Monad.Trans.Except as EX
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
@@ -44,50 +45,49 @@ authorsNewsSearchList ::
     Maybe DataTypes.Limit
   ) ->
   IO (Either ErrorTypes.GetNewsError [DataTypes.News])
-authorsNewsSearchList _ (h, _, Nothing, _, _) = do
-  Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidSearchGetNews (ErrorTypes.InvalidRequest "authorsNewsSearchList: BAD! Not text for searching \n"))
-  return $ Left $ ErrorTypes.InvalidSearchGetNews $ ErrorTypes.InvalidRequest []
-authorsNewsSearchList conn (h, user, Just search, mo, ml) = do
-  Logger.logInfo (News.hLogHandle h) $ T.concat ["Request with authentication: Get News Search List ", search, " offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
-  checkAuthor <- Lib.checkUserAuthor h user
-  case checkAuthor of
-    Left err -> return $ Left $ ErrorTypes.InvalidPermissionGetNews err
-    Right _ -> do
-      checkRequest <- OffsetLimit.checkOffsetLimitNews h mo ml
-      case checkRequest of
-        Left err -> return $ Left err
-        Right (offset, limit) -> do
-          res <- authorsNewsSearchList' conn h user search offset limit
-          news <- Prelude.mapM (NewsIO.toNews conn h) res
-          case News.checkErrorsToNews news res of
-            (True, news') -> do
-              let toTextNews = T.concat $ map ToText.toText news'
-              Logger.logInfo (News.hLogHandle h) $ T.concat ["authorsNewsSearchList: OK! \n", toTextNews]
-              return $ Right news'
-            _ ->
-              return $
-                Left $
-                  ErrorTypes.GetNewsSQLRequestError $ ErrorTypes.SQLRequestError []
+authorsNewsSearchList conn (h, user, search, mo, ml) = do EX.runExceptT $ authorsNewsSearchListExcept conn (h, user, search, mo, ml)
 
-authorsNewsSearchList' ::
+authorsNewsSearchListExcept ::
+  SQL.Connection ->
+  ( News.Handle IO,
+    DataTypes.User,
+    Maybe T.Text,
+    Maybe DataTypes.Offset,
+    Maybe DataTypes.Limit
+  ) ->
+  EX.ExceptT ErrorTypes.GetNewsError IO [DataTypes.News]
+authorsNewsSearchListExcept _ (h, _, Nothing, _, _) = do
+  liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidSearchGetNews (ErrorTypes.InvalidRequest "authorsNewsSearchListExcept: BAD! Not text for searching \n"))
+  EX.throwE $ ErrorTypes.InvalidSearchGetNews $ ErrorTypes.InvalidRequest []
+authorsNewsSearchListExcept conn (h, user, Just search, mo, ml) = do
+  liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request with authentication: Get News Search List ", search, " offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
+  _ <- EX.withExceptT ErrorTypes.InvalidPermissionGetNews (Lib.checkUserAuthor h user)
+  (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetNews $ OffsetLimit.checkOffsetLimit h mo ml
+  dbNews <- authorsNewsSearchListFromDb conn h user search offset limit
+  news <- Prelude.mapM (NewsIO.toNews conn h) dbNews
+  let toTextNews = T.concat $ map ToText.toText news
+  liftIO $ Logger.logDebug (News.hLogHandle h) $ T.concat ["authorsNewsSearchListExcept: OK! \n", toTextNews]
+  return news
+
+authorsNewsSearchListFromDb ::
   SQL.Connection ->
   News.Handle IO ->
   DataTypes.User ->
   T.Text ->
   DataTypes.Offset ->
   DataTypes.Limit ->
-  IO [NewsHelpTypes.DbNews]
-authorsNewsSearchList' conn _ DataTypes.User {..} search off lim = do
+  EX.ExceptT ErrorTypes.GetNewsError IO [NewsHelpTypes.DbNews]
+authorsNewsSearchListFromDb conn _ DataTypes.User {..} search off lim = do
   res <-
-    SQL.query
-      conn
-      [sql| SELECT news_title, news_created, usr_name, category_path, category_name, news_text, news_images_id, cardinality (news_images_id), news_published
+    liftIO $
+      SQL.query
+        conn
+        [sql| SELECT news_title, news_created, usr_name, category_path, category_name, news_text, news_images_id, cardinality (news_images_id), news_published , news_id
             FROM news
             INNER JOIN usr ON news.news_author_login = usr.usr_login INNER JOIN category ON news.news_category_id = category.category_id
             where ((news_published = true) or (news_author_login = ? )) and (to_tsvector(news_title) || to_tsvector(usr_name) || to_tsvector(category_name) || to_tsvector(news_text) @@ plainto_tsquery(?))
             ORDER BY news_created DESC 
             LIMIT ?  OFFSET ? |]
-      (userLogin, search, show lim, show off)
-  print res
+        (userLogin, search, show lim, show off)
   let dbNews = Prelude.map News.toDbNews res
   return dbNews

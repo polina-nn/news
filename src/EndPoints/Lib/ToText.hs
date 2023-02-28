@@ -166,6 +166,8 @@ instance ToText DataTypes.News where
         T.pack $ show newsImages,
         ",  \nnews_published = ",
         T.pack $ show newsPublished,
+        ",  \nnews_id = ",
+        T.pack $ show newsId,
         "} \n"
       ]
 

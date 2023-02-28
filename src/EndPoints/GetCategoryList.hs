@@ -5,6 +5,7 @@ module EndPoints.GetCategoryList
 where
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
+import qualified Control.Monad.Trans.Except as EX
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
@@ -31,21 +32,25 @@ categoryList ::
   SQL.Connection ->
   (News.Handle IO, Maybe DataTypes.Offset, Maybe DataTypes.Limit) ->
   IO (Either ErrorTypes.GetContentError [DataTypes.Category])
-categoryList conn (h, mo, ml) = do
-  Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Get Category List  with offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
-  rezCheckOffsetLimit <- OffsetLimit.checkOffsetLimit h mo ml
-  case rezCheckOffsetLimit of
-    Left err -> return $ Left err
-    Right (o, l) -> do
-      res <-
-        SQL.query
-          conn
-          [sql| SELECT category_path, category_id, category_name
+categoryList conn (h, mo, ml) = do EX.runExceptT $ categoryListExcept conn (h, mo, ml)
+
+categoryListExcept ::
+  SQL.Connection ->
+  (News.Handle IO, Maybe DataTypes.Offset, Maybe DataTypes.Limit) ->
+  EX.ExceptT ErrorTypes.GetContentError IO [DataTypes.Category]
+categoryListExcept conn (h, mo, ml) = do
+  liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Get Category List  with offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
+  (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetContent $ OffsetLimit.checkOffsetLimit h mo ml
+  res <-
+    liftIO $
+      SQL.query
+        conn
+        [sql| SELECT category_path, category_id, category_name
                 FROM category 
                 ORDER BY category_path 
                 LIMIT ?  OFFSET ? |]
-          (show l, show o)
-      let categories = Prelude.map Category.toCategories res
-      let toTextCategories = T.concat $ map ToText.toText categories
-      Logger.logDebug (News.hLogHandle h) $ T.concat ["categoryList: OK! \n", toTextCategories]
-      return $ Right categories
+        (show limit, show offset)
+  let categories = Prelude.map Category.toCategories res
+  let toTextCategories = T.concat $ map ToText.toText categories
+  liftIO $ Logger.logDebug (News.hLogHandle h) $ T.concat ["categoryList: OK! \n", toTextCategories]
+  return categories

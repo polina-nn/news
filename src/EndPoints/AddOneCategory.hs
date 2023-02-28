@@ -4,18 +4,13 @@ module EndPoints.AddOneCategory
   )
 where
 
-import Control.Exception.Base
-  ( Exception (displayException),
-    SomeException (SomeException),
-    catch,
-    throwIO,
-  )
 import Control.Monad.IO.Class (MonadIO (liftIO))
+import Control.Monad.Trans.Class (MonadTrans (lift))
+import qualified Control.Monad.Trans.Except as EX
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.Category.Category as Category
-import qualified EndPoints.Lib.Category.CategoryHelpTypes as CategoryHelpTypes
 import qualified EndPoints.Lib.Category.CategoryIO as CategoryIO
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
@@ -41,123 +36,89 @@ addCategory ::
   SQL.Connection ->
   (News.Handle IO, DataTypes.User, DataTypes.CreateCategoryRequest) ->
   IO (Either ErrorTypes.AddEditCategoryError DataTypes.Category)
-addCategory conn (h, user, r) = do
-  Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add Category: \n", ToText.toText r, "by user: ", ToText.toText user]
-  allCheck <-
-    Lib.checkUserAdmin h user >>= checkSyntaxPath h r
-      >>= CategoryIO.getAllCategoriesIO conn h
-      >>= Category.checkLogicPathForAddCategory h r
-  case allCheck ::
-         Either
-           ErrorTypes.AddEditCategoryError
-           ( DataTypes.CreateCategoryRequest,
-             [DataTypes.Category]
-           ) of
-    Left err -> return $ Left err
-    Right (req, categories) -> do
-      let toChangePaths =
-            Category.changePathForAddCategory req categories :: [CategoryHelpTypes.EditCategory]
-      rez <-
-        catch
-          ( CategoryIO.changePathCategoriesIO conn h toChangePaths
-              >>= addCategoryIO conn h req
-          )
-          handleError
-      case rez of
-        (Right newCategory) -> do
-          Logger.logInfo (News.hLogHandle h) $ T.concat ["addCategory: OK! \n", ToText.toText newCategory]
-          return rez
-        (Left newCategoryError) -> do
-          Logger.logError
-            (News.hLogHandle h)
-            ("addCategory: BAD! " .< show newCategoryError)
-          return rez
-  where
-    handleError ::
-      SomeException ->
-      IO (Either ErrorTypes.AddEditCategoryError DataTypes.Category)
-    handleError (SomeException e) = do
-      let errMsg = displayException e
-      Logger.logError
-        (News.hLogHandle h)
-        ("addCategory:handleError:" .< errMsg)
-      throwIO e
+addCategory conn (h, user, r) = EX.runExceptT $ addCategoryExcept conn (h, user, r)
+
+addCategoryExcept ::
+  SQL.Connection ->
+  (News.Handle IO, DataTypes.User, DataTypes.CreateCategoryRequest) ->
+  EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.Category
+addCategoryExcept conn (h, user, r) =
+  do
+    liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add Category: \n", ToText.toText r, "by user: ", ToText.toText user]
+    _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditCategory (Lib.checkUserAdmin h user)
+    _ <- checkSyntaxPath h r
+    categories <- CategoryIO.getAllCategories conn
+    _ <- Category.checkLogicPathForAddCategory h r categories
+    _ <- CategoryIO.changePathCategories conn h $ Category.changePathForAddCategory r categories
+    addCategoryToDb conn h r
 
 checkSyntaxPath ::
-  News.Handle IO ->
+  Monad m =>
+  News.Handle m ->
   DataTypes.CreateCategoryRequest ->
-  Either ErrorTypes.InvalidAdminPermission DataTypes.User ->
-  IO (Either ErrorTypes.AddEditCategoryError DataTypes.CreateCategoryRequest)
-checkSyntaxPath _ _ (Left err) =
-  return $ Left $ ErrorTypes.InvalidPermissionAddEditCategory err
-checkSyntaxPath h r@DataTypes.CreateCategoryRequest {..} (Right _) =
+  EX.ExceptT ErrorTypes.AddEditCategoryError m DataTypes.CreateCategoryRequest
+checkSyntaxPath h r@DataTypes.CreateCategoryRequest {..} =
   if Category.validSyntaxPath path
-    then return $ Right r
+    then return r
     else do
-      Logger.logError
-        (News.hLogHandle h)
-        ( "ERROR "
-            .< ErrorTypes.InvalidSyntaxPath
-              ( ErrorTypes.InvalidContent
-                  "checkSyntaxPath: BAD! Path is not valid! Only digits(not zero begin) and points must have! "
-              )
-        )
-      return $
-        Left $ ErrorTypes.InvalidSyntaxPath $ ErrorTypes.InvalidContent []
+      lift $
+        Logger.logError
+          (News.hLogHandle h)
+          ( "ERROR "
+              .< ErrorTypes.InvalidSyntaxPath
+                ( ErrorTypes.InvalidContent
+                    "checkSyntaxPath: BAD! Path is not valid! Only digits(not zero begin) and points must have! "
+                )
+          )
+      EX.throwE $ ErrorTypes.InvalidSyntaxPath $ ErrorTypes.InvalidContent []
 
-addCategoryIO ::
+addCategoryToDb ::
   SQL.Connection ->
   News.Handle IO ->
   DataTypes.CreateCategoryRequest ->
-  Either ErrorTypes.AddEditCategoryError Int ->
-  IO (Either ErrorTypes.AddEditCategoryError DataTypes.Category)
-addCategoryIO _ _ _ (Left er) = return $ Left er
-addCategoryIO conn h DataTypes.CreateCategoryRequest {..} (Right _) = do
+  EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.Category
+addCategoryToDb conn h DataTypes.CreateCategoryRequest {..} = do
   res <-
-    SQL.execute
-      conn
-      [sql| INSERT INTO  category (category_path, category_name)  VALUES (?,?) |]
-      (path, category)
+    liftIO
+      ( SQL.execute
+          conn
+          [sql| INSERT INTO  category (category_path, category_name)  VALUES (?,?) |]
+          (path, category)
+      )
   case read (show res) :: Int of
     1 -> do
       resId <-
-        SQL.query
-          conn
-          [sql| SELECT category_id  FROM category WHERE category_path = ? |]
-          (SQL.Only path)
+        liftIO
+          ( SQL.query
+              conn
+              [sql| SELECT category_id  FROM category WHERE category_path = ? |]
+              (SQL.Only path)
+          )
       case resId of
         [val] -> do
           let rez = SQL.fromOnly val
-          return $
-            Right
-              ( DataTypes.Category
-                  { categoryPath = path,
-                    categoryId = rez,
-                    categoryName = category
-                  }
-              )
-        _ -> do
-          Logger.logError
-            (News.hLogHandle h)
-            ( "ERROR "
-                .< ErrorTypes.AddEditCategorySQLRequestError
-                  ( ErrorTypes.SQLRequestError
-                      "addCategoryIO! Don't get Id category or category_path is not unique "
-                  )
-            )
-          return $
-            Left $
-              ErrorTypes.AddEditCategorySQLRequestError $
-                ErrorTypes.SQLRequestError []
-    _ -> do
-      Logger.logError
-        (News.hLogHandle h)
-        ( "ERROR "
-            .< ErrorTypes.AddEditCategorySQLRequestError
-              ( ErrorTypes.SQLRequestError "addCategoryIO! Don't INSERT INTO  category"
-              )
-        )
-      return $
-        Left $
-          ErrorTypes.AddEditCategorySQLRequestError $
-            ErrorTypes.SQLRequestError []
+              newCategory =
+                ( DataTypes.Category
+                    { categoryPath = path,
+                      categoryId = rez,
+                      categoryName = category
+                    }
+                )
+          liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["addCategoryToDb: OK!", ToText.toText newCategory]
+          return newCategory
+        _ -> sqlRequestError
+    _ -> sqlRequestError
+  where
+    sqlRequestError :: EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.Category
+    sqlRequestError = do
+      liftIO $
+        Logger.logError
+          (News.hLogHandle h)
+          ( "ERROR "
+              .< ErrorTypes.AddEditCategorySQLRequestError
+                ( ErrorTypes.SQLRequestError "addCategoryToDb! Don't INSERT INTO  category"
+                )
+          )
+      EX.throwE $
+        ErrorTypes.AddEditCategorySQLRequestError $
+          ErrorTypes.SQLRequestError []

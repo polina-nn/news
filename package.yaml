@@ -38,9 +38,10 @@ dependencies:
 - mtl                  # Control.Monad.Identity
 - base64               # Data.ByteString.Base64 
 - containers           # Data.Map 
-- safe-exceptions      # Control.Exception.Safe (throwString for working whith config) 
+- safe-exceptions      # Control.Exception.Safe (throwString for working with config) 
 - directory            # for System.Directory (check if image files exist)
-- postgresql-simple-migration  
+- postgresql-simple-migration 
+- transformers 
 
 # About ghc options read here. https://ghc.gitlab.haskell.org/ghc/doc/users_guide/using-warnings.html#
 ghc-options:
@@ -50,6 +51,7 @@ ghc-options:
 - -Wcompat    # Turns on warnings that will be enabled by default in the future, 
               # but remain off in normal compilations for the time being. 
               # This allows library authors eager to make their code future compatible to adapt to new features before they even generate warnings.
+# - -Wno-deprecations # for use import Control.Monad.Error 
 
 default-extensions:
 - DataKinds
@@ -58,7 +60,7 @@ default-extensions:
 - DeriveGeneric 
 - FlexibleContexts
 - FlexibleInstances
-- GeneralizedNewtypeDeriving
+# - GeneralizedNewtypeDeriving
 - MultiParamTypeClasses
 - OverloadedStrings
 - QuasiQuotes

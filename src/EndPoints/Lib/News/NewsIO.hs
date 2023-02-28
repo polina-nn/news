@@ -1,9 +1,11 @@
 module EndPoints.Lib.News.NewsIO
-  ( addImageNewsIO, -- use in EndPoints.AddOneNews, EndPoints.EditOneNews
+  ( addImageNews, -- use in EndPoints.AddOneNews, EndPoints.EditOneNews
     toNews, --use in EndPoints.GetNewsList,  EndPoints.GetAuthorsNewsList
   )
 where
 
+import Control.Monad.IO.Class (MonadIO (liftIO))
+import qualified Control.Monad.Trans.Except as EX
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base64 as Base64
 import qualified Database.PostgreSQL.Simple as SQL
@@ -20,94 +22,94 @@ type IdImage = Int
 
 type CategoryPath = String
 
--- | addImageNewsIO adding one pictures to the table of pictures when working with news
-addImageNewsIO ::
+-- | addImageNews adding one pictures to the table of pictures when working with news
+addImageNews ::
   SQL.Connection ->
   News.Handle IO ->
   DataTypes.CreateImageRequest ->
-  IO (Either ErrorTypes.AddEditNewsError IdImage)
-addImageNewsIO conn h DataTypes.CreateImageRequest {..} = do
-  content <- B.readFile image
+  EX.ExceptT ErrorTypes.AddEditNewsError IO IdImage
+addImageNews conn h DataTypes.CreateImageRequest {..} = do
+  content <- liftIO $ B.readFile image
   resId <-
-    SQL.query_
-      conn
-      [sql| select NEXTVAL('image_id_seq')|]
+    liftIO
+      ( SQL.query_
+          conn
+          [sql| select NEXTVAL('image_id_seq')|]
+      )
   case resId of
     [val] -> do
       let idIm = SQL.fromOnly val
           imageDecodeBase64ByteString = Base64.decodeBase64Lenient content
       res <-
-        SQL.execute
-          conn
-          [sql| INSERT INTO image (image_id, image_name, image_type, image_content) VALUES (?,?,?,?)|]
-          (idIm, file, format, show imageDecodeBase64ByteString)
+        liftIO
+          ( SQL.execute
+              conn
+              [sql| INSERT INTO image (image_id, image_name, image_type, image_content) VALUES (?,?,?,?)|]
+              (idIm, file, format, show imageDecodeBase64ByteString)
+          )
       case res of
         1 -> do
-          Logger.logDebug (News.hLogHandle h) ("addImageIO: OK! Image_id  " .< show idIm)
-          return $ Right idIm
+          liftIO $ Logger.logDebug (News.hLogHandle h) ("addImageNews: OK! Image_id  " .< show idIm)
+          return idIm
         _ -> sqlRequestError
     _ -> sqlRequestError
   where
-    sqlRequestError :: IO (Either ErrorTypes.AddEditNewsError IdImage)
+    sqlRequestError :: EX.ExceptT ErrorTypes.AddEditNewsError IO IdImage
     sqlRequestError = do
-      Logger.logError
-        (News.hLogHandle h)
-        ( "ERROR "
-            .< ErrorTypes.AddEditNewsSQLRequestError
-              ( ErrorTypes.SQLRequestError "addImageNewsIO: BAD!"
-              )
-        )
-      return $ Left $ ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
+      liftIO $
+        Logger.logError
+          (News.hLogHandle h)
+          ( "ERROR "
+              .< ErrorTypes.AddEditNewsSQLRequestError
+                ( ErrorTypes.SQLRequestError "addImageNews: BAD!"
+                )
+          )
+      EX.throwE $ ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
 
 toNews ::
   SQL.Connection ->
   News.Handle IO ->
   NewsHelpTypes.DbNews ->
-  IO (Either ErrorTypes.GetNewsError DataTypes.News)
+  EX.ExceptT ErrorTypes.GetNewsError IO DataTypes.News
 toNews con h NewsHelpTypes.DbNews {..} = do
-  categories <- getCategoriesIO con h dbNewsCategoryPath
-  case categories of
-    Left err -> return $ Left err
-    Right cats -> do
-      let news =
-            DataTypes.News
-              { newsTitle = dbNewsTitle,
-                newsCreated = dbNewsCreated,
-                newsAuthor = dbNewsAuthor,
-                newsCategory = cats,
-                newsText = dbNewsText,
-                newsImages = imageUris dbNewsImagesId,
-                newsPublished = dbNewsPublished
-              }
-      return $ Right news
-  where
-    imageUris :: [Int] -> [DataTypes.URI]
-    imageUris [] = []
-    imageUris xs = map (Lib.imageIdToURI h) xs
+  categories <- getCategories con h dbNewsCategoryPath
+  let news =
+        DataTypes.News
+          { newsTitle = dbNewsTitle,
+            newsCreated = dbNewsCreated,
+            newsAuthor = dbNewsAuthor,
+            newsCategory = categories,
+            newsText = dbNewsText,
+            newsImages = Lib.imagesURIs h dbNewsImagesId,
+            newsPublished = dbNewsPublished,
+            newsId = dbNewsId
+          }
+  return news
 
-getCategoriesIO ::
+getCategories ::
   SQL.Connection ->
   News.Handle IO ->
   CategoryPath ->
-  IO (Either ErrorTypes.GetNewsError [DataTypes.Category])
-getCategoriesIO con h''' path = do
+  EX.ExceptT ErrorTypes.GetNewsError IO [DataTypes.Category]
+getCategories con h''' path = do
   res <-
-    SQL.query
-      con
-      [sql| SELECT category_path, category_id, category_name FROM category 
+    liftIO $
+      SQL.query
+        con
+        [sql| SELECT category_path, category_id, category_name FROM category 
             WHERE ? LIKE category_path||'%' ORDER BY category_path |]
-      (SQL.Only path)
+        (SQL.Only path)
   case res of
     [] -> do
-      Logger.logError
-        (News.hLogHandle h''')
-        ( "ERROR "
-            .< ErrorTypes.GetNewsSQLRequestError
-              ( ErrorTypes.SQLRequestError "getNewsCategoryIO: getCategoriesIO : BAD "
-              )
-        )
-      return $
-        Left $ ErrorTypes.GetNewsSQLRequestError $ ErrorTypes.SQLRequestError []
+      liftIO $
+        Logger.logError
+          (News.hLogHandle h''')
+          ( "ERROR "
+              .< ErrorTypes.GetNewsSQLRequestError
+                ( ErrorTypes.SQLRequestError "getNewsCategoryIO: getCategories : BAD "
+                )
+          )
+      EX.throwE $ ErrorTypes.GetNewsSQLRequestError $ ErrorTypes.SQLRequestError []
     _ -> do
       let categories = Prelude.map Category.toCategories res
-      return $ Right categories
+      return categories

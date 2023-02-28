@@ -5,6 +5,7 @@ module EndPoints.GetOneImage
 where
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
+import qualified Control.Monad.Trans.Except as EX
 import qualified Data.ByteString as B
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
@@ -23,37 +24,44 @@ oneImage ::
   SQL.Connection ->
   (News.Handle IO, Integer) ->
   IO (Either ErrorTypes.GetImageError B.ByteString)
-oneImage conn (h, id') = do
-  Logger.logInfo (News.hLogHandle h) $ "Request: Get One Image with id " .< id'
-  resCheckId <- checkId conn (h, id')
-  case resCheckId of
-    Right _ -> do
-      res <-
-        SQL.query
+oneImage conn (h, id') = EX.runExceptT $ oneImageExcept conn (h, id')
+
+oneImageExcept ::
+  SQL.Connection ->
+  (News.Handle IO, Integer) ->
+  EX.ExceptT ErrorTypes.GetImageError IO B.ByteString
+oneImageExcept conn (h, id') = do
+  liftIO $ Logger.logInfo (News.hLogHandle h) $ "Request: Get One Image with id " .< id'
+  _ <- checkId conn (h, id')
+  res <-
+    liftIO
+      ( SQL.query
           conn
           [sql|SELECT image_content FROM image WHERE image_id = ?|]
           (SQL.Only id')
-      let rez = SQL.fromOnly . head $ res
-      Logger.logInfo
-        (News.hLogHandle h)
-        "oneImage: OK!"
-      return $ Right $ read rez
-    Left err -> return $ Left err
+      )
+  let rez = SQL.fromOnly . head $ res
+  liftIO $
+    Logger.logInfo
+      (News.hLogHandle h)
+      "oneImage: OK!"
+  return $ read rez
 
 checkId ::
   SQL.Connection ->
   (News.Handle IO, Integer) ->
-  IO (Either ErrorTypes.GetImageError Integer)
+  EX.ExceptT ErrorTypes.GetImageError IO Integer
 checkId conn (h', id') = do
   res <-
-    SQL.query
-      conn
-      [sql|SELECT EXISTS (SELECT image_id  FROM image WHERE image_id = ?)|]
-      (SQL.Only id')
+    liftIO $
+      SQL.query
+        conn
+        [sql|SELECT EXISTS (SELECT image_id  FROM image WHERE image_id = ?)|]
+        (SQL.Only id')
   if SQL.fromOnly $ head res
     then do
-      Logger.logDebug (News.hLogHandle h') "checkId: OK!  Image exist "
-      return $ Right id'
+      liftIO $ Logger.logDebug (News.hLogHandle h') "checkId: OK!  Image exist "
+      return id'
     else do
-      Logger.logError (News.hLogHandle h') ("ERROR " .< ErrorTypes.InvalidImagedId (ErrorTypes.InvalidId "checkId: BAD! Image not exist"))
-      return $ Left $ ErrorTypes.InvalidImagedId $ ErrorTypes.InvalidId []
+      liftIO $ Logger.logError (News.hLogHandle h') ("ERROR " .< ErrorTypes.InvalidImagedId (ErrorTypes.InvalidId "checkId: BAD! Image not exist"))
+      EX.throwE $ ErrorTypes.InvalidImagedId $ ErrorTypes.InvalidId []

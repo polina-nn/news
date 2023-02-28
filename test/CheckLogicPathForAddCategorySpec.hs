@@ -3,7 +3,7 @@ module CheckLogicPathForAddCategorySpec
   )
 where
 
-import Control.Monad.Identity (Identity (Identity))
+import qualified Control.Monad.Trans.Except as EX
 import qualified EndPoints.Lib.Category.Category as Category
 import Handle (handleSpec)
 import Test.Hspec (Spec, describe, it, shouldBe)
@@ -20,32 +20,32 @@ spec =
         Category.checkLogicPathForAddCategory
           handleSpec
           req1
-          (Right myCategoryEmpty)
-          `shouldBe` Identity (Left error1)
+          myCategoryEmpty
+          `shouldBe` EX.throwE error1
       it
         "Invalid Logic Path For Add Category : add path 1.1.8, then path 1.1.7 not exists"
-        $ Category.checkLogicPathForAddCategory handleSpec req2 (Right myCategory)
-          `shouldBe` Identity (Left error1)
+        $ Category.checkLogicPathForAddCategory handleSpec req2 myCategory
+          `shouldBe` EX.throwE error1
       it "Valid Logic Path For Add Category : add path 1 in not empty table" $
-        Category.checkLogicPathForAddCategory handleSpec req3 (Right myCategory)
-          `shouldBe` Identity (Right (req3, myCategory))
+        Category.checkLogicPathForAddCategory handleSpec req3 myCategory
+          `shouldBe` EX.except (Right req3)
       it "Valid Logic Path For Add Category : add path 1 in empty table" $
         Category.checkLogicPathForAddCategory
           handleSpec
           req3
-          (Right myCategoryEmpty)
-          `shouldBe` Identity (Right (req3, myCategoryEmpty))
+          myCategoryEmpty
+          `shouldBe` EX.except (Right req3)
       it
         "Valid Logic Path For Add Category : add path 1.1.7, then path 1.1.6 is exists"
-        $ Category.checkLogicPathForAddCategory handleSpec req4 (Right myCategory)
-          `shouldBe` Identity (Right (req4, myCategory))
+        $ Category.checkLogicPathForAddCategory handleSpec req4 myCategory
+          `shouldBe` EX.except (Right req4)
       it
         "Valid Logic Path For Add Category : add path 1.1.3, then path 1.1.3 is exists"
-        $ Category.checkLogicPathForAddCategory handleSpec req5 (Right myCategory)
-          `shouldBe` Identity (Right (req5, myCategory))
+        $ Category.checkLogicPathForAddCategory handleSpec req5 myCategory
+          `shouldBe` EX.except (Right req5)
       it "Valid Logic Path For Add Category : add path 3.1, then path 3 is exists" $
-        Category.checkLogicPathForAddCategory handleSpec req6 (Right myCategory)
-          `shouldBe` Identity (Right (req6, myCategory))
+        Category.checkLogicPathForAddCategory handleSpec req6 myCategory
+          `shouldBe` EX.except (Right req6)
 
 req1 :: DataTypes.CreateCategoryRequest
 req1 = DataTypes.CreateCategoryRequest {path = "1.1.3", category = ""}

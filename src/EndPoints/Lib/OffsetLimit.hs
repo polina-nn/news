@@ -3,10 +3,11 @@ module EndPoints.Lib.OffsetLimit
   ( checkOffset,
     checkLimit,
     checkOffsetLimit,
-    checkOffsetLimitNews,
   )
 where
 
+import Control.Monad.Trans.Class (MonadTrans (lift))
+import qualified Control.Monad.Trans.Except as EX
 import qualified Data.Text as T
 import Logger (logDebug, logError, (.<))
 import qualified News
@@ -18,20 +19,21 @@ checkOffset ::
   Monad m =>
   News.Handle m ->
   Maybe DataTypes.Offset ->
-  m (Either ErrorTypes.InvalidOffset DataTypes.Offset)
-checkOffset _ Nothing = return $ Right 0
+  EX.ExceptT ErrorTypes.InvalidOffsetOrLimit m DataTypes.Offset
+checkOffset _ Nothing = return 0
 checkOffset h (Just offset)
-  | offset >= 0 = return $ Right offset
+  | offset >= 0 = return offset
   | otherwise = do
-    Logger.logError
-      (News.hLogHandle h)
-      ( "ERROR "
-          .< ErrorTypes.InvalidOffset
-            ( "checkOffset: Offset in request is a negative number. Offset = "
-                ++ show offset
-            )
-      )
-    return $ Left $ ErrorTypes.InvalidOffset []
+    lift $
+      Logger.logError
+        (News.hLogHandle h)
+        ( "ERROR "
+            .< ErrorTypes.InvalidOffset
+              ( "checkOffset: Offset in request is a negative number. Offset = "
+                  ++ show offset
+              )
+        )
+    EX.throwE $ ErrorTypes.InvalidOffset []
 
 -- | checkLimit -- return limit of request result
 checkLimit ::
@@ -42,58 +44,32 @@ checkLimit ::
   -- | take from  AppConfig
   Int ->
   -- | don`t show more then limit from AppConfig
-  m (Either ErrorTypes.InvalidLimit DataTypes.Limit)
+  EX.ExceptT ErrorTypes.InvalidOffsetOrLimit m DataTypes.Limit
 checkLimit _ Nothing appConfigLimit =
-  return $ Right (appConfigLimit :: DataTypes.Limit)
+  return appConfigLimit
 checkLimit h (Just limit) appConfigLimit
-  | limit > appConfigLimit = return $ Right (appConfigLimit :: DataTypes.Limit)
-  | limit <= appConfigLimit && (limit > 0) = return $ Right limit
+  | limit > appConfigLimit = return appConfigLimit
+  | limit <= appConfigLimit && (limit > 0) = return limit
   | otherwise = do
-    Logger.logError
-      (News.hLogHandle h)
-      ( "ERROR "
-          .< ErrorTypes.InvalidLimit
-            ( "checkLimit: Limit in request is a negative number or zero. Limit = "
-                ++ show limit
-            )
-      )
-    return $ Left $ ErrorTypes.InvalidLimit []
+    lift $
+      Logger.logError
+        (News.hLogHandle h)
+        ( "ERROR "
+            .< ErrorTypes.InvalidLimit
+              ( "checkLimit: Limit in request is a negative number or zero. Limit = "
+                  ++ show limit
+              )
+        )
+    EX.throwE $ ErrorTypes.InvalidLimit []
 
 checkOffsetLimit ::
   Monad m =>
   News.Handle m ->
   Maybe DataTypes.Offset ->
   Maybe DataTypes.Limit ->
-  m (Either ErrorTypes.GetContentError (DataTypes.Offset, DataTypes.Limit))
+  EX.ExceptT ErrorTypes.InvalidOffsetOrLimit m (DataTypes.Offset, DataTypes.Limit)
 checkOffsetLimit h mo ml = do
-  checkOff <- checkOffset h mo
-  case checkOff of
-    Left err -> return $ Left $ ErrorTypes.InvalidOffsetGetContent err
-    Right offset -> do
-      checkLim <- checkLimit h ml (News.appShowLimit $ News.hAppConfig h)
-      case checkLim of
-        Left err -> return $ Left $ ErrorTypes.InvalidLimitGetContent err
-        Right limit -> do
-          Logger.logDebug (News.hLogHandle h) $ T.concat ["checkOffsetLimit: OK! Offset = ", T.pack $ show offset, "Limit  = ", T.pack $ show limit]
-          return $ Right (offset, limit)
-
-checkOffsetLimitNews ::
-  Monad m =>
-  News.Handle m ->
-  Maybe DataTypes.Offset ->
-  Maybe DataTypes.Limit ->
-  m (Either ErrorTypes.GetNewsError (DataTypes.Offset, DataTypes.Limit))
-checkOffsetLimitNews h mo ml = do
-  Logger.logDebug (News.hLogHandle h) ("In request: offset = " .< mo)
-  Logger.logDebug (News.hLogHandle h) ("In request: limit = " .< ml)
-  checkOff <- checkOffset h mo
-  case checkOff of
-    Left err -> return $ Left $ ErrorTypes.InvalidOffsetGetNews err
-    Right offset -> do
-      checkLim <- checkLimit h ml (News.appShowLimit $ News.hAppConfig h)
-      case checkLim of
-        Left err -> return $ Left $ ErrorTypes.InvalidLimitGetNews err
-        Right limit -> do
-          Logger.logDebug (News.hLogHandle h) ("checkOffsetLimit: OK! Offset = " .< offset)
-          Logger.logDebug (News.hLogHandle h) ("checkOffsetLimit: OK! Limit  = " .< limit)
-          return $ Right (offset, limit)
+  offset <- checkOffset h mo
+  limit <- checkLimit h ml (News.appShowLimit $ News.hAppConfig h)
+  lift $ Logger.logDebug (News.hLogHandle h) $ T.concat ["checkOffsetLimit: OK! Offset = ", T.pack $ show offset, "Limit  = ", T.pack $ show limit]
+  return (offset, limit)
