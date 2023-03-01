@@ -1,17 +1,18 @@
 module Server
   ( server,
     serviceApi,
-    Handle (..),
     run,
   )
 where
 
+import qualified Control.Monad.Except as EX
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BSC8
 import qualified Data.Pool as POOL
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
+import qualified DbConnect
 import qualified DbServices
 import qualified EndPoints.AddOneCategory as AddOneCategory
 import qualified EndPoints.AddOneImage as AddOneImage
@@ -44,10 +45,6 @@ import Servant
 import qualified Types.ApiTypes as ApiTypes
 import qualified Types.DataTypes as DataTypes
 
-newtype Handle = Handle
-  { hServerHandle :: News.Handle IO
-  }
-
 server :: News.Handle IO -> DataTypes.Db -> Server ApiTypes.RestAPI
 server h db =
   return (T.pack "Welcome to tiny news server") :<|> AddOneUser.addOneUser h db
@@ -67,17 +64,16 @@ server h db =
 serviceApi :: Proxy ApiTypes.RestAPI
 serviceApi = Proxy
 
-run :: Handle -> IO ()
+run :: DataTypes.Handle -> IO ()
 run h = do
-  Logger.logDebug (News.hLogHandle (hServerHandle h)) "run: Server is running"
-  let dbConfig = News.hDbConfig (hServerHandle h)
-  let appConfig = News.hAppConfig (hServerHandle h)
+  Logger.logDebug (News.hLogHandle (DataTypes.hServerHandle h)) "run: Server is running"
+  let appConfig = News.hAppConfig (DataTypes.hServerHandle h)
   let appPort = News.appPort appConfig
-  pool <- DbServices.initConnPool dbConfig
+  pool <- DbServices.initConnPool h
   POOL.withResource
     pool
-    (`DbServices.migrateDb` (hServerHandle h, "_migrations"))
-  Network.Wai.Handler.Warp.run appPort $ app (hServerHandle h) pool
+    (`DbServices.migrateDb` (DataTypes.hServerHandle h, "_migrations"))
+  Network.Wai.Handler.Warp.run appPort $ app (DataTypes.hServerHandle h) pool
 
 app :: News.Handle IO -> POOL.Pool SQL.Connection -> Application
 app h connPool =
@@ -95,31 +91,42 @@ myAuthCheck ::
   POOL.Pool SQL.Connection ->
   BasicAuthData ->
   IO (BasicAuthResult DataTypes.User)
-myAuthCheck h conns (BasicAuthData u p) = do
-  isSuchUser <- withConnPool . flip suchUser $ u
-  if isSuchUser == 0
-    then do
-      Logger.logInfo
+myAuthCheck h _ (BasicAuthData u p) = do
+  tryConnectDb <- EX.runExceptT $ DbConnect.tryRequestConnectDb h
+  case tryConnectDb of
+    Left _ -> do
+      Logger.logError
         (News.hLogHandle h)
-        "myAuthCheck: suchUser: user not found "
-      return NoSuchUser
-    else do
-      isGoodPassword <- withConnPool . flip goodPassword $ (u, p)
-      if isGoodPassword == 0
+        "myAuthCheck: Don't connect to Data Base. Unauthorized "
+      return Unauthorized
+    Right conn -> do
+      conns <- POOL.createPool (pure conn) SQL.close noOfStripes' (realToFrac idleTime') stripeSize'
+      isSuchUser <- POOL.withResource conns . flip suchUser $ u
+      if isSuchUser == 0
         then do
-          Logger.logInfo
+          Logger.logError
             (News.hLogHandle h)
-            "myAuthCheck: goodPassword: user found, but his password not valid"
-          return BadPassword
+            "myAuthCheck: suchUser: user not found! NoSuchUser "
+          return NoSuchUser
         else do
-          users <- withConnPool . flip userAuthorized $ u
-          let a = head users
-          Logger.logInfo
-            (News.hLogHandle h)
-            "myAuthCheck: Ok! User is Authorized "
-          return $ Authorized a
+          isGoodPassword <- POOL.withResource conns . flip goodPassword $ (u, p)
+          if isGoodPassword == 0
+            then do
+              Logger.logError
+                (News.hLogHandle h)
+                "myAuthCheck: goodPassword: user found, but his password not valid! BadPassword "
+              return BadPassword
+            else do
+              users <- POOL.withResource conns . flip userAuthorized $ u
+              let a = head users
+              Logger.logInfo
+                (News.hLogHandle h)
+                "myAuthCheck: Ok!  Authorized "
+              return $ Authorized a
   where
-    withConnPool = POOL.withResource conns
+    noOfStripes' = News.noOfStripes (News.hDbConfig h)
+    idleTime' = News.idleTime (News.hDbConfig h)
+    stripeSize' = News.stripeSize (News.hDbConfig h)
 
 userAuthorized :: SQL.Connection -> ByteString -> IO [DataTypes.User]
 userAuthorized conn login = do

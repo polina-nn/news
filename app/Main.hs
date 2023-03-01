@@ -7,16 +7,17 @@ import qualified Config
 import qualified Control.Exception as Exc
 import Control.Exception.Base (throwIO)
 import qualified Data.Configurator as C
-import qualified Data.Configurator.Types as C
+import qualified Data.Configurator.Types as CT
 import qualified Logger
 import qualified Logger.Impl
 import qualified News
 import qualified Server
+import qualified Types.DataTypes as DataTypes
 
 main :: IO ()
 main = do
   loadedConf <-
-    Exc.try $ C.load [C.Required "config.conf"] :: IO (Either Exc.IOException C.Config)
+    Exc.try $ C.load [C.Required "config.conf"] :: IO (Either Exc.IOException CT.Config)
   case loadedConf of
     Left exception -> do
       putStrLn $ "Did not load config file. Fault:  " ++ show exception
@@ -28,7 +29,7 @@ main = do
         putStrLn "main: makeServerHandle: OК. ServerHandle created"
         runServer serverHandle
 
-withLogHandle :: C.Config -> (Logger.Handle IO -> IO ()) -> IO ()
+withLogHandle :: CT.Config -> (Logger.Handle IO -> IO ()) -> IO ()
 withLogHandle conf f = do
   config <- Config.getLoggerConfig conf
   putStrLn "getLoggerConfig OK!"
@@ -36,9 +37,9 @@ withLogHandle conf f = do
 
 runServer :: News.Handle IO -> IO ()
 runServer serverHandle =
-  Server.run Server.Handle {Server.hServerHandle = serverHandle}
+  Server.run DataTypes.Handle {DataTypes.hServerHandle = serverHandle}
 
-makeServerHandle :: C.Config -> Logger.Handle IO -> IO (News.Handle IO)
+makeServerHandle :: CT.Config -> Logger.Handle IO -> IO (News.Handle IO)
 makeServerHandle conf logHandle = do
   appConfig <- Config.getAppConfig conf
   putStrLn "getAppConfig OK!"

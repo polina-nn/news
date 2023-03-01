@@ -12,6 +12,7 @@ import qualified Data.ByteString.Base64 as Base64
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
+import qualified DbConnect
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
@@ -39,19 +40,21 @@ addImage ::
   SQL.Connection ->
   (News.Handle IO, DataTypes.User, DataTypes.CreateImageRequest) ->
   IO (Either ErrorTypes.AddImageError DataTypes.URI)
-addImage conn (h, user, createImage) = EX.runExceptT $ addImageExcept conn (h, user, createImage)
+addImage _ (h, user, createImage) = EX.runExceptT $ addImageExcept (h, user, createImage)
 
 addImageExcept ::
-  SQL.Connection ->
   (News.Handle IO, DataTypes.User, DataTypes.CreateImageRequest) ->
   EX.ExceptT ErrorTypes.AddImageError IO DataTypes.URI
-addImageExcept conn (h, user, createImage) = do
+addImageExcept (h, user, createImage) = do
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add One Image ", ToText.toText createImage, "\nby user: ", ToText.toText user]
   _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddImage (Lib.checkUserAuthor h user)
   _ <- checkPngImage h createImage
   _ <- checkImageFileExist h createImage
   allCheckAndDecodeBase64ByteString <- checkAndDecodeBase64Image h createImage
-  addImageToDB conn h createImage allCheckAndDecodeBase64ByteString
+  conn <- EX.withExceptT ErrorTypes.AddImageSQLRequestError $ DbConnect.tryRequestConnectDb h
+  res <- addImageToDB conn h createImage allCheckAndDecodeBase64ByteString
+  liftIO $ SQL.close conn
+  return res
 
 checkImageFileExist ::
   News.Handle IO ->

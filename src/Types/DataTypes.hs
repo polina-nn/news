@@ -10,6 +10,10 @@ import qualified News
 import Servant.API (FromHttpApiData (parseQueryParam))
 import qualified Types.ErrorTypes as ErrorTypes
 
+newtype Handle = Handle
+  { hServerHandle :: News.Handle IO
+  }
+
 -- | data Db used in module DbServices
 data Db = Db
   { dbAddUser :: (News.Handle IO, User, CreateUserRequest) -> IO (Either ErrorTypes.AddUserError User),

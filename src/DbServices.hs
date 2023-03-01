@@ -6,10 +6,11 @@ module DbServices
   )
 where
 
-import qualified Data.ByteString.Char8 as BS8
+import qualified Control.Exception.Safe as EXS
 import qualified Data.Pool as POOL
 import qualified Database.PostgreSQL.Simple as SQL
 import qualified Database.PostgreSQL.Simple.Migration as Migration
+import qualified DbConnect
 import qualified EndPoints.AddOneCategory as AddOneCategory
 import qualified EndPoints.AddOneImage as AddOneImage
 import qualified EndPoints.AddOneNews as AddOneNews
@@ -26,28 +27,16 @@ import qualified EndPoints.GetUserList as GetUserList
 import Logger (logDebug, (.<))
 import qualified News
 import qualified Types.DataTypes as DataTypes
+import qualified Types.ExceptionTypes as ExceptionTypes
 
-initConnPool :: News.DbConfig -> IO (POOL.Pool SQL.Connection)
-initConnPool News.DbConfig {..} =
-  POOL.createPool
-    (SQL.connectPostgreSQL url)
-    SQL.close
-    noOfStripes
-    (realToFrac idleTime)
-    stripeSize
+initConnPool :: DataTypes.Handle -> IO (POOL.Pool SQL.Connection)
+initConnPool h = do
+  conn <- EXS.catch (DbConnect.tryInitConnectDb (DataTypes.hServerHandle h)) (ExceptionTypes.handleException (DataTypes.hServerHandle h))
+  POOL.createPool (pure conn) SQL.close noOfStripes' (realToFrac idleTime') stripeSize'
   where
-    url =
-      BS8.pack $
-        "host='"
-          ++ dbHost
-          ++ "' dbname='"
-          ++ dbName
-          ++ "' user='"
-          ++ user
-          ++ "' password='"
-          ++ password
-          ++ "' port="
-          ++ dbPort
+    noOfStripes' = News.noOfStripes (News.hDbConfig (DataTypes.hServerHandle h))
+    idleTime' = News.idleTime (News.hDbConfig (DataTypes.hServerHandle h))
+    stripeSize' = News.stripeSize (News.hDbConfig (DataTypes.hServerHandle h))
 
 createDb :: POOL.Pool SQL.Connection -> DataTypes.Db
 createDb pool =

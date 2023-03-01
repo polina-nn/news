@@ -9,6 +9,7 @@ import qualified Control.Monad.Trans.Except as EX
 import qualified Data.ByteString as B
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
+import qualified DbConnect
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import Logger (logDebug, logError, logInfo, (.<))
 import qualified News
@@ -24,14 +25,14 @@ oneImage ::
   SQL.Connection ->
   (News.Handle IO, Integer) ->
   IO (Either ErrorTypes.GetImageError B.ByteString)
-oneImage conn (h, id') = EX.runExceptT $ oneImageExcept conn (h, id')
+oneImage _ (h, id') = EX.runExceptT $ oneImageExcept (h, id')
 
 oneImageExcept ::
-  SQL.Connection ->
   (News.Handle IO, Integer) ->
   EX.ExceptT ErrorTypes.GetImageError IO B.ByteString
-oneImageExcept conn (h, id') = do
+oneImageExcept (h, id') = do
   liftIO $ Logger.logInfo (News.hLogHandle h) $ "Request: Get One Image with id " .< id'
+  conn <- EX.withExceptT ErrorTypes.GetImageSQLRequestError $ DbConnect.tryRequestConnectDb h
   _ <- checkId conn (h, id')
   res <-
     liftIO
@@ -45,6 +46,7 @@ oneImageExcept conn (h, id') = do
     Logger.logInfo
       (News.hLogHandle h)
       "oneImage: OK!"
+  liftIO $ SQL.close conn
   return $ read rez
 
 checkId ::
