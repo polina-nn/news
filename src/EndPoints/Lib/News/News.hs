@@ -10,7 +10,7 @@ where
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Control.Monad.Trans.Except as EX
 import Data.List (sortBy)
-import Data.Maybe (isNothing)
+import qualified Data.Maybe as M
 import qualified Data.Text as T
 import qualified Data.Time as TIME
 import qualified Database.PostgreSQL.Simple.Types as SQLTypes
@@ -21,6 +21,14 @@ import qualified Logger
 import qualified News
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
+
+-- | remotePast - time before database creation (use in date filtering)
+remotePast :: TIME.Day
+remotePast = TIME.fromGregorian 2000 01 01
+
+-- | farFuture - far future  (use in date filtering)
+farFuture :: TIME.Day
+farFuture = TIME.fromGregorian 2100 01 01
 
 toFilter ::
   Maybe DataTypes.DayAt ->
@@ -79,25 +87,23 @@ checkDayFilter ::
   DataTypes.Filter ->
   EX.ExceptT ErrorTypes.GetNewsError m DataTypes.Filter
 checkDayFilter fi@DataTypes.Filter {..}
-  | isNothing filterDayAt && isNothing filterDayUntil && isNothing filterDaySince = return fi
-  | isNothing filterDayUntil && isNothing filterDaySince = return fi
-  | isNothing filterDayAt && isNothing filterDaySince = return fi
-  | isNothing filterDayAt && isNothing filterDayUntil = return fi
+  | M.isNothing filterDayAt && M.isNothing filterDayUntil && M.isNothing filterDaySince = return fi
+  | M.isNothing filterDayUntil && M.isNothing filterDaySince = return fi
+  | M.isNothing filterDayAt && M.isNothing filterDaySince = return fi
+  | M.isNothing filterDayAt && M.isNothing filterDayUntil = return fi
   | otherwise = EX.throwE $ ErrorTypes.InvalidFilterGetNews $ ErrorTypes.InvalidRequest []
 
 -- | dayAt -- return value for part "AND (news_created = dbFilterDayAt OR news_created < dbFilterDayUntil OR news_created > dbFilterDaySince)"  at select request
--- if filter dbFilterDayAt is not specified, use day before data base created ("2000 - 01 - 01")
+-- if filter dbFilterDayAt is not specified, use day before data base created (remotePast)
 dayAt :: Maybe DataTypes.DayAt -> TIME.Day
-dayAt Nothing = TIME.fromGregorian 2000 01 01
-dayAt (Just v) = v
+dayAt = M.fromMaybe remotePast
 
 -- | dayUntil -- return value for part "AND (news_created = dbFilterDayAt OR news_created < dbFilterDayUntil OR news_created > dbFilterDaySince)"  at select request
--- if filter dbFilterDayUntil is not specified, use day before data base created ("2000 - 01 - 01")
+-- if filter dbFilterDayUntil is not specified, use day before data base created (remotePast)
 dayUntil :: Maybe DataTypes.DayUntil -> TIME.Day
-dayUntil Nothing = TIME.fromGregorian 2000 01 01
-dayUntil (Just v) = v
+dayUntil = M.fromMaybe remotePast
 
--- | daySince  if all "Days" are nothing, then set the date to the day before the creation of the database ("2000 - 01 - 01") so that everything is shown, else use a big day after creation ("2100-01-01")
+-- | daySince  if all "Days" are nothing, then set the date to the day before the creation of the database (remotePast) so that everything is shown, else use a big day after creation (farFuture)
 daySince ::
   Maybe DataTypes.DayAt ->
   Maybe DataTypes.DayUntil ->
@@ -105,9 +111,8 @@ daySince ::
   TIME.Day
 daySince _ _ (Just v) = v
 daySince dayAt' dayUntil' daySince'
-  | isNothing dayAt' && isNothing dayUntil' && isNothing daySince' =
-    TIME.fromGregorian 2000 01 01
-  | otherwise = TIME.fromGregorian 2100 01 01
+  | M.isNothing dayAt' && M.isNothing dayUntil' && M.isNothing daySince' = remotePast
+  | otherwise = farFuture
 
 -- textLike - return value (instead of "?" ) for part  "AND news_title LIKE ?" at select request
 -- LIKE pattern matching always covers the entire string. Therefore, if it's desired to match a sequence anywhere within a string, the pattern must start and end with a percent sign.
