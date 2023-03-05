@@ -18,6 +18,7 @@ import qualified News
 import Servant (Handler)
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
+import qualified DbConnect
 
 getCategoryList ::
   News.Handle IO ->
@@ -38,9 +39,10 @@ categoryListExcept ::
   SQL.Connection ->
   (News.Handle IO, Maybe DataTypes.Offset, Maybe DataTypes.Limit) ->
   EX.ExceptT ErrorTypes.GetContentError IO [DataTypes.Category]
-categoryListExcept conn (h, mo, ml) = do
+categoryListExcept _ (h, mo, ml) = do
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Get Category List  with offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
   (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetContent $ OffsetLimit.checkOffsetLimit h mo ml
+  conn <- EX.withExceptT ErrorTypes.GetContentSQLRequestError $ DbConnect.tryRequestConnectDb h
   res <-
     liftIO $
       SQL.query

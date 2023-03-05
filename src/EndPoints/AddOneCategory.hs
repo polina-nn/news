@@ -24,7 +24,7 @@ import qualified Types.ErrorTypes as ErrorTypes
 addOneCategory ::
   News.Handle IO ->
   DataTypes.Db ->
-  DataTypes.User ->
+  DataTypes.Account ->
   DataTypes.CreateCategoryRequest ->
   Handler DataTypes.Category
 addOneCategory h DataTypes.Db {..} user createCategoryReq =
@@ -34,15 +34,17 @@ addOneCategory h DataTypes.Db {..} user createCategoryReq =
 
 addCategory ::
   SQL.Connection ->
-  (News.Handle IO, DataTypes.User, DataTypes.CreateCategoryRequest) ->
+  (News.Handle IO, DataTypes.Account, DataTypes.CreateCategoryRequest) ->
   IO (Either ErrorTypes.AddEditCategoryError DataTypes.Category)
 addCategory conn (h, user, r) = EX.runExceptT $ addCategoryExcept conn (h, user, r)
 
 addCategoryExcept ::
   SQL.Connection ->
-  (News.Handle IO, DataTypes.User, DataTypes.CreateCategoryRequest) ->
+  (News.Handle IO, DataTypes.Account, DataTypes.CreateCategoryRequest) ->
   EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.Category
-addCategoryExcept conn (h, user, r) =
+addCategoryExcept conn (h, user, r) = undefined
+
+{--
   do
     liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add Category: \n", ToText.toText r, "by user: ", ToText.toText user]
     _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditCategory (Lib.checkUserAdmin h user)
@@ -51,7 +53,7 @@ addCategoryExcept conn (h, user, r) =
     _ <- Category.checkLogicPathForAddCategory h r categories
     _ <- CategoryIO.changePathCategories conn h $ Category.changePathForAddCategory r categories
     addCategoryToDb conn h r
-
+--}
 checkSyntaxPath ::
   Monad m =>
   News.Handle m ->

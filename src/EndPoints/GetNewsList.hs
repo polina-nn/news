@@ -20,6 +20,7 @@ import qualified News
 import Servant (Handler)
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
+import qualified DbConnect
 
 getNewsList ::
   News.Handle IO ->
@@ -63,10 +64,11 @@ newsListExcept ::
     Maybe DataTypes.Limit
   ) ->
   EX.ExceptT ErrorTypes.GetNewsError IO [DataTypes.News]
-newsListExcept conn (h, f, mSort, mo, ml) = do
+newsListExcept _ (h, f, mSort, mo, ml) = do
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Get News List with filter ", ToText.toText f, " offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
   (offset, limit, dbFilter) <- News.checkOffsetLimitFilter (h, f, mo, ml)
   liftIO $ Logger.logDebug (News.hLogHandle h) $ T.concat ["dbFilter: OK! \n", T.pack $ show dbFilter]
+  conn <- EX.withExceptT ErrorTypes.GetNewsSQLRequestError $ DbConnect.tryRequestConnectDb h
   dbNews <- newsListFromDb conn offset limit dbFilter
   sortedDbNews <- News.sortNews h mSort dbNews
   news <- Prelude.mapM (NewsIO.toNews conn h) sortedDbNews

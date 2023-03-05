@@ -26,7 +26,7 @@ import qualified Types.ErrorTypes as ErrorTypes
 getAuthorsNewsSearchList ::
   News.Handle IO ->
   DataTypes.Db ->
-  DataTypes.User ->
+  DataTypes.Account ->
   Maybe T.Text ->
   Maybe DataTypes.Offset ->
   Maybe DataTypes.Limit ->
@@ -39,7 +39,7 @@ getAuthorsNewsSearchList h DataTypes.Db {..} user search' mo ml =
 authorsNewsSearchList ::
   SQL.Connection ->
   ( News.Handle IO,
-    DataTypes.User,
+    DataTypes.Account,
     Maybe T.Text,
     Maybe DataTypes.Offset,
     Maybe DataTypes.Limit
@@ -50,24 +50,26 @@ authorsNewsSearchList conn (h, user, search, mo, ml) = do EX.runExceptT $ author
 authorsNewsSearchListExcept ::
   SQL.Connection ->
   ( News.Handle IO,
-    DataTypes.User,
+    DataTypes.Account,
     Maybe T.Text,
     Maybe DataTypes.Offset,
     Maybe DataTypes.Limit
   ) ->
   EX.ExceptT ErrorTypes.GetNewsError IO [DataTypes.News]
-authorsNewsSearchListExcept _ (h, _, Nothing, _, _) = do
+authorsNewsSearchListExcept _ (h, _, Nothing, _, _) = undefined
+
+{--do
   liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidSearchGetNews (ErrorTypes.InvalidRequest "authorsNewsSearchListExcept: BAD! Not text for searching \n"))
   EX.throwE $ ErrorTypes.InvalidSearchGetNews $ ErrorTypes.InvalidRequest []
 authorsNewsSearchListExcept conn (h, user, Just search, mo, ml) = do
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request with authentication: Get News Search List ", search, " offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
-  _ <- EX.withExceptT ErrorTypes.InvalidPermissionGetNews (Lib.checkUserAuthor h user)
+   _ <- EX.withExceptT ErrorTypes.InvalidPermissionGetNews (Lib.checkUserAuthor h user)
   (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetNews $ OffsetLimit.checkOffsetLimit h mo ml
   dbNews <- authorsNewsSearchListFromDb conn h user search offset limit
   news <- Prelude.mapM (NewsIO.toNews conn h) dbNews
   let toTextNews = T.concat $ map ToText.toText news
   liftIO $ Logger.logDebug (News.hLogHandle h) $ T.concat ["authorsNewsSearchListExcept: OK! \n", toTextNews]
-  return news
+  return news--}
 
 authorsNewsSearchListFromDb ::
   SQL.Connection ->

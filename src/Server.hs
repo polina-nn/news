@@ -8,6 +8,7 @@ where
 import qualified Control.Monad.Except as EX
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BSC8
+import qualified Data.Map as Map
 import qualified Data.Pool as POOL
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
@@ -29,21 +30,28 @@ import qualified EndPoints.GetOneImage as GetOneImage
 import qualified EndPoints.GetUserList as GetUserList
 import qualified EndPoints.Lib.Lib as Lib
 import qualified Logger
+import Network.Wai (Request, requestHeaders)
 import qualified Network.Wai.Handler.Warp
 import qualified News
 import Servant
   ( Application,
-    BasicAuthCheck (..),
     BasicAuthData (..),
     BasicAuthResult (..),
     Context (EmptyContext, (:.)),
+    Handler,
     Proxy (..),
     Server,
+    err401,
+    err403,
+    errBody,
     serveWithContext,
+    throwError,
     (:<|>) ((:<|>)),
   )
+import Servant.Server.Experimental.Auth (AuthHandler, AuthServerData, mkAuthHandler)
 import qualified Types.ApiTypes as ApiTypes
 import qualified Types.DataTypes as DataTypes
+import Web.Cookie (parseCookies)
 
 server :: News.Handle IO -> DataTypes.Db -> Server ApiTypes.RestAPI
 server h db =
@@ -77,11 +85,48 @@ run h = do
 
 app :: News.Handle IO -> POOL.Pool SQL.Connection -> Application
 app h connPool =
-  serveWithContext Server.serviceApi ctx $
-    Server.server h $ DbServices.createDb connPool
+  serveWithContext Server.serviceApi genAuthServerContext $ Server.server h $ DbServices.createDb connPool
+  where
+    genAuthServerContext :: Context (AuthHandler Request DataTypes.Account ': '[])
+    genAuthServerContext = authHandler :. EmptyContext
+    authHandler = authHandlerConn h connPool
+
+----------- образец из серванта
+authHandlerConn ::
+  News.Handle IO ->
+  POOL.Pool SQL.Connection ->
+  AuthHandler Request DataTypes.Account
+authHandlerConn h conn = mkAuthHandler handler
+  where
+    maybeToEither e = maybe (Left e) Right
+    throw401 msg = throwError $ err401 {errBody = msg}
+    handler req = either throw401 lookupAccount $ do
+      cookie <- maybeToEither "Missing cookie header" $ lookup "cookie" $ requestHeaders req
+      maybeToEither "Missing token in cookie" $ lookup "servant-auth-cookie" $ parseCookies cookie
+
+lookupAccount :: ByteString -> Handler DataTypes.Account
+lookupAccount key = case Map.lookup key database of
+  Nothing -> throwError (err403 {errBody = "Invalid Cookie"})
+  Just usr -> return usr
+
+database :: Map.Map ByteString DataTypes.Account
+database =
+  Map.fromList
+    [ ("key1", DataTypes.Account "Anne Briggs"),
+      ("key2", DataTypes.Account "Bruce Cockburn"),
+      ("key3", DataTypes.Account "Ghédalia Tazartès")
+    ]
+
+--------------------
+
+{-- OLD
+app :: News.Handle IO -> POOL.Pool SQL.Connection -> Application
+app h connPool =
+  serveWithContext Server.serviceApi ctx $  Server.server h $ DbServices.createDb connPool
   where
     ctx = BasicAuthCheck authCfg :. EmptyContext
     authCfg = myAuthCheck h connPool
+    --}
 
 -- | myAuthCheck function is the one that actually check the username
 -- and password and return an value that indicate the status of authentication. Look in the 'app' function

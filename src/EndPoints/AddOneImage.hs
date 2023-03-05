@@ -28,7 +28,7 @@ type ImageDecodeBase64ByteString = B.ByteString
 addOneImage ::
   News.Handle IO ->
   DataTypes.Db ->
-  DataTypes.User ->
+  DataTypes.Account ->
   DataTypes.CreateImageRequest ->
   Handler DataTypes.URI
 addOneImage h DataTypes.Db {..} user createImageReq =
@@ -38,23 +38,25 @@ addOneImage h DataTypes.Db {..} user createImageReq =
 
 addImage ::
   SQL.Connection ->
-  (News.Handle IO, DataTypes.User, DataTypes.CreateImageRequest) ->
+  (News.Handle IO, DataTypes.Account, DataTypes.CreateImageRequest) ->
   IO (Either ErrorTypes.AddImageError DataTypes.URI)
 addImage _ (h, user, createImage) = EX.runExceptT $ addImageExcept (h, user, createImage)
 
 addImageExcept ::
-  (News.Handle IO, DataTypes.User, DataTypes.CreateImageRequest) ->
+  (News.Handle IO, DataTypes.Account, DataTypes.CreateImageRequest) ->
   EX.ExceptT ErrorTypes.AddImageError IO DataTypes.URI
-addImageExcept (h, user, createImage) = do
-  liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add One Image ", ToText.toText createImage, "\nby user: ", ToText.toText user]
-  _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddImage (Lib.checkUserAuthor h user)
-  _ <- checkPngImage h createImage
-  _ <- checkImageFileExist h createImage
-  allCheckAndDecodeBase64ByteString <- checkAndDecodeBase64Image h createImage
-  conn <- EX.withExceptT ErrorTypes.AddImageSQLRequestError $ DbConnect.tryRequestConnectDb h
-  res <- addImageToDB conn h createImage allCheckAndDecodeBase64ByteString
-  liftIO $ SQL.close conn
-  return res
+addImageExcept (h, user, createImage) = undefined
+
+{-- do
+liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add One Image ", ToText.toText createImage, "\nby user: ", ToText.toText user]
+_ <- EX.withExceptT ErrorTypes.InvalidPermissionAddImage (Lib.checkUserAuthor h user)
+_ <- checkPngImage h createImage
+_ <- checkImageFileExist h createImage
+allCheckAndDecodeBase64ByteString <- checkAndDecodeBase64Image h createImage
+conn <- EX.withExceptT ErrorTypes.AddImageSQLRequestError $ DbConnect.tryRequestConnectDb h
+res <- addImageToDB conn h createImage allCheckAndDecodeBase64ByteString
+liftIO $ SQL.close conn
+return res --}
 
 checkImageFileExist ::
   News.Handle IO ->

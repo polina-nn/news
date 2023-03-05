@@ -20,6 +20,7 @@ import qualified News
 import Servant (Handler)
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
+import qualified DbConnect
 
 getNewsSearchList ::
   News.Handle IO ->
@@ -54,9 +55,10 @@ newsSearchListExcept ::
 newsSearchListExcept _ (h, Nothing, _, _) = do
   liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidSearchGetNews (ErrorTypes.InvalidRequest "newsSearchListExcept: BAD! Not text for searching \n"))
   EX.throwE $ ErrorTypes.InvalidSearchGetNews $ ErrorTypes.InvalidRequest []
-newsSearchListExcept conn (h, Just search, mo, ml) = do
+newsSearchListExcept _ (h, Just search, mo, ml) = do
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Get News Search List ", search, " offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
   (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetNews $ OffsetLimit.checkOffsetLimit h mo ml
+  conn <- EX.withExceptT ErrorTypes.GetNewsSQLRequestError $ DbConnect.tryRequestConnectDb h
   res <- newsSearchListAtDb conn h search offset limit
   news <- Prelude.mapM (NewsIO.toNews conn h) res
   let toTextNews = T.concat $ map ToText.toText news

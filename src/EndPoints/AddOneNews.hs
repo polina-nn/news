@@ -32,7 +32,7 @@ type IdImage = Int
 addOneNews ::
   News.Handle IO ->
   DataTypes.Db ->
-  DataTypes.User ->
+  DataTypes.Account ->
   DataTypes.CreateNewsRequest ->
   Handler DataTypes.News
 addOneNews h DataTypes.Db {..} user createNewsReq =
@@ -42,24 +42,26 @@ addOneNews h DataTypes.Db {..} user createNewsReq =
 
 addNews ::
   SQL.Connection ->
-  (News.Handle IO, DataTypes.User, DataTypes.CreateNewsRequest) ->
+  (News.Handle IO, DataTypes.Account, DataTypes.CreateNewsRequest) ->
   IO (Either ErrorTypes.AddEditNewsError DataTypes.News)
 addNews conn (h, user, r) = EX.runExceptT $ addNewsExcept conn (h, user, r)
 
 addNewsExcept ::
   SQL.Connection ->
-  (News.Handle IO, DataTypes.User, DataTypes.CreateNewsRequest) ->
+  (News.Handle IO, DataTypes.Account, DataTypes.CreateNewsRequest) ->
   EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.News
-addNewsExcept conn (h, user, r) = do
-  liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add One News: \n", ToText.toText r, "by user: ", ToText.toText user]
-  _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditNews (Lib.checkUserAuthor h user)
-  _ <- checkImageFilesExist h r
-  _ <- checkPngImages h r
-  _ <- checkBase64Images h r
-  categories' <- checkCategoryId conn h r
-  newsId' <- getNewsId conn h
-  images' <- addAllImages conn h r
-  addNewsToDB conn h user categories' r newsId' images'
+addNewsExcept conn (h, user, r) = undefined
+
+{--do
+liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add One News: \n", ToText.toText r, "by user: ", ToText.toText user]
+_ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditNews (Lib.checkUserAuthor h user)
+_ <- checkImageFilesExist h r
+_ <- checkPngImages h r
+_ <- checkBase64Images h r
+categories' <- checkCategoryId conn h r
+newsId' <- getNewsId conn h
+images' <- addAllImages conn h r
+addNewsToDB conn h user categories' r newsId' images' --}
 
 checkImageFilesExist ::
   News.Handle IO ->

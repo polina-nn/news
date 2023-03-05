@@ -21,7 +21,7 @@ import qualified Types.ErrorTypes as ErrorTypes
 addOneUser ::
   News.Handle IO ->
   DataTypes.Db ->
-  DataTypes.User ->
+  DataTypes.Account ->
   DataTypes.CreateUserRequest ->
   Handler DataTypes.User
 addOneUser h DataTypes.Db {..} user createUserReq =
@@ -31,19 +31,21 @@ addOneUser h DataTypes.Db {..} user createUserReq =
 
 addUser ::
   SQL.Connection ->
-  (News.Handle IO, DataTypes.User, DataTypes.CreateUserRequest) ->
+  (News.Handle IO, DataTypes.Account, DataTypes.CreateUserRequest) ->
   IO (Either ErrorTypes.AddUserError DataTypes.User)
 addUser conn (h, user, req) = EX.runExceptT $ addUserExcept conn (h, user, req)
 
 addUserExcept ::
   SQL.Connection ->
-  (News.Handle IO, DataTypes.User, DataTypes.CreateUserRequest) ->
+  (News.Handle IO, DataTypes.Account, DataTypes.CreateUserRequest) ->
   EX.ExceptT ErrorTypes.AddUserError IO DataTypes.User
-addUserExcept conn (h, user, req) = do
-  liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add User: \n", ToText.toText req, "by user: ", ToText.toText user]
-  _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddUser (Lib.checkUserAdmin h user)
-  _ <- checkLogin conn h req
-  addUserToDB conn h req
+addUserExcept conn (h, user, req) = undefined
+
+{--do
+liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add User: \n", ToText.toText req, "by user: ", ToText.toText user]
+_ <- EX.withExceptT ErrorTypes.InvalidPermissionAddUser (Lib.checkUserAdmin h user)
+_ <- checkLogin conn h req
+addUserToDB conn h req --}
 
 -- | checkLogin - check the existence of the login. Duplication of login is not allowed
 checkLogin ::

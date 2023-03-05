@@ -46,7 +46,6 @@ oneImageExcept (h, id') = do
     Logger.logInfo
       (News.hLogHandle h)
       "oneImage: OK!"
-  liftIO $ SQL.close conn
   return $ read rez
 
 checkId ::

@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeFamilies #-}
+
 -- | DataTypes for End Points --
 module Types.DataTypes where
 
@@ -8,23 +10,32 @@ import qualified Data.Time as TIME
 import GHC.Generics (Generic)
 import qualified News
 import Servant.API (FromHttpApiData (parseQueryParam))
+import Servant.API.Experimental.Auth (AuthProtect)
+import Servant.Server.Experimental.Auth (AuthServerData)
 import qualified Types.ErrorTypes as ErrorTypes
 
 newtype Handle = Handle
   { hServerHandle :: News.Handle IO
   }
 
+--- | We need to specify the data returned after authentication
+type instance AuthServerData (AuthProtect "cookie-auth") = Account
+
+-- | An account type that we "fetch from the database" after
+-- performing authentication
+newtype Account = Account {unAccount :: T.Text}
+
 -- | data Db used in module DbServices
 data Db = Db
-  { dbAddUser :: (News.Handle IO, User, CreateUserRequest) -> IO (Either ErrorTypes.AddUserError User),
-    dbAddCategory :: (News.Handle IO, User, CreateCategoryRequest) -> IO (Either ErrorTypes.AddEditCategoryError Category),
-    dbAddNews :: (News.Handle IO, User, CreateNewsRequest) -> IO (Either ErrorTypes.AddEditNewsError News),
-    dbAddImage :: (News.Handle IO, User, CreateImageRequest) -> IO (Either ErrorTypes.AddImageError URI),
-    dbEditCategory :: (News.Handle IO, User, Int, EditCategoryRequest) -> IO (Either ErrorTypes.AddEditCategoryError Category),
-    dbEditNews :: (News.Handle IO, User, Int, EditNewsRequest) -> IO (Either ErrorTypes.AddEditNewsError News),
+  { dbAddUser :: (News.Handle IO, Account, CreateUserRequest) -> IO (Either ErrorTypes.AddUserError User),
+    dbAddCategory :: (News.Handle IO, Account, CreateCategoryRequest) -> IO (Either ErrorTypes.AddEditCategoryError Category),
+    dbAddNews :: (News.Handle IO, Account, CreateNewsRequest) -> IO (Either ErrorTypes.AddEditNewsError News),
+    dbAddImage :: (News.Handle IO, Account, CreateImageRequest) -> IO (Either ErrorTypes.AddImageError URI),
+    dbEditCategory :: (News.Handle IO, Account, Int, EditCategoryRequest) -> IO (Either ErrorTypes.AddEditCategoryError Category),
+    dbEditNews :: (News.Handle IO, Account, Int, EditNewsRequest) -> IO (Either ErrorTypes.AddEditNewsError News),
     dbAuthorsNewsList ::
       ( News.Handle IO,
-        User,
+        Account,
         Filter,
         Maybe SortBy,
         Maybe Offset,
@@ -33,7 +44,7 @@ data Db = Db
       IO (Either ErrorTypes.GetNewsError [News]),
     dbAuthorsNewsSearchList ::
       ( News.Handle IO,
-        User,
+        Account,
         Maybe T.Text,
         Maybe Offset,
         Maybe Limit
