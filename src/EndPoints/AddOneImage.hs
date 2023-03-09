@@ -14,6 +14,7 @@ import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified DbConnect
 import qualified EndPoints.Lib.Lib as Lib
+import qualified EndPoints.Lib.LibIO as LibIO
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
 import Logger (logDebug, logError, logInfo, (.<))
@@ -40,23 +41,23 @@ addImage ::
   SQL.Connection ->
   (News.Handle IO, DataTypes.Account, DataTypes.CreateImageRequest) ->
   IO (Either ErrorTypes.AddImageError DataTypes.URI)
-addImage _ (h, user, createImage) = EX.runExceptT $ addImageExcept (h, user, createImage)
+addImage conn (h, account, createImage) = EX.runExceptT $ addImageExcept conn (h, account, createImage)
 
 addImageExcept ::
+  SQL.Connection ->
   (News.Handle IO, DataTypes.Account, DataTypes.CreateImageRequest) ->
   EX.ExceptT ErrorTypes.AddImageError IO DataTypes.URI
-addImageExcept (h, user, createImage) = undefined
-
-{-- do
-liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add One Image ", ToText.toText createImage, "\nby user: ", ToText.toText user]
-_ <- EX.withExceptT ErrorTypes.InvalidPermissionAddImage (Lib.checkUserAuthor h user)
-_ <- checkPngImage h createImage
-_ <- checkImageFileExist h createImage
-allCheckAndDecodeBase64ByteString <- checkAndDecodeBase64Image h createImage
-conn <- EX.withExceptT ErrorTypes.AddImageSQLRequestError $ DbConnect.tryRequestConnectDb h
-res <- addImageToDB conn h createImage allCheckAndDecodeBase64ByteString
-liftIO $ SQL.close conn
-return res --}
+addImageExcept _ (h, account, createImage) = do
+  conn <- EX.withExceptT ErrorTypes.AddImageSQLRequestError $ DbConnect.tryRequestConnectDb h
+  user <- EX.withExceptT ErrorTypes.AddImageSQLRequestError (LibIO.searchUser h conn account)
+  liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add One Image ", ToText.toText createImage, "\nby user: ", ToText.toText user]
+  _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddImage (Lib.checkUserAuthor h user)
+  _ <- checkPngImage h createImage
+  _ <- checkImageFileExist h createImage
+  allCheckAndDecodeBase64ByteString <- checkAndDecodeBase64Image h createImage
+  res <- addImageToDB conn h createImage allCheckAndDecodeBase64ByteString
+  liftIO $ SQL.close conn
+  return res
 
 checkImageFileExist ::
   News.Handle IO ->

@@ -13,8 +13,10 @@ import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified Database.PostgreSQL.Simple.Types as SQLTypes
+import qualified DbConnect
 import qualified EndPoints.Lib.Category.Category as Category
 import qualified EndPoints.Lib.Lib as Lib
+import qualified EndPoints.Lib.LibIO as LibIO
 import qualified EndPoints.Lib.News.NewsIO as NewsIO
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
@@ -44,24 +46,24 @@ addNews ::
   SQL.Connection ->
   (News.Handle IO, DataTypes.Account, DataTypes.CreateNewsRequest) ->
   IO (Either ErrorTypes.AddEditNewsError DataTypes.News)
-addNews conn (h, user, r) = EX.runExceptT $ addNewsExcept conn (h, user, r)
+addNews conn (h, account, r) = EX.runExceptT $ addNewsExcept conn (h, account, r)
 
 addNewsExcept ::
   SQL.Connection ->
   (News.Handle IO, DataTypes.Account, DataTypes.CreateNewsRequest) ->
   EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.News
-addNewsExcept conn (h, user, r) = undefined
-
-{--do
-liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add One News: \n", ToText.toText r, "by user: ", ToText.toText user]
-_ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditNews (Lib.checkUserAuthor h user)
-_ <- checkImageFilesExist h r
-_ <- checkPngImages h r
-_ <- checkBase64Images h r
-categories' <- checkCategoryId conn h r
-newsId' <- getNewsId conn h
-images' <- addAllImages conn h r
-addNewsToDB conn h user categories' r newsId' images' --}
+addNewsExcept _ (h, account, r) = do
+  conn <- EX.withExceptT ErrorTypes.AddEditNewsSQLRequestError $ DbConnect.tryRequestConnectDb h
+  user <- EX.withExceptT ErrorTypes.AddEditNewsSQLRequestError (LibIO.searchUser h conn account)
+  liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add One News: \n", ToText.toText r, "by user: ", ToText.toText user]
+  _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditNews (Lib.checkUserAuthor h user)
+  _ <- checkImageFilesExist h r
+  _ <- checkPngImages h r
+  _ <- checkBase64Images h r
+  categories' <- checkCategoryId conn h r
+  newsId' <- getNewsId conn h
+  images' <- addAllImages conn h r
+  addNewsToDB conn h user categories' r newsId' images' --}
 
 checkImageFilesExist ::
   News.Handle IO ->

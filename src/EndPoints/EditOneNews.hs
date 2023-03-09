@@ -14,8 +14,10 @@ import qualified Data.Time as TIME
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified Database.PostgreSQL.Simple.Types as SQLTypes
+import qualified DbConnect
 import qualified EndPoints.Lib.Category.Category as Category
 import qualified EndPoints.Lib.Lib as Lib
+import qualified EndPoints.Lib.LibIO as LibIO
 import qualified EndPoints.Lib.News.NewsIO as NewsIO
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
@@ -48,31 +50,30 @@ editNews ::
   SQL.Connection ->
   (News.Handle IO, DataTypes.Account, IdNews, DataTypes.EditNewsRequest) ->
   IO (Either ErrorTypes.AddEditNewsError DataTypes.News)
-editNews conn (h, user, newsId, r) = do EX.runExceptT $ editNewsExcept conn (h, user, newsId, r)
+editNews conn (h, account, newsId, r) = do EX.runExceptT $ editNewsExcept conn (h, account, newsId, r)
 
 editNewsExcept ::
   SQL.Connection ->
   (News.Handle IO, DataTypes.Account, IdNews, DataTypes.EditNewsRequest) ->
   EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.News
-editNewsExcept conn (h, user, newsId, r) = undefined
-
-{--do
-liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Edit One News \n", ToText.toText r, "with news id ", T.pack $ show newsId, "\nby user: ", ToText.toText user]
-_ <- checkUserThisNewsAuthor conn h user newsId
-_ <- checkImageFilesExist h r
-_ <- checkPngImages h r
-_ <- checkBase64Images h r
-_ <- checkId conn h newsId
-_ <- checkCategoryId conn h r
-_ <- newTitle conn h newsId r
-_ <- newCatId conn h newsId r
-_ <- newText conn h newsId r
-_ <- newImages conn h r
-_ <- newPublish conn h newsId r
-newsCategory <- getNewsCategory conn h newsId
-idImages <- getNewsImages conn h newsId
-getNews conn h user newsId newsCategory idImages
---}
+editNewsExcept _ (h, account, newsId, r) = do
+  conn <- EX.withExceptT ErrorTypes.AddEditNewsSQLRequestError $ DbConnect.tryRequestConnectDb h
+  user <- EX.withExceptT ErrorTypes.AddEditNewsSQLRequestError (LibIO.searchUser h conn account)
+  liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Edit One News \n", ToText.toText r, "with news id ", T.pack $ show newsId, "\nby user: ", ToText.toText user]
+  _ <- checkUserThisNewsAuthor conn h user newsId
+  _ <- checkImageFilesExist h r
+  _ <- checkPngImages h r
+  _ <- checkBase64Images h r
+  _ <- checkId conn h newsId
+  _ <- checkCategoryId conn h r
+  _ <- newTitle conn h newsId r
+  _ <- newCatId conn h newsId r
+  _ <- newText conn h newsId r
+  _ <- newImages conn h r
+  _ <- newPublish conn h newsId r
+  newsCategory <- getNewsCategory conn h newsId
+  idImages <- getNewsImages conn h newsId
+  getNews conn h user newsId newsCategory idImages
 
 newTitle ::
   SQL.Connection ->

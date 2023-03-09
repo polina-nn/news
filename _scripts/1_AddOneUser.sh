@@ -1,6 +1,7 @@
 #!/bin/sh
-curl -i --user polina:polina \
+curl -i -POST \
+--header "Cookie: servant-auth-cookie=keypolina" \
 --header "Content-Type: application/json"   \
---request POST   \
 --data '{"name":"Алиса", "login":"alica", "password":"alica", "admin": false, "author": true }' \
-http://localhost:8080/login/users
+http://localhost:8080/login/users \
+

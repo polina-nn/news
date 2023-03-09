@@ -9,6 +9,7 @@ import qualified Control.Monad.Trans.Except as EX
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
+import qualified DbConnect
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.OffsetLimit as OffsetLimit
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
@@ -18,7 +19,6 @@ import qualified News
 import Servant (Handler)
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
-import qualified DbConnect
 
 getUserList ::
   News.Handle IO ->

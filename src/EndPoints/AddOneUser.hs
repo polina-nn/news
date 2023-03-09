@@ -9,7 +9,9 @@ import qualified Control.Monad.Trans.Except as EX
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
+import qualified DbConnect
 import qualified EndPoints.Lib.Lib as Lib
+import qualified EndPoints.Lib.LibIO as LibIO
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
 import Logger (logDebug, logError, logInfo, (.<))
@@ -33,19 +35,20 @@ addUser ::
   SQL.Connection ->
   (News.Handle IO, DataTypes.Account, DataTypes.CreateUserRequest) ->
   IO (Either ErrorTypes.AddUserError DataTypes.User)
-addUser conn (h, user, req) = EX.runExceptT $ addUserExcept conn (h, user, req)
+addUser conn (h, account, req) = EX.runExceptT $ addUserExcept conn (h, account, req)
 
 addUserExcept ::
   SQL.Connection ->
   (News.Handle IO, DataTypes.Account, DataTypes.CreateUserRequest) ->
   EX.ExceptT ErrorTypes.AddUserError IO DataTypes.User
-addUserExcept conn (h, user, req) = undefined
-
-{--do
-liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add User: \n", ToText.toText req, "by user: ", ToText.toText user]
-_ <- EX.withExceptT ErrorTypes.InvalidPermissionAddUser (Lib.checkUserAdmin h user)
-_ <- checkLogin conn h req
-addUserToDB conn h req --}
+addUserExcept _ (h, account, req) = do
+  conn <- EX.withExceptT ErrorTypes.AddUserSQLRequestError $ DbConnect.tryRequestConnectDb h
+  user <- EX.withExceptT ErrorTypes.AddUserSQLRequestError (LibIO.searchUser h conn account)
+  liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add User: \n", ToText.toText req, "by user: ", ToText.toText user]
+  _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddUser (Lib.checkUserAdmin h user)
+  _ <- checkLogin conn h req
+  _ <- addCookieToDB conn h req
+  addUserToDB conn h req
 
 -- | checkLogin - check the existence of the login. Duplication of login is not allowed
 checkLogin ::
@@ -82,6 +85,29 @@ checkLogin conn h' r@DataTypes.CreateUserRequest {..} = do
                 ( ErrorTypes.SQLRequestError "checkLogin: BAD! Logic error!"
                 )
           )
+      EX.throwE $ ErrorTypes.AddUserSQLRequestError $ ErrorTypes.SQLRequestError []
+
+addCookieToDB ::
+  SQL.Connection ->
+  News.Handle IO ->
+  DataTypes.CreateUserRequest ->
+  EX.ExceptT ErrorTypes.AddUserError IO DataTypes.CreateUserRequest
+addCookieToDB conn h r@DataTypes.CreateUserRequest {..} = do
+  let cookie = "key" ++ login
+  res <-
+    liftIO
+      ( SQL.execute
+          conn
+          [sql|INSERT INTO cookie  (cookie_account,  cookie_key )
+             VALUES (?, ?) |]
+          (login, cookie)
+      )
+  case read (show res) :: Int of
+    1 -> do
+      liftIO $ Logger.logInfo (News.hLogHandle h) $ "addCookieToDB: OK! Cookie is " .< cookie
+      return r
+    _ -> do
+      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.AddUserSQLRequestError (ErrorTypes.SQLRequestError "addCookieToDB! Don't INSERT INTO  user table"))
       EX.throwE $ ErrorTypes.AddUserSQLRequestError $ ErrorTypes.SQLRequestError []
 
 addUserToDB ::

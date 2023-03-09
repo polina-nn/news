@@ -10,6 +10,8 @@ import Data.Maybe (fromMaybe, isJust)
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
+import qualified DbConnect
+import qualified EndPoints.Lib.LibIO as LibIO
 import qualified EndPoints.Lib.News.News as News
 import qualified EndPoints.Lib.News.NewsHelpTypes as NewsHelpTypes
 import qualified EndPoints.Lib.News.NewsIO as NewsIO
@@ -54,7 +56,7 @@ authorsNewsList ::
     Maybe DataTypes.Limit
   ) ->
   IO (Either ErrorTypes.GetNewsError [DataTypes.News])
-authorsNewsList conn (h, user, f, mSort, mo, ml) = do EX.runExceptT $ authorsNewsListExcept conn (h, user, f, mSort, mo, ml)
+authorsNewsList conn (h, account, f, mSort, mo, ml) = do EX.runExceptT $ authorsNewsListExcept conn (h, account, f, mSort, mo, ml)
 
 authorsNewsListExcept ::
   SQL.Connection ->
@@ -66,17 +68,17 @@ authorsNewsListExcept ::
     Maybe DataTypes.Limit
   ) ->
   EX.ExceptT ErrorTypes.GetNewsError IO [DataTypes.News]
-authorsNewsListExcept conn (h, user, f, mSort, mo, ml) = undefined
-
-{--do
-liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request with authentication: Get News List with filter ", ToText.toText f, " offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
-(offset, limit, dbFiler) <- News.checkUserOffsetLimitFilter (h, user, f, mo, ml)
-dbNews <- authorsNewsListFromDb conn user offset limit dbFiler
-sortedDbNews <- News.sortNews h mSort dbNews
-news <- Prelude.mapM (NewsIO.toNews conn h) sortedDbNews
-let toTextNews = T.concat $ map ToText.toText news
-liftIO $ Logger.logDebug (News.hLogHandle h) $ T.concat ["authorsNewsSearchListExcept: OK! \n", toTextNews]
-return news--}
+authorsNewsListExcept _ (h, account, f, mSort, mo, ml) = do
+  conn <- EX.withExceptT ErrorTypes.GetNewsSQLRequestError $ DbConnect.tryRequestConnectDb h
+  user <- EX.withExceptT ErrorTypes.GetNewsSQLRequestError (LibIO.searchUser h conn account)
+  liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request with authentication: Get News List with filter ", ToText.toText f, " offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
+  (offset, limit, dbFiler) <- News.checkUserOffsetLimitFilter (h, user, f, mo, ml)
+  dbNews <- authorsNewsListFromDb conn user offset limit dbFiler
+  sortedDbNews <- News.sortNews h mSort dbNews
+  news <- Prelude.mapM (NewsIO.toNews conn h) sortedDbNews
+  let toTextNews = T.concat $ map ToText.toText news
+  liftIO $ Logger.logDebug (News.hLogHandle h) $ T.concat ["authorsNewsSearchListExcept: OK! \n", toTextNews]
+  return news
 
 -- | authorsNewsListFromDb  get the full list of news if the array is empty, there is no news
 authorsNewsListFromDb ::

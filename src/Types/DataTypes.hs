@@ -24,6 +24,7 @@ type instance AuthServerData (AuthProtect "cookie-auth") = Account
 -- | An account type that we "fetch from the database" after
 -- performing authentication
 newtype Account = Account {unAccount :: T.Text}
+  deriving (Show)
 
 -- | data Db used in module DbServices
 data Db = Db

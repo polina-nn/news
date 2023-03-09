@@ -10,10 +10,12 @@ import qualified Control.Monad.Trans.Except as EX
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
+import qualified DbConnect
 import qualified EndPoints.Lib.Category.Category as Category
 import qualified EndPoints.Lib.Category.CategoryHelpTypes as CategoryHelpTypes
 import qualified EndPoints.Lib.Category.CategoryIO as CategoryIO
 import qualified EndPoints.Lib.Lib as Lib
+import qualified EndPoints.Lib.LibIO as LibIO
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
 import Logger (logDebug, logError, logInfo, (.<))
@@ -38,29 +40,29 @@ editCategory ::
   SQL.Connection ->
   (News.Handle IO, DataTypes.Account, Int, DataTypes.EditCategoryRequest) ->
   IO (Either ErrorTypes.AddEditCategoryError DataTypes.Category)
-editCategory conn (h, user, catId, r) = EX.runExceptT $ editCategoryExcept conn (h, user, catId, r)
+editCategory conn (h, account, catId, r) = EX.runExceptT $ editCategoryExcept conn (h, account, catId, r)
 
 editCategoryExcept ::
   SQL.Connection ->
   (News.Handle IO, DataTypes.Account, Int, DataTypes.EditCategoryRequest) ->
   EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.Category
-editCategoryExcept conn (h, user, catId, r) = undefined
-
-{--do
-liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Edit Category: \n", ToText.toText r, "with category id ", T.pack $ show catId, "\nby user: ", ToText.toText user]
-_ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditCategory (Lib.checkUserAdmin h user)
-_ <- checkId conn h catId
-_ <- checkSyntaxPath h r
-categories <- CategoryIO.getAllCategories conn
-editCategoryFullRequest <- Category.checkLogicPathForEditCategory h catId r categories
-liftIO $ Logger.logDebug (News.hLogHandle h) $ T.concat ["editCategoryExcept: allCheck: OK!  \n", ToText.toText editCategoryFullRequest]
-case Category.changePathsForEditCategory editCategoryFullRequest categories of
-  Nothing -> do
-    liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidValuePath (ErrorTypes.InvalidContent "check Developer Error, then update categories table"))
-    EX.throwE $ ErrorTypes.InvalidValuePath $ ErrorTypes.InvalidContent []
-  Just toChangePaths -> do
-    _ <- CategoryIO.changePathCategories conn h toChangePaths
-    editCategoryName conn h editCategoryFullRequest --}
+editCategoryExcept _ (h, account, catId, r) = do
+  conn <- EX.withExceptT ErrorTypes.AddEditCategorySQLRequestError $ DbConnect.tryRequestConnectDb h
+  user <- EX.withExceptT ErrorTypes.AddEditCategorySQLRequestError (LibIO.searchUser h conn account)
+  liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Edit Category: \n", ToText.toText r, "with category id ", T.pack $ show catId, "\nby user: ", ToText.toText user]
+  _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditCategory (Lib.checkUserAdmin h user)
+  _ <- checkId conn h catId
+  _ <- checkSyntaxPath h r
+  categories <- CategoryIO.getAllCategories conn
+  editCategoryFullRequest <- Category.checkLogicPathForEditCategory h catId r categories
+  liftIO $ Logger.logDebug (News.hLogHandle h) $ T.concat ["editCategoryExcept: allCheck: OK!  \n", ToText.toText editCategoryFullRequest]
+  case Category.changePathsForEditCategory editCategoryFullRequest categories of
+    Nothing -> do
+      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidValuePath (ErrorTypes.InvalidContent "check Developer Error, then update categories table"))
+      EX.throwE $ ErrorTypes.InvalidValuePath $ ErrorTypes.InvalidContent []
+    Just toChangePaths -> do
+      _ <- CategoryIO.changePathCategories conn h toChangePaths
+      editCategoryName conn h editCategoryFullRequest --}
 
 -- | checkIdIO  - check if there is a record with the given category id in the database ( id = 7 in http://localhost:8080/category/7 )
 checkId ::

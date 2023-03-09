@@ -10,9 +10,11 @@ import qualified Control.Monad.Trans.Except as EX
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
+import qualified DbConnect
 import qualified EndPoints.Lib.Category.Category as Category
 import qualified EndPoints.Lib.Category.CategoryIO as CategoryIO
 import qualified EndPoints.Lib.Lib as Lib
+import qualified EndPoints.Lib.LibIO as LibIO
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
 import Logger (logError, logInfo, (.<))
@@ -36,16 +38,16 @@ addCategory ::
   SQL.Connection ->
   (News.Handle IO, DataTypes.Account, DataTypes.CreateCategoryRequest) ->
   IO (Either ErrorTypes.AddEditCategoryError DataTypes.Category)
-addCategory conn (h, user, r) = EX.runExceptT $ addCategoryExcept conn (h, user, r)
+addCategory conn (h, account, r) = EX.runExceptT $ addCategoryExcept conn (h, account, r)
 
 addCategoryExcept ::
   SQL.Connection ->
   (News.Handle IO, DataTypes.Account, DataTypes.CreateCategoryRequest) ->
   EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.Category
-addCategoryExcept conn (h, user, r) = undefined
-
-{--
+addCategoryExcept _ (h, account, r) =
   do
+    conn <- EX.withExceptT ErrorTypes.AddEditCategorySQLRequestError $ DbConnect.tryRequestConnectDb h
+    user <- EX.withExceptT ErrorTypes.AddEditCategorySQLRequestError (LibIO.searchUser h conn account)
     liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add Category: \n", ToText.toText r, "by user: ", ToText.toText user]
     _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditCategory (Lib.checkUserAdmin h user)
     _ <- checkSyntaxPath h r
@@ -53,7 +55,7 @@ addCategoryExcept conn (h, user, r) = undefined
     _ <- Category.checkLogicPathForAddCategory h r categories
     _ <- CategoryIO.changePathCategories conn h $ Category.changePathForAddCategory r categories
     addCategoryToDb conn h r
---}
+
 checkSyntaxPath ::
   Monad m =>
   News.Handle m ->
