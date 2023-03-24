@@ -7,6 +7,7 @@ where
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import qualified Control.Monad.Trans.Except as EX
+import qualified Data.Pool as POOL
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
@@ -34,6 +35,13 @@ addOneCategory h DataTypes.Db {..} user createCategoryReq =
     (liftIO $ dbAddCategory (h, user, createCategoryReq))
     ToHttpResponse.toHttpResponse
 
+addCategory ::
+  DataTypes.StatePool ->
+  (News.Handle IO, DataTypes.Account, DataTypes.CreateCategoryRequest) ->
+  IO (Either ErrorTypes.AddEditCategoryError DataTypes.Category)
+addCategory conn (h, account, r) = undefined
+
+{--
 addCategory ::
   SQL.Connection ->
   (News.Handle IO, DataTypes.Account, DataTypes.CreateCategoryRequest) ->
@@ -126,3 +134,4 @@ addCategoryToDb conn h DataTypes.CreateCategoryRequest {..} = do
       EX.throwE $
         ErrorTypes.AddEditCategorySQLRequestError $
           ErrorTypes.SQLRequestError []
+--}

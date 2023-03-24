@@ -9,6 +9,7 @@ import Control.Monad.Trans.Class (MonadTrans (lift))
 import qualified Control.Monad.Trans.Except as EX
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base64 as Base64
+import qualified Data.Pool as POOL
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
@@ -43,6 +44,13 @@ addOneNews h DataTypes.Db {..} user createNewsReq =
     ToHttpResponse.toHttpResponse
 
 addNews ::
+  DataTypes.StatePool ->
+  (News.Handle IO, DataTypes.Account, DataTypes.CreateNewsRequest) ->
+  IO (Either ErrorTypes.AddEditNewsError DataTypes.News)
+addNews conn (h, account, r) = undefined
+
+{--
+addNews ::
   SQL.Connection ->
   (News.Handle IO, DataTypes.Account, DataTypes.CreateNewsRequest) ->
   IO (Either ErrorTypes.AddEditNewsError DataTypes.News)
@@ -63,7 +71,7 @@ addNewsExcept _ (h, account, r) = do
   categories' <- checkCategoryId conn h r
   newsId' <- getNewsId conn h
   images' <- addAllImages conn h r
-  addNewsToDB conn h user categories' r newsId' images' --}
+  addNewsToDB conn h user categories' r newsId' images'
 
 checkImageFilesExist ::
   News.Handle IO ->
@@ -269,3 +277,5 @@ addNewsToDB conn h DataTypes.User {..} categories DataTypes.CreateNewsRequest {.
           )
       EX.throwE $
         ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
+
+--}

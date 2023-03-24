@@ -9,6 +9,7 @@ import Control.Monad.Trans.Class (MonadTrans (lift))
 import qualified Control.Monad.Trans.Except as EX
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base64 as Base64
+import qualified Data.Pool as POOL
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
@@ -37,6 +38,13 @@ addOneImage h DataTypes.Db {..} user createImageReq =
     (liftIO $ dbAddImage (h, user, createImageReq))
     ToHttpResponse.toHttpResponse
 
+addImage ::
+  DataTypes.StatePool ->
+  (News.Handle IO, DataTypes.Account, DataTypes.CreateImageRequest) ->
+  IO (Either ErrorTypes.AddImageError DataTypes.URI)
+addImage conn (h, account, createImage) = undefined
+
+{--
 addImage ::
   SQL.Connection ->
   (News.Handle IO, DataTypes.Account, DataTypes.CreateImageRequest) ->
@@ -160,3 +168,4 @@ addImageToDB conn h DataTypes.CreateImageRequest {..} im = do
                 )
           )
       EX.throwE $ ErrorTypes.AddImageSQLRequestError $ ErrorTypes.SQLRequestError []
+--}

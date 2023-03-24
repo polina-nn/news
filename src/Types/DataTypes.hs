@@ -5,8 +5,10 @@ module Types.DataTypes where
 
 import qualified Data.Aeson as A
 import qualified Data.ByteString as B
+import qualified Data.Pool as POOL
 import qualified Data.Text as T
 import qualified Data.Time as TIME
+import qualified Database.PostgreSQL.Simple as SQL
 import GHC.Generics (Generic)
 import qualified News
 import Servant.API (FromHttpApiData (parseQueryParam))
@@ -17,6 +19,8 @@ import qualified Types.ErrorTypes as ErrorTypes
 newtype Handle = Handle
   { hServerHandle :: News.Handle IO
   }
+
+type StatePool = POOL.Pool SQL.Connection
 
 --- | We need to specify the data returned after authentication
 type instance AuthServerData (AuthProtect "cookie-auth") = Account

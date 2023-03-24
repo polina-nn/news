@@ -6,6 +6,7 @@ where
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Control.Monad.Trans.Except as EX
+import qualified Data.Pool as POOL
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
@@ -38,6 +39,18 @@ getAuthorsNewsSearchList h DataTypes.Db {..} user search' mo ml =
     (liftIO $ dbAuthorsNewsSearchList (h, user, search', mo, ml))
     ToHttpResponse.toHttpResponse
 
+authorsNewsSearchList ::
+  DataTypes.StatePool ->
+  ( News.Handle IO,
+    DataTypes.Account,
+    Maybe T.Text,
+    Maybe DataTypes.Offset,
+    Maybe DataTypes.Limit
+  ) ->
+  IO (Either ErrorTypes.GetNewsError [DataTypes.News])
+authorsNewsSearchList conn (h, account, search, mo, ml) = undefined
+
+{--
 authorsNewsSearchList ::
   SQL.Connection ->
   ( News.Handle IO,
@@ -90,8 +103,9 @@ authorsNewsSearchListFromDb conn _ DataTypes.User {..} search off lim = do
             FROM news
             INNER JOIN usr ON news.news_author_login = usr.usr_login INNER JOIN category ON news.news_category_id = category.category_id
             where ((news_published = true) or (news_author_login = ? )) and (to_tsvector(news_title) || to_tsvector(usr_name) || to_tsvector(category_name) || to_tsvector(news_text) @@ plainto_tsquery(?))
-            ORDER BY news_created DESC 
+            ORDER BY news_created DESC
             LIMIT ?  OFFSET ? |]
         (userLogin, search, show lim, show off)
   let dbNews = Prelude.map News.toDbNews res
   return dbNews
+--}

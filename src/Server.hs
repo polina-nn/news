@@ -26,7 +26,7 @@ import qualified EndPoints.GetNewsSearchList as GetNewsSearchList
 import qualified EndPoints.GetOneImage as GetOneImage
 import qualified EndPoints.GetUserList as GetUserList
 import qualified EndPoints.Lib.LibIO as LibIO
-import Logger (logDebug, (.<))
+import Logger (logDebug, logError, (.<))
 import Network.Wai (Request, requestHeaders)
 import qualified Network.Wai.Handler.Warp
 import qualified News
@@ -103,11 +103,18 @@ authHandlerConn h conn = mkAuthHandler handler
       maybeToEither "Missing token in cookie" $ lookup "servant-auth-cookie" $ parseCookies cookie
 
 lookupAccount :: News.Handle IO -> POOL.Pool SQL.Connection -> ByteString -> Handler DataTypes.Account
-lookupAccount h conns key = do
-  account <- liftIO $ EX.runExceptT $ POOL.withResource conns . flip LibIO.searchAccount $ (h, key)
+lookupAccount h pool key = do
+  account <- liftIO $ EX.runExceptT $ POOL.withResource pool . flip LibIO.searchAccount $ (h, key)
   case account of
     Left (ErrorTypes.ServerAuthErrorSQLRequestError a) -> throwError err500 {errReasonPhrase = show a}
     Left (ErrorTypes.ServerAuthErrorInvalidCookie a) -> throwError err403 {errReasonPhrase = show a}
     Right acc -> do
       liftIO $ Logger.logDebug (News.hLogHandle h) $ "lookupAccount = " .< acc
       return acc
+
+{--
+withPool :: (Connection -> IO a) -> ReaderT Environment IO a
+withPool f = do
+  pool <- asks dbPool
+  lift $ withResource pool f
+--}

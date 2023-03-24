@@ -7,6 +7,7 @@ where
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Control.Monad.Trans.Except as EX
 import qualified Data.ByteString as B
+import qualified Data.Pool as POOL
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified DbConnect
@@ -21,6 +22,13 @@ getOneImage :: News.Handle IO -> DataTypes.Db -> Integer -> Handler B.ByteString
 getOneImage h DataTypes.Db {..} idImage =
   (>>=) (liftIO $ dbOneImage (h, idImage)) ToHttpResponse.toHttpResponse
 
+oneImage ::
+  DataTypes.StatePool ->
+  (News.Handle IO, Integer) ->
+  IO (Either ErrorTypes.GetImageError B.ByteString)
+oneImage _ (h, id') = undefined
+
+{--
 oneImage ::
   SQL.Connection ->
   (News.Handle IO, Integer) ->
@@ -66,3 +74,4 @@ checkId conn (h', id') = do
     else do
       liftIO $ Logger.logError (News.hLogHandle h') ("ERROR " .< ErrorTypes.InvalidImagedId (ErrorTypes.InvalidId "checkId: BAD! Image not exist"))
       EX.throwE $ ErrorTypes.InvalidImagedId $ ErrorTypes.InvalidId []
+--}

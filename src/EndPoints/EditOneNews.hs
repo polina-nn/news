@@ -9,6 +9,7 @@ import Control.Monad.Trans.Class (MonadTrans (lift))
 import qualified Control.Monad.Trans.Except as EX
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base64 as Base64
+import qualified Data.Pool as POOL
 import qualified Data.Text as T
 import qualified Data.Time as TIME
 import qualified Database.PostgreSQL.Simple as SQL
@@ -47,6 +48,13 @@ editOneNews h DataTypes.Db {..} user catId r =
   (>>=) (liftIO $ dbEditNews (h, user, catId, r)) ToHttpResponse.toHttpResponse
 
 editNews ::
+  DataTypes.StatePool ->
+  (News.Handle IO, DataTypes.Account, IdNews, DataTypes.EditNewsRequest) ->
+  IO (Either ErrorTypes.AddEditNewsError DataTypes.News)
+editNews conn (h, account, newsId, r) = undefined
+
+{--
+editNews ::
   SQL.Connection ->
   (News.Handle IO, DataTypes.Account, IdNews, DataTypes.EditNewsRequest) ->
   IO (Either ErrorTypes.AddEditNewsError DataTypes.News)
@@ -56,15 +64,15 @@ editNewsExcept ::
   SQL.Connection ->
   (News.Handle IO, DataTypes.Account, IdNews, DataTypes.EditNewsRequest) ->
   EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.News
-editNewsExcept _ (h, account, newsId, r) = do
-  conn <- EX.withExceptT ErrorTypes.AddEditNewsSQLRequestError $ DbConnect.tryRequestConnectDb h
+editNewsExcept conn (h, account, newsId, r) = do
+  --conn <- EX.withExceptT ErrorTypes.AddEditNewsSQLRequestError $ DbConnect.tryRequestConnectDb h
   user <- EX.withExceptT ErrorTypes.AddEditNewsSQLRequestError (LibIO.searchUser h conn account)
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Edit One News \n", ToText.toText r, "with news id ", T.pack $ show newsId, "\nby user: ", ToText.toText user]
+  _ <- checkId conn h newsId
   _ <- checkUserThisNewsAuthor conn h user newsId
   _ <- checkImageFilesExist h r
   _ <- checkPngImages h r
   _ <- checkBase64Images h r
-  _ <- checkId conn h newsId
   _ <- checkCategoryId conn h r
   _ <- newTitle conn h newsId r
   _ <- newCatId conn h newsId r
@@ -308,8 +316,8 @@ getNews conn h user idNews categories imagesIds = do
     liftIO
       ( SQL.query
           conn
-          [sql| SELECT news_title , news_created, news_text,  news_published 
-                FROM news 
+          [sql| SELECT news_title , news_created, news_text,  news_published
+                FROM news
                 WHERE  news_id = ? |]
           (SQL.Only idNews) ::
           IO [(T.Text, TIME.Day, T.Text, Bool)]
@@ -488,3 +496,5 @@ checkBase64Images h r@DataTypes.EditNewsRequest {newImages = Just req} = do
       liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.NotBase64ImageAddEditNews (ErrorTypes.InvalidContent "checkBase64Image: BAD!"))
       EX.throwE $
         ErrorTypes.NotBase64ImageAddEditNews $ ErrorTypes.InvalidContent []
+
+--}

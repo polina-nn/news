@@ -7,6 +7,7 @@ where
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import qualified Control.Monad.Trans.Except as EX
+import qualified Data.Pool as POOL
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
@@ -37,6 +38,14 @@ editOneCategory h DataTypes.Db {..} user catId r =
     ToHttpResponse.toHttpResponse
 
 editCategory ::
+  DataTypes.StatePool ->
+  (News.Handle IO, DataTypes.Account, Int, DataTypes.EditCategoryRequest) ->
+  IO (Either ErrorTypes.AddEditCategoryError DataTypes.Category)
+editCategory conn (h, account, catId, r) = undefined
+
+{--
+
+editCategory ::
   SQL.Connection ->
   (News.Handle IO, DataTypes.Account, Int, DataTypes.EditCategoryRequest) ->
   IO (Either ErrorTypes.AddEditCategoryError DataTypes.Category)
@@ -48,10 +57,10 @@ editCategoryExcept ::
   EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.Category
 editCategoryExcept _ (h, account, catId, r) = do
   conn <- EX.withExceptT ErrorTypes.AddEditCategorySQLRequestError $ DbConnect.tryRequestConnectDb h
+  _ <- checkId conn h catId
   user <- EX.withExceptT ErrorTypes.AddEditCategorySQLRequestError (LibIO.searchUser h conn account)
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Edit Category: \n", ToText.toText r, "with category id ", T.pack $ show catId, "\nby user: ", ToText.toText user]
   _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditCategory (Lib.checkUserAdmin h user)
-  _ <- checkId conn h catId
   _ <- checkSyntaxPath h r
   categories <- CategoryIO.getAllCategories conn
   editCategoryFullRequest <- Category.checkLogicPathForEditCategory h catId r categories
@@ -62,7 +71,7 @@ editCategoryExcept _ (h, account, catId, r) = do
       EX.throwE $ ErrorTypes.InvalidValuePath $ ErrorTypes.InvalidContent []
     Just toChangePaths -> do
       _ <- CategoryIO.changePathCategories conn h toChangePaths
-      editCategoryName conn h editCategoryFullRequest --}
+      editCategoryName conn h editCategoryFullRequest
 
 -- | checkIdIO  - check if there is a record with the given category id in the database ( id = 7 in http://localhost:8080/category/7 )
 checkId ::
@@ -153,3 +162,4 @@ editCategoryName conn h CategoryHelpTypes.EditCategoryFullRequest {..} = do
       EX.throwE $
         ErrorTypes.AddEditCategorySQLRequestError $
           ErrorTypes.SQLRequestError []
+--}

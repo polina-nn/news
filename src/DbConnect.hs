@@ -20,6 +20,7 @@ tryInitConnectDb h = do
   case res of
     Left e -> do
       Logger.logError (News.hLogHandle h) "tryInitConnectDb: BAD, not connection to the Data Base"
+      putStrLn $ "tryInitConnectDb: BAD, not connection to the Data Base " ++ show e
       EXS.throw (ExceptionTypes.DbNotConnect e)
     Right conn -> do
       Logger.logDebug (News.hLogHandle h) "tryInitConnectDb: OK "

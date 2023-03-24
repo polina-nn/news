@@ -7,6 +7,7 @@ where
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Control.Monad.Trans.Except as EX
 import Data.Maybe (fromMaybe, isJust)
+import qualified Data.Pool as POOL
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
@@ -46,6 +47,19 @@ getAuthorsNewsList h DataTypes.Db {..} user da du ds ar i t c mSort mo ml =
     filter' :: DataTypes.Filter
     filter' = News.toFilter da du ds ar i t c
 
+authorsNewsList ::
+  DataTypes.StatePool ->
+  ( News.Handle IO,
+    DataTypes.Account,
+    DataTypes.Filter,
+    Maybe DataTypes.SortBy,
+    Maybe DataTypes.Offset,
+    Maybe DataTypes.Limit
+  ) ->
+  IO (Either ErrorTypes.GetNewsError [DataTypes.News])
+authorsNewsList conn (h, account, f, mSort, mo, ml) = undefined
+
+{--
 authorsNewsList ::
   SQL.Connection ->
   ( News.Handle IO,
@@ -109,13 +123,13 @@ authorsNewsListCategory conn DataTypes.User {..} off lim NewsHelpTypes.DbFilter 
         [sql| SELECT news_title, news_created, usr_name, category_path, category_name, news_text, news_images_id, cardinality (news_images_id), news_published, news_id
             FROM news
             INNER JOIN usr ON news.news_author_login = usr.usr_login INNER JOIN category ON news.news_category_id = category.category_id
-            WHERE ((news_published = true) OR (news_author_login = ? )) 
-            AND (news_created = ? OR news_created < ? OR news_created > ?) 
+            WHERE ((news_published = true) OR (news_author_login = ? ))
+            AND (news_created = ? OR news_created < ? OR news_created > ?)
             AND usr_name LIKE ?
             AND news_title LIKE ?
             AND news_text LIKE ?
             AND news_category_id = ?
-            ORDER BY news_created DESC 
+            ORDER BY news_created DESC
             LIMIT ?  OFFSET ?|]
         ( userLogin,
           dbFilterDayAt,
@@ -148,12 +162,12 @@ authorsNewsListNotCategory conn DataTypes.User {..} off lim NewsHelpTypes.DbFilt
         [sql| SELECT news_title, news_created, usr_name, category_path, category_name, news_text, news_images_id, cardinality (news_images_id), news_published , news_id
             FROM news
             INNER JOIN usr ON news.news_author_login = usr.usr_login INNER JOIN category ON news.news_category_id = category.category_id
-            WHERE ((news_published = true) OR (news_author_login = ? )) 
-            AND (news_created = ? OR news_created < ? OR news_created > ?) 
+            WHERE ((news_published = true) OR (news_author_login = ? ))
+            AND (news_created = ? OR news_created < ? OR news_created > ?)
             AND usr_name LIKE ?
             AND news_title LIKE ?
             AND news_text LIKE ?
-            ORDER BY news_created DESC 
+            ORDER BY news_created DESC
             LIMIT ?  OFFSET ?|]
         ( userLogin,
           dbFilterDayAt,
@@ -167,3 +181,4 @@ authorsNewsListNotCategory conn DataTypes.User {..} off lim NewsHelpTypes.DbFilt
         )
   let dbNews = Prelude.map News.toDbNews res
   return dbNews
+--}

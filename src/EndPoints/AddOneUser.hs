@@ -6,6 +6,7 @@ where
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Control.Monad.Trans.Except as EX
+import qualified Data.Pool as POOL
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
@@ -31,6 +32,13 @@ addOneUser h DataTypes.Db {..} user createUserReq =
     (liftIO $ dbAddUser (h, user, createUserReq))
     ToHttpResponse.toHttpResponse
 
+addUser ::
+  DataTypes.StatePool ->
+  (News.Handle IO, DataTypes.Account, DataTypes.CreateUserRequest) ->
+  IO (Either ErrorTypes.AddUserError DataTypes.User)
+addUser conn (h, account, req) = undefined
+
+{--
 addUser ::
   SQL.Connection ->
   (News.Handle IO, DataTypes.Account, DataTypes.CreateUserRequest) ->
@@ -142,3 +150,5 @@ addUserToDB conn h DataTypes.CreateUserRequest {..} = do
     _ -> do
       liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.AddUserSQLRequestError (ErrorTypes.SQLRequestError "addUserToDB! Don't INSERT INTO  user table"))
       EX.throwE $ ErrorTypes.AddUserSQLRequestError $ ErrorTypes.SQLRequestError []
+
+--}

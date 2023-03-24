@@ -29,7 +29,7 @@ import qualified News
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ExceptionTypes as ExceptionTypes
 
-initConnPool :: DataTypes.Handle -> IO (POOL.Pool SQL.Connection)
+initConnPool :: DataTypes.Handle -> IO DataTypes.StatePool
 initConnPool h = do
   conn <- EXS.catch (DbConnect.tryInitConnectDb (DataTypes.hServerHandle h)) (ExceptionTypes.handleException (DataTypes.hServerHandle h))
   POOL.createPool (pure conn) SQL.close noOfStripes' (realToFrac idleTime') stripeSize'
@@ -37,6 +37,44 @@ initConnPool h = do
     noOfStripes' = News.noOfStripes (News.hDbConfig (DataTypes.hServerHandle h))
     idleTime' = News.idleTime (News.hDbConfig (DataTypes.hServerHandle h))
     stripeSize' = News.stripeSize (News.hDbConfig (DataTypes.hServerHandle h))
+
+createDb :: DataTypes.StatePool -> DataTypes.Db
+createDb pool =
+  DataTypes.Db
+    { dbAddUser = AddOneUser.addUser pool,
+      dbAddCategory = AddOneCategory.addCategory pool,
+      dbAddNews = AddOneNews.addNews pool,
+      dbAddImage = AddOneImage.addImage pool,
+      dbEditCategory = EditOneCategory.editCategory pool,
+      dbEditNews = EditOneNews.editNews pool,
+      dbAuthorsNewsList = GetAuthorsNewsList.authorsNewsList pool,
+      dbAuthorsNewsSearchList =
+        GetAuthorsNewsSearchList.authorsNewsSearchList pool,
+      dbUserList = GetUserList.userList pool,
+      dbOneImage = GetOneImage.oneImage pool,
+      dbCategoryList = GetCategoryList.categoryList pool,
+      dbNewsList = GetNewsList.newsList pool,
+      dbNewsSearchList = GetNewsSearchList.newsSearchList pool
+    }
+
+withPool :: DataTypes.Handle -> (DataTypes.StatePool -> IO c) -> IO c
+withPool h = EXS.bracket (initConnPool h) POOL.destroyAllResources
+
+{--
+withPool :: Config -> (State -> IO a) -> IO a
+withPool cfg action =
+  bracket initPool cleanPool action
+where
+    initPool = createPool openConn closeConn
+                (configStripeCount cfg)
+                (configIdleConnTimeout cfg)
+                (configMaxOpenConnPerStripe cfg)
+    cleanPool = destroyAllResources
+    openConn = connectPostgreSQL (configUrl cfg)
+    closeConn = close
+--
+-- where
+--   withConnPool = POOL.withResource pool
 
 createDb :: POOL.Pool SQL.Connection -> DataTypes.Db
 createDb pool =
@@ -58,6 +96,7 @@ createDb pool =
     }
   where
     withConnPool = POOL.withResource pool
+    --}
 
 migrateDb :: SQL.Connection -> (News.Handle IO, String) -> IO ()
 migrateDb conn (h, xs) = do
