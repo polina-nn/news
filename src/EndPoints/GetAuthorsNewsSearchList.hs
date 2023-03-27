@@ -9,7 +9,6 @@ import qualified Control.Monad.Trans.Except as EX
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
-import qualified DbConnect
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.LibIO as LibIO
 import qualified EndPoints.Lib.News.News as News
@@ -28,7 +27,7 @@ import qualified Types.ErrorTypes as ErrorTypes
 getAuthorsNewsSearchList ::
   News.Handle IO ->
   DataTypes.Db ->
-  DataTypes.Account ->
+  DataTypes.Token ->
   Maybe T.Text ->
   Maybe DataTypes.Offset ->
   Maybe DataTypes.Limit ->
@@ -41,18 +40,18 @@ getAuthorsNewsSearchList h DataTypes.Db {..} user search' mo ml =
 authorsNewsSearchList ::
   SQL.Connection ->
   ( News.Handle IO,
-    DataTypes.Account,
+    DataTypes.Token,
     Maybe T.Text,
     Maybe DataTypes.Offset,
     Maybe DataTypes.Limit
   ) ->
   IO (Either ErrorTypes.GetNewsError [DataTypes.News])
-authorsNewsSearchList conn (h, account, search, mo, ml) = do EX.runExceptT $ authorsNewsSearchListExcept conn (h, account, search, mo, ml)
+authorsNewsSearchList conn (h, token, search, mo, ml) = do EX.runExceptT $ authorsNewsSearchListExcept conn (h, token, search, mo, ml)
 
 authorsNewsSearchListExcept ::
   SQL.Connection ->
   ( News.Handle IO,
-    DataTypes.Account,
+    DataTypes.Token,
     Maybe T.Text,
     Maybe DataTypes.Offset,
     Maybe DataTypes.Limit
@@ -61,9 +60,8 @@ authorsNewsSearchListExcept ::
 authorsNewsSearchListExcept _ (h, _, Nothing, _, _) = do
   liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidSearchGetNews (ErrorTypes.InvalidRequest "authorsNewsSearchListExcept: BAD! Not text for searching \n"))
   EX.throwE $ ErrorTypes.InvalidSearchGetNews $ ErrorTypes.InvalidRequest []
-authorsNewsSearchListExcept _ (h, account, Just search, mo, ml) = do
-  conn <- EX.withExceptT ErrorTypes.GetNewsSQLRequestError $ DbConnect.tryRequestConnectDb h
-  user <- EX.withExceptT ErrorTypes.GetNewsSQLRequestError (LibIO.searchUser h conn account)
+authorsNewsSearchListExcept conn (h, token, Just search, mo, ml) = do
+  user <- EX.withExceptT ErrorTypes.GetNewsSQLRequestError (LibIO.searchUser h conn token)
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request with authentication: Get News Search List ", search, " offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
   _ <- EX.withExceptT ErrorTypes.InvalidPermissionGetNews (Lib.checkUserAuthor h user)
   (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetNews $ OffsetLimit.checkOffsetLimit h mo ml

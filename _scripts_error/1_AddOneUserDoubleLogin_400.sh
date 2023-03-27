@@ -1,5 +1,6 @@
 #!/bin/sh
-curl -i --user polina:polina \
+curl -i  \
+--header "Cookie: servant-auth-cookie=keypolina" \
 --header "Content-Type: application/json"   \
 --request POST   \
 --data '{"name":"user", "login":"user", "password":"user", "admin": false, "author": false }' \

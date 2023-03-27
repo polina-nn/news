@@ -5,12 +5,15 @@ module Server
   )
 where
 
+import qualified Control.Exception.Safe as EXS
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Control.Monad.Trans.Except as EX
 import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as BSC8
 import qualified Data.Pool as POOL
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
+import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified DbServices
 import qualified EndPoints.AddOneCategory as AddOneCategory
 import qualified EndPoints.AddOneImage as AddOneImage
@@ -25,8 +28,8 @@ import qualified EndPoints.GetNewsList as GetNewsList
 import qualified EndPoints.GetNewsSearchList as GetNewsSearchList
 import qualified EndPoints.GetOneImage as GetOneImage
 import qualified EndPoints.GetUserList as GetUserList
-import qualified EndPoints.Lib.LibIO as LibIO
-import Logger (logDebug, (.<))
+import qualified EndPoints.Lib.Lib as Lib
+import Logger (logDebug, logError, (.<))
 import Network.Wai (Request, requestHeaders)
 import qualified Network.Wai.Handler.Warp
 import qualified News
@@ -85,29 +88,53 @@ app :: News.Handle IO -> POOL.Pool SQL.Connection -> Application
 app h connPool =
   serveWithContext Server.serviceApi genAuthServerContext $ Server.server h $ DbServices.createDb connPool
   where
-    genAuthServerContext :: Context (AuthHandler Request DataTypes.Account ': '[])
+    genAuthServerContext :: Context (AuthHandler Request DataTypes.Token ': '[])
     genAuthServerContext = authHandler :. EmptyContext
     authHandler = authHandlerConn h connPool
 
 authHandlerConn ::
   News.Handle IO ->
   POOL.Pool SQL.Connection ->
-  AuthHandler Request DataTypes.Account
+  AuthHandler Request DataTypes.Token
 authHandlerConn h conn = mkAuthHandler handler
   where
     maybeToEither e = maybe (Left e) Right
     throw401 msg = throwError $ err401 {errBody = msg}
-    handler :: Request -> Handler DataTypes.Account
-    handler req = either throw401 (lookupAccount h conn) $ do
+    handler :: Request -> Handler DataTypes.Token
+    handler req = either throw401 (lookupToken h conn) $ do
       cookie <- maybeToEither "Missing cookie header" $ lookup "cookie" $ requestHeaders req
       maybeToEither "Missing token in cookie" $ lookup "servant-auth-cookie" $ parseCookies cookie
 
-lookupAccount :: News.Handle IO -> POOL.Pool SQL.Connection -> ByteString -> Handler DataTypes.Account
-lookupAccount h conns key = do
-  account <- liftIO $ EX.runExceptT $ POOL.withResource conns . flip LibIO.searchAccount $ (h, key)
-  case account of
+lookupToken :: News.Handle IO -> POOL.Pool SQL.Connection -> ByteString -> Handler DataTypes.Token
+lookupToken h conns key = do
+  token <- liftIO $ EX.runExceptT $ POOL.withResource conns . flip lookupTokenDB $ (h, key)
+  case token of
     Left (ErrorTypes.ServerAuthErrorSQLRequestError a) -> throwError err500 {errReasonPhrase = show a}
-    Left (ErrorTypes.ServerAuthErrorInvalidCookie a) -> throwError err403 {errReasonPhrase = show a}
-    Right acc -> do
-      liftIO $ Logger.logDebug (News.hLogHandle h) $ "lookupAccount = " .< acc
-      return acc
+    Left (ErrorTypes.ServerAuthErrorInvalidToken a) -> throwError err403 {errReasonPhrase = show a}
+    Right value -> return value
+
+lookupTokenDB :: SQL.Connection -> (News.Handle IO, ByteString) -> EX.ExceptT ErrorTypes.ServerAuthError IO DataTypes.Token
+lookupTokenDB conn (h, t) = do
+  let token = Lib.hashed $ BSC8.unpack t
+  res <-
+    liftIO
+      ( EXS.try $
+          SQL.query
+            conn
+            [sql| SELECT EXISTS  (SELECT  token_key FROM token WHERE token_key = ?) |]
+            (SQL.Only token) ::
+          IO (Either SQL.SqlError [SQL.Only Bool])
+      )
+  case res of
+    Left err -> do
+      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.SQLRequestError ("lookupTokenDB: BAD!" <> show err))
+      EX.throwE $ ErrorTypes.ServerAuthErrorSQLRequestError $ ErrorTypes.SQLRequestError []
+    Right [SQL.Only True] -> do
+      liftIO $ Logger.logDebug (News.hLogHandle h) "lookupTokenDB: OK! Token exist "
+      return DataTypes.Token {..}
+    Right [SQL.Only False] -> do
+      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidToken "lookupTokenDB: BAD! Token not exist")
+      EX.throwE $ ErrorTypes.ServerAuthErrorInvalidToken $ ErrorTypes.InvalidToken []
+    Right _ -> do
+      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.SQLRequestError "lookupTokenDB: BAD! Developer error! ")
+      EX.throwE $ ErrorTypes.ServerAuthErrorSQLRequestError $ ErrorTypes.SQLRequestError []

@@ -14,7 +14,6 @@ import qualified Data.Time as TIME
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified Database.PostgreSQL.Simple.Types as SQLTypes
-import qualified DbConnect
 import qualified EndPoints.Lib.Category.Category as Category
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.LibIO as LibIO
@@ -39,7 +38,7 @@ type CategoryPath = String
 editOneNews ::
   News.Handle IO ->
   DataTypes.Db ->
-  DataTypes.Account ->
+  DataTypes.Token ->
   IdNews ->
   DataTypes.EditNewsRequest ->
   Handler DataTypes.News
@@ -48,17 +47,16 @@ editOneNews h DataTypes.Db {..} user catId r =
 
 editNews ::
   SQL.Connection ->
-  (News.Handle IO, DataTypes.Account, IdNews, DataTypes.EditNewsRequest) ->
+  (News.Handle IO, DataTypes.Token, IdNews, DataTypes.EditNewsRequest) ->
   IO (Either ErrorTypes.AddEditNewsError DataTypes.News)
-editNews conn (h, account, newsId, r) = do EX.runExceptT $ editNewsExcept conn (h, account, newsId, r)
+editNews conn (h, token, newsId, r) = do EX.runExceptT $ editNewsExcept conn (h, token, newsId, r)
 
 editNewsExcept ::
   SQL.Connection ->
-  (News.Handle IO, DataTypes.Account, IdNews, DataTypes.EditNewsRequest) ->
+  (News.Handle IO, DataTypes.Token, IdNews, DataTypes.EditNewsRequest) ->
   EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.News
-editNewsExcept _ (h, account, newsId, r) = do
-  conn <- EX.withExceptT ErrorTypes.AddEditNewsSQLRequestError $ DbConnect.tryRequestConnectDb h
-  user <- EX.withExceptT ErrorTypes.AddEditNewsSQLRequestError (LibIO.searchUser h conn account)
+editNewsExcept conn (h, token, newsId, r) = do
+  user <- EX.withExceptT ErrorTypes.AddEditNewsSQLRequestError (LibIO.searchUser h conn token)
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Edit One News \n", ToText.toText r, "with news id ", T.pack $ show newsId, "\nby user: ", ToText.toText user]
   _ <- checkUserThisNewsAuthor conn h user newsId
   _ <- checkImageFilesExist h r

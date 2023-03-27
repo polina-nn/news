@@ -1,5 +1,6 @@
 #!/bin/sh
-curl -i --user user:user \
+curl -i \
+--header "Cookie: servant-auth-cookie=keyuser" \
 --header "Content-Type: application/json"   \
 --request POST   \
 --data '{"file":"white", "format":"png","image": "./_images/white_base64" }' \

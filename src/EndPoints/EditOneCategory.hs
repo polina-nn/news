@@ -10,7 +10,6 @@ import qualified Control.Monad.Trans.Except as EX
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
-import qualified DbConnect
 import qualified EndPoints.Lib.Category.Category as Category
 import qualified EndPoints.Lib.Category.CategoryHelpTypes as CategoryHelpTypes
 import qualified EndPoints.Lib.Category.CategoryIO as CategoryIO
@@ -27,7 +26,7 @@ import qualified Types.ErrorTypes as ErrorTypes
 editOneCategory ::
   News.Handle IO ->
   DataTypes.Db ->
-  DataTypes.Account ->
+  DataTypes.Token ->
   Int ->
   DataTypes.EditCategoryRequest ->
   Handler DataTypes.Category
@@ -38,17 +37,16 @@ editOneCategory h DataTypes.Db {..} user catId r =
 
 editCategory ::
   SQL.Connection ->
-  (News.Handle IO, DataTypes.Account, Int, DataTypes.EditCategoryRequest) ->
+  (News.Handle IO, DataTypes.Token, Int, DataTypes.EditCategoryRequest) ->
   IO (Either ErrorTypes.AddEditCategoryError DataTypes.Category)
-editCategory conn (h, account, catId, r) = EX.runExceptT $ editCategoryExcept conn (h, account, catId, r)
+editCategory conn (h, token, catId, r) = EX.runExceptT $ editCategoryExcept conn (h, token, catId, r)
 
 editCategoryExcept ::
   SQL.Connection ->
-  (News.Handle IO, DataTypes.Account, Int, DataTypes.EditCategoryRequest) ->
+  (News.Handle IO, DataTypes.Token, Int, DataTypes.EditCategoryRequest) ->
   EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.Category
-editCategoryExcept _ (h, account, catId, r) = do
-  conn <- EX.withExceptT ErrorTypes.AddEditCategorySQLRequestError $ DbConnect.tryRequestConnectDb h
-  user <- EX.withExceptT ErrorTypes.AddEditCategorySQLRequestError (LibIO.searchUser h conn account)
+editCategoryExcept conn (h, token, catId, r) = do
+  user <- EX.withExceptT ErrorTypes.AddEditCategorySQLRequestError (LibIO.searchUser h conn token)
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Edit Category: \n", ToText.toText r, "with category id ", T.pack $ show catId, "\nby user: ", ToText.toText user]
   _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditCategory (Lib.checkUserAdmin h user)
   _ <- checkId conn h catId

@@ -10,7 +10,6 @@ import qualified Control.Monad.Trans.Except as EX
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
-import qualified DbConnect
 import qualified EndPoints.Lib.Category.Category as Category
 import qualified EndPoints.Lib.Category.CategoryIO as CategoryIO
 import qualified EndPoints.Lib.Lib as Lib
@@ -26,7 +25,7 @@ import qualified Types.ErrorTypes as ErrorTypes
 addOneCategory ::
   News.Handle IO ->
   DataTypes.Db ->
-  DataTypes.Account ->
+  DataTypes.Token ->
   DataTypes.CreateCategoryRequest ->
   Handler DataTypes.Category
 addOneCategory h DataTypes.Db {..} user createCategoryReq =
@@ -36,18 +35,17 @@ addOneCategory h DataTypes.Db {..} user createCategoryReq =
 
 addCategory ::
   SQL.Connection ->
-  (News.Handle IO, DataTypes.Account, DataTypes.CreateCategoryRequest) ->
+  (News.Handle IO, DataTypes.Token, DataTypes.CreateCategoryRequest) ->
   IO (Either ErrorTypes.AddEditCategoryError DataTypes.Category)
-addCategory conn (h, account, r) = EX.runExceptT $ addCategoryExcept conn (h, account, r)
+addCategory conn (h, token, r) = EX.runExceptT $ addCategoryExcept conn (h, token, r)
 
 addCategoryExcept ::
   SQL.Connection ->
-  (News.Handle IO, DataTypes.Account, DataTypes.CreateCategoryRequest) ->
+  (News.Handle IO, DataTypes.Token, DataTypes.CreateCategoryRequest) ->
   EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.Category
-addCategoryExcept _ (h, account, r) =
+addCategoryExcept conn (h, token, r) =
   do
-    conn <- EX.withExceptT ErrorTypes.AddEditCategorySQLRequestError $ DbConnect.tryRequestConnectDb h
-    user <- EX.withExceptT ErrorTypes.AddEditCategorySQLRequestError (LibIO.searchUser h conn account)
+    user <- EX.withExceptT ErrorTypes.AddEditCategorySQLRequestError (LibIO.searchUser h conn token)
     liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add Category: \n", ToText.toText r, "by user: ", ToText.toText user]
     _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditCategory (Lib.checkUserAdmin h user)
     _ <- checkSyntaxPath h r

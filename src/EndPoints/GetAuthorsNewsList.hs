@@ -10,7 +10,6 @@ import Data.Maybe (fromMaybe, isJust)
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
-import qualified DbConnect
 import qualified EndPoints.Lib.LibIO as LibIO
 import qualified EndPoints.Lib.News.News as News
 import qualified EndPoints.Lib.News.NewsHelpTypes as NewsHelpTypes
@@ -26,7 +25,7 @@ import qualified Types.ErrorTypes as ErrorTypes
 getAuthorsNewsList ::
   News.Handle IO ->
   DataTypes.Db ->
-  DataTypes.Account ->
+  DataTypes.Token ->
   Maybe DataTypes.DayAt ->
   Maybe DataTypes.DayUntil ->
   Maybe DataTypes.DaySince ->
@@ -49,28 +48,27 @@ getAuthorsNewsList h DataTypes.Db {..} user da du ds ar i t c mSort mo ml =
 authorsNewsList ::
   SQL.Connection ->
   ( News.Handle IO,
-    DataTypes.Account,
+    DataTypes.Token,
     DataTypes.Filter,
     Maybe DataTypes.SortBy,
     Maybe DataTypes.Offset,
     Maybe DataTypes.Limit
   ) ->
   IO (Either ErrorTypes.GetNewsError [DataTypes.News])
-authorsNewsList conn (h, account, f, mSort, mo, ml) = do EX.runExceptT $ authorsNewsListExcept conn (h, account, f, mSort, mo, ml)
+authorsNewsList conn (h, token, f, mSort, mo, ml) = do EX.runExceptT $ authorsNewsListExcept conn (h, token, f, mSort, mo, ml)
 
 authorsNewsListExcept ::
   SQL.Connection ->
   ( News.Handle IO,
-    DataTypes.Account,
+    DataTypes.Token,
     DataTypes.Filter,
     Maybe DataTypes.SortBy,
     Maybe DataTypes.Offset,
     Maybe DataTypes.Limit
   ) ->
   EX.ExceptT ErrorTypes.GetNewsError IO [DataTypes.News]
-authorsNewsListExcept _ (h, account, f, mSort, mo, ml) = do
-  conn <- EX.withExceptT ErrorTypes.GetNewsSQLRequestError $ DbConnect.tryRequestConnectDb h
-  user <- EX.withExceptT ErrorTypes.GetNewsSQLRequestError (LibIO.searchUser h conn account)
+authorsNewsListExcept conn (h, token, f, mSort, mo, ml) = do
+  user <- EX.withExceptT ErrorTypes.GetNewsSQLRequestError (LibIO.searchUser h conn token)
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request with authentication: Get News List with filter ", ToText.toText f, " offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
   (offset, limit, dbFiler) <- News.checkUserOffsetLimitFilter (h, user, f, mo, ml)
   dbNews <- authorsNewsListFromDb conn user offset limit dbFiler

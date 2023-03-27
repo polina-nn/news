@@ -88,20 +88,20 @@ instance Show SQLRequestError where
   show (SQLRequestError a) = show a
 
 -- | 9
--- | InvalidCookie  - Invalid Cookie
-newtype InvalidCookie
-  = InvalidCookie String
+-- | InvalidToken  - Invalid token
+newtype InvalidToken
+  = InvalidToken String
   deriving (Eq)
 
-instance Show InvalidCookie where
-  show (InvalidCookie []) = show error403
-  show (InvalidCookie a) = show a
+instance Show InvalidToken where
+  show (InvalidToken []) = show error403
+  show (InvalidToken a) = show a
 
 -------------------------------------------------------------
 
 -- | LIST OF ERRORS FOR SERVER Authentication
 data ServerAuthError
-  = ServerAuthErrorInvalidCookie InvalidCookie
+  = ServerAuthErrorInvalidToken InvalidToken
   | ServerAuthErrorSQLRequestError SQLRequestError
   deriving (Show, Eq)
 

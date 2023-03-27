@@ -12,7 +12,6 @@ import qualified Data.ByteString.Base64 as Base64
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
-import qualified DbConnect
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.LibIO as LibIO
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
@@ -29,7 +28,7 @@ type ImageDecodeBase64ByteString = B.ByteString
 addOneImage ::
   News.Handle IO ->
   DataTypes.Db ->
-  DataTypes.Account ->
+  DataTypes.Token ->
   DataTypes.CreateImageRequest ->
   Handler DataTypes.URI
 addOneImage h DataTypes.Db {..} user createImageReq =
@@ -39,17 +38,16 @@ addOneImage h DataTypes.Db {..} user createImageReq =
 
 addImage ::
   SQL.Connection ->
-  (News.Handle IO, DataTypes.Account, DataTypes.CreateImageRequest) ->
+  (News.Handle IO, DataTypes.Token, DataTypes.CreateImageRequest) ->
   IO (Either ErrorTypes.AddImageError DataTypes.URI)
-addImage conn (h, account, createImage) = EX.runExceptT $ addImageExcept conn (h, account, createImage)
+addImage conn (h, token, createImage) = EX.runExceptT $ addImageExcept conn (h, token, createImage)
 
 addImageExcept ::
   SQL.Connection ->
-  (News.Handle IO, DataTypes.Account, DataTypes.CreateImageRequest) ->
+  (News.Handle IO, DataTypes.Token, DataTypes.CreateImageRequest) ->
   EX.ExceptT ErrorTypes.AddImageError IO DataTypes.URI
-addImageExcept _ (h, account, createImage) = do
-  conn <- EX.withExceptT ErrorTypes.AddImageSQLRequestError $ DbConnect.tryRequestConnectDb h
-  user <- EX.withExceptT ErrorTypes.AddImageSQLRequestError (LibIO.searchUser h conn account)
+addImageExcept conn (h, token, createImage) = do
+  user <- EX.withExceptT ErrorTypes.AddImageSQLRequestError (LibIO.searchUser h conn token)
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add One Image ", ToText.toText createImage, "\nby user: ", ToText.toText user]
   _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddImage (Lib.checkUserAuthor h user)
   _ <- checkPngImage h createImage

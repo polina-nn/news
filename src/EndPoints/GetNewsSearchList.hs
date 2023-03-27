@@ -4,12 +4,14 @@ module EndPoints.GetNewsSearchList
   )
 where
 
+import qualified Control.Exception.Safe as EXS
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Control.Monad.Trans.Except as EX
 import qualified Data.Text as T
+import qualified Data.Time as TIME
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
-import qualified DbConnect
+import qualified Database.PostgreSQL.Simple.Types as SQLTypes
 import qualified EndPoints.Lib.News.News as News
 import qualified EndPoints.Lib.News.NewsHelpTypes as NewsHelpTypes
 import qualified EndPoints.Lib.News.NewsIO as NewsIO
@@ -55,10 +57,9 @@ newsSearchListExcept ::
 newsSearchListExcept _ (h, Nothing, _, _) = do
   liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidSearchGetNews (ErrorTypes.InvalidRequest "newsSearchListExcept: BAD! Not text for searching \n"))
   EX.throwE $ ErrorTypes.InvalidSearchGetNews $ ErrorTypes.InvalidRequest []
-newsSearchListExcept _ (h, Just search, mo, ml) = do
+newsSearchListExcept conn (h, Just search, mo, ml) = do
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Get News Search List ", search, " offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
   (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetNews $ OffsetLimit.checkOffsetLimit h mo ml
-  conn <- EX.withExceptT ErrorTypes.GetNewsSQLRequestError $ DbConnect.tryRequestConnectDb h
   res <- newsSearchListAtDb conn h search offset limit
   news <- Prelude.mapM (NewsIO.toNews conn h) res
   let toTextNews = T.concat $ map ToText.toText news
@@ -72,17 +73,25 @@ newsSearchListAtDb ::
   DataTypes.Offset ->
   DataTypes.Limit ->
   EX.ExceptT ErrorTypes.GetNewsError IO [NewsHelpTypes.DbNews]
-newsSearchListAtDb conn _ search off lim = do
+newsSearchListAtDb conn h search off lim = do
   res <-
-    liftIO $
-      SQL.query
-        conn
-        [sql| SELECT news_title, news_created, usr_name, category_path, category_name, news_text, news_images_id, cardinality (news_images_id), news_published, news_id
+    liftIO
+      ( EXS.try $
+          SQL.query
+            conn
+            [sql| SELECT news_title, news_created, usr_name, category_path, category_name, news_text, news_images_id, cardinality (news_images_id), news_published, news_id
             FROM news
             INNER JOIN usr ON news.news_author_login = usr.usr_login INNER JOIN category ON news.news_category_id = category.category_id
             where (news_published = true) and (to_tsvector(news_title) || to_tsvector(usr_name) || to_tsvector(category_name) || to_tsvector(news_text) @@ plainto_tsquery(?))
             ORDER BY news_created DESC 
             LIMIT ?  OFFSET ? |]
-        (search, show lim, show off)
-  let dbNews = Prelude.map News.toDbNews res
-  return dbNews
+            (search, show lim, show off) ::
+          IO (Either SQL.SqlError [(T.Text, TIME.Day, T.Text, String, T.Text, T.Text, SQLTypes.PGArray Int, Int, Bool, Int)])
+      )
+  case res of
+    Left err -> do
+      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.SQLRequestError ("newsSearchListAtDb: BAD!" <> show err))
+      EX.throwE $ ErrorTypes.GetNewsSQLRequestError $ ErrorTypes.SQLRequestError []
+    Right newsList -> do
+      let dbNews = Prelude.map News.toDbNews newsList
+      return dbNews
