@@ -4,16 +4,20 @@ module EndPoints.GetAuthorsNewsList
   )
 where
 
+import qualified Control.Exception.Safe as EXS
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Control.Monad.Trans.Except as EX
 import Data.Maybe (fromMaybe, isJust)
 import qualified Data.Text as T
+import qualified Data.Time as TIME
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
+import qualified Database.PostgreSQL.Simple.Types as SQLTypes
 import qualified EndPoints.Lib.LibIO as LibIO
 import qualified EndPoints.Lib.News.News as News
 import qualified EndPoints.Lib.News.NewsHelpTypes as NewsHelpTypes
 import qualified EndPoints.Lib.News.NewsIO as NewsIO
+import qualified EndPoints.Lib.ThrowSqlRequestError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
 import Logger (logDebug, logInfo)
@@ -71,7 +75,7 @@ authorsNewsListExcept conn (h, token, f, mSort, mo, ml) = do
   user <- EX.withExceptT ErrorTypes.GetNewsSQLRequestError (LibIO.searchUser h conn token)
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request with authentication: Get News List with filter ", ToText.toText f, " offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
   (offset, limit, dbFiler) <- News.checkUserOffsetLimitFilter (h, user, f, mo, ml)
-  dbNews <- authorsNewsListFromDb conn user offset limit dbFiler
+  dbNews <- authorsNewsListFromDb conn h user offset limit dbFiler
   sortedDbNews <- News.sortNews h mSort dbNews
   news <- Prelude.mapM (NewsIO.toNews conn h) sortedDbNews
   let toTextNews = T.concat $ map ToText.toText news
@@ -81,30 +85,33 @@ authorsNewsListExcept conn (h, token, f, mSort, mo, ml) = do
 -- | authorsNewsListFromDb  get the full list of news if the array is empty, there is no news
 authorsNewsListFromDb ::
   SQL.Connection ->
+  News.Handle IO ->
   DataTypes.User ->
   DataTypes.Offset ->
   DataTypes.Limit ->
   NewsHelpTypes.DbFilter ->
   EX.ExceptT ErrorTypes.GetNewsError IO [NewsHelpTypes.DbNews]
-authorsNewsListFromDb conn user mo ml f@NewsHelpTypes.DbFilter {..}
+authorsNewsListFromDb conn h user mo ml f@NewsHelpTypes.DbFilter {..}
   --  category specified in db_filer_category_id
-  | isJust dbFilterCategoryId = authorsNewsListCategory conn user mo ml f
+  | isJust dbFilterCategoryId = authorsNewsListCategory conn h user mo ml f
   -- category not specified
-  | otherwise = authorsNewsListNotCategory conn user mo ml f
+  | otherwise = authorsNewsListNotCategory conn h user mo ml f
 
 authorsNewsListCategory ::
   SQL.Connection ->
+  News.Handle IO ->
   DataTypes.User ->
   DataTypes.Offset ->
   DataTypes.Limit ->
   NewsHelpTypes.DbFilter ->
   EX.ExceptT ErrorTypes.GetNewsError IO [NewsHelpTypes.DbNews]
-authorsNewsListCategory conn DataTypes.User {..} off lim NewsHelpTypes.DbFilter {..} = do
+authorsNewsListCategory conn h DataTypes.User {..} off lim NewsHelpTypes.DbFilter {..} = do
   res <-
-    liftIO $
-      SQL.query
-        conn
-        [sql| SELECT news_title, news_created, usr_name, category_path, category_name, news_text, news_images_id, cardinality (news_images_id), news_published, news_id
+    liftIO
+      ( EXS.try $
+          SQL.query
+            conn
+            [sql| SELECT news_title, news_created, usr_name, category_path, category_name, news_text, news_images_id, cardinality (news_images_id), news_published, news_id
             FROM news
             INNER JOIN usr ON news.news_author_login = usr.usr_login INNER JOIN category ON news.news_category_id = category.category_id
             WHERE ((news_published = true) OR (news_author_login = ? )) 
@@ -115,35 +122,42 @@ authorsNewsListCategory conn DataTypes.User {..} off lim NewsHelpTypes.DbFilter 
             AND news_category_id = ?
             ORDER BY news_created DESC 
             LIMIT ?  OFFSET ?|]
-        ( userLogin,
-          dbFilterDayAt,
-          dbFilterDayUntil,
-          dbFilterDaySince,
-          dbFilterAuthor,
-          dbFilterTitle,
-          dbFilterContent,
-          newsCat,
-          lim,
-          off
-        )
-  let dbNews = Prelude.map News.toDbNews res
-  return dbNews
+            ( userLogin,
+              dbFilterDayAt,
+              dbFilterDayUntil,
+              dbFilterDaySince,
+              dbFilterAuthor,
+              dbFilterTitle,
+              dbFilterContent,
+              newsCat,
+              lim,
+              off
+            ) ::
+          IO (Either SQL.SqlError [(T.Text, TIME.Day, T.Text, String, T.Text, T.Text, SQLTypes.PGArray Int, Int, Bool, Int)])
+      )
+  case res of
+    Left err -> Throw.throwSqlRequestError h ("authorsNewsListCategory", show err)
+    Right news -> do
+      let dbNews = Prelude.map News.toDbNews news
+      return dbNews
   where
     newsCat = fromMaybe 0 dbFilterCategoryId
 
 authorsNewsListNotCategory ::
   SQL.Connection ->
+  News.Handle IO ->
   DataTypes.User ->
   DataTypes.Offset ->
   DataTypes.Limit ->
   NewsHelpTypes.DbFilter ->
   EX.ExceptT ErrorTypes.GetNewsError IO [NewsHelpTypes.DbNews]
-authorsNewsListNotCategory conn DataTypes.User {..} off lim NewsHelpTypes.DbFilter {..} = do
+authorsNewsListNotCategory conn h DataTypes.User {..} off lim NewsHelpTypes.DbFilter {..} = do
   res <-
-    liftIO $
-      SQL.query
-        conn
-        [sql| SELECT news_title, news_created, usr_name, category_path, category_name, news_text, news_images_id, cardinality (news_images_id), news_published , news_id
+    liftIO
+      ( EXS.try $
+          SQL.query
+            conn
+            [sql| SELECT news_title, news_created, usr_name, category_path, category_name, news_text, news_images_id, cardinality (news_images_id), news_published , news_id
             FROM news
             INNER JOIN usr ON news.news_author_login = usr.usr_login INNER JOIN category ON news.news_category_id = category.category_id
             WHERE ((news_published = true) OR (news_author_login = ? )) 
@@ -153,15 +167,20 @@ authorsNewsListNotCategory conn DataTypes.User {..} off lim NewsHelpTypes.DbFilt
             AND news_text LIKE ?
             ORDER BY news_created DESC 
             LIMIT ?  OFFSET ?|]
-        ( userLogin,
-          dbFilterDayAt,
-          dbFilterDayUntil,
-          dbFilterDaySince,
-          dbFilterAuthor,
-          dbFilterTitle,
-          dbFilterContent,
-          lim,
-          off
-        )
-  let dbNews = Prelude.map News.toDbNews res
-  return dbNews
+            ( userLogin,
+              dbFilterDayAt,
+              dbFilterDayUntil,
+              dbFilterDaySince,
+              dbFilterAuthor,
+              dbFilterTitle,
+              dbFilterContent,
+              lim,
+              off
+            ) ::
+          IO (Either SQL.SqlError [(T.Text, TIME.Day, T.Text, String, T.Text, T.Text, SQLTypes.PGArray Int, Int, Bool, Int)])
+      )
+  case res of
+    Left err -> Throw.throwSqlRequestError h ("authorsNewsListNotCategory", show err)
+    Right news -> do
+      let dbNews = Prelude.map News.toDbNews news
+      return dbNews

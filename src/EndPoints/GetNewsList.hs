@@ -16,9 +16,10 @@ import qualified Database.PostgreSQL.Simple.Types as SQLTypes
 import qualified EndPoints.Lib.News.News as News
 import qualified EndPoints.Lib.News.NewsHelpTypes as NewsHelpTypes
 import qualified EndPoints.Lib.News.NewsIO as NewsIO
+import qualified EndPoints.Lib.ThrowSqlRequestError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
-import Logger (logDebug, logError, logInfo, (.<))
+import Logger (logDebug, logInfo)
 import qualified News
 import Servant (Handler)
 import qualified Types.DataTypes as DataTypes
@@ -128,9 +129,7 @@ newsListCategory conn h off lim NewsHelpTypes.DbFilter {..} = do
           IO (Either SQL.SqlError [(T.Text, TIME.Day, T.Text, String, T.Text, T.Text, SQLTypes.PGArray Int, Int, Bool, Int)])
       )
   case res of
-    Left _ -> do
-      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.SQLRequestError "newsListCategory: BAD! Connection disconnected. Restore the connection to the database and run the server again! ")
-      EX.throwE $ ErrorTypes.GetNewsSQLRequestError $ ErrorTypes.SQLRequestError []
+    Left err -> Throw.throwSqlRequestError h ("newsListCategory", show err)
     Right news -> do
       let dbNews = Prelude.map News.toDbNews news
       return dbNews
@@ -172,9 +171,7 @@ newsListNotCategory conn h off lim NewsHelpTypes.DbFilter {..} = do
           IO (Either SQL.SqlError [(T.Text, TIME.Day, T.Text, String, T.Text, T.Text, SQLTypes.PGArray Int, Int, Bool, Int)])
       )
   case res of
-    Left err -> do
-      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.SQLRequestError ("newsListCategory: BAD!" <> show err))
-      EX.throwE $ ErrorTypes.GetNewsSQLRequestError $ ErrorTypes.SQLRequestError []
+    Left err -> Throw.throwSqlRequestError h ("newsListNotCategory", show err)
     Right news -> do
       let dbNews = Prelude.map News.toDbNews news
       return dbNews

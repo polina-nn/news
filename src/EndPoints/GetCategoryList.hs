@@ -12,9 +12,10 @@ import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.Category.Category as Category
 import qualified EndPoints.Lib.OffsetLimit as OffsetLimit
+import qualified EndPoints.Lib.ThrowSqlRequestError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
-import Logger (logDebug, logError, logInfo, (.<))
+import Logger (logDebug, logInfo)
 import qualified News
 import Servant (Handler)
 import qualified Types.DataTypes as DataTypes
@@ -55,9 +56,7 @@ categoryListExcept conn (h, mo, ml) = do
           IO (Either SQL.SqlError [(DataTypes.Path, DataTypes.Id, DataTypes.Name)])
       )
   case res of
-    Left err -> do
-      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.SQLRequestError ("categoryListExcept: BAD!" <> show err))
-      EX.throwE $ ErrorTypes.GetContentSQLRequestError $ ErrorTypes.SQLRequestError []
+    Left err -> Throw.throwSqlRequestError h ("checkId", show err)
     Right value -> do
       let categories = Prelude.map Category.toCategories value
           toTextCategories = T.concat $ map ToText.toText categories

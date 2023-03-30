@@ -13,6 +13,7 @@ import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.OffsetLimit as OffsetLimit
+import qualified EndPoints.Lib.ThrowSqlRequestError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
 import Logger (logDebug, logError, logInfo, (.<))
@@ -54,9 +55,7 @@ userListExcept conn (h, mo, ml) = do
           IO (Either SQL.SqlError [(T.Text, String, Bool, Bool, TIME.Day)])
       )
   case res of
-    Left err -> do
-      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.SQLRequestError ("userListExcept: BAD!" <> show err))
-      EX.throwE $ ErrorTypes.GetContentSQLRequestError $ ErrorTypes.SQLRequestError []
+    Left err -> Throw.throwSqlRequestError h ("userListExcept", show err)
     Right value -> do
       let users = Prelude.map Lib.toUser value
       let toTextUsers = T.concat $ map ToText.toText users

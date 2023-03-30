@@ -4,17 +4,21 @@ module EndPoints.GetAuthorsNewsSearchList
   )
 where
 
+import qualified Control.Exception.Safe as EXS
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Control.Monad.Trans.Except as EX
 import qualified Data.Text as T
+import qualified Data.Time as TIME
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
+import qualified Database.PostgreSQL.Simple.Types as SQLTypes
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.LibIO as LibIO
 import qualified EndPoints.Lib.News.News as News
 import qualified EndPoints.Lib.News.NewsHelpTypes as NewsHelpTypes
 import qualified EndPoints.Lib.News.NewsIO as NewsIO
 import qualified EndPoints.Lib.OffsetLimit as OffsetLimit
+import qualified EndPoints.Lib.ThrowSqlRequestError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
 import Logger (logError, (.<))
@@ -79,17 +83,23 @@ authorsNewsSearchListFromDb ::
   DataTypes.Offset ->
   DataTypes.Limit ->
   EX.ExceptT ErrorTypes.GetNewsError IO [NewsHelpTypes.DbNews]
-authorsNewsSearchListFromDb conn _ DataTypes.User {..} search off lim = do
+authorsNewsSearchListFromDb conn h DataTypes.User {..} search off lim = do
   res <-
-    liftIO $
-      SQL.query
-        conn
-        [sql| SELECT news_title, news_created, usr_name, category_path, category_name, news_text, news_images_id, cardinality (news_images_id), news_published , news_id
+    liftIO
+      ( EXS.try $
+          SQL.query
+            conn
+            [sql| SELECT news_title, news_created, usr_name, category_path, category_name, news_text, news_images_id, cardinality (news_images_id), news_published , news_id
             FROM news
             INNER JOIN usr ON news.news_author_login = usr.usr_login INNER JOIN category ON news.news_category_id = category.category_id
             where ((news_published = true) or (news_author_login = ? )) and (to_tsvector(news_title) || to_tsvector(usr_name) || to_tsvector(category_name) || to_tsvector(news_text) @@ plainto_tsquery(?))
             ORDER BY news_created DESC 
             LIMIT ?  OFFSET ? |]
-        (userLogin, search, show lim, show off)
-  let dbNews = Prelude.map News.toDbNews res
-  return dbNews
+            (userLogin, search, show lim, show off) ::
+          IO (Either SQL.SqlError [(T.Text, TIME.Day, T.Text, String, T.Text, T.Text, SQLTypes.PGArray Int, Int, Bool, Int)])
+      )
+  case res of
+    Left err -> Throw.throwSqlRequestError h ("authorsNewsSearchListFromDb", show err)
+    Right newsList -> do
+      let dbNews = Prelude.map News.toDbNews newsList
+      return dbNews

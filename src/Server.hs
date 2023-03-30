@@ -29,6 +29,7 @@ import qualified EndPoints.GetNewsSearchList as GetNewsSearchList
 import qualified EndPoints.GetOneImage as GetOneImage
 import qualified EndPoints.GetUserList as GetUserList
 import qualified EndPoints.Lib.Lib as Lib
+import qualified EndPoints.Lib.ThrowSqlRequestError as Throw
 import Logger (logDebug, logError, (.<))
 import Network.Wai (Request, requestHeaders)
 import qualified Network.Wai.Handler.Warp
@@ -126,15 +127,11 @@ lookupTokenDB conn (h, t) = do
           IO (Either SQL.SqlError [SQL.Only Bool])
       )
   case res of
-    Left err -> do
-      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.SQLRequestError ("lookupTokenDB: BAD!" <> show err))
-      EX.throwE $ ErrorTypes.ServerAuthErrorSQLRequestError $ ErrorTypes.SQLRequestError []
+    Left err -> Throw.throwSqlRequestError h ("lookupTokenDB", show err)
     Right [SQL.Only True] -> do
       liftIO $ Logger.logDebug (News.hLogHandle h) "lookupTokenDB: OK! Token exist "
       return DataTypes.Token {..}
     Right [SQL.Only False] -> do
       liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidToken "lookupTokenDB: BAD! Token not exist")
       EX.throwE $ ErrorTypes.ServerAuthErrorInvalidToken $ ErrorTypes.InvalidToken []
-    Right _ -> do
-      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.SQLRequestError "lookupTokenDB: BAD! Developer error! ")
-      EX.throwE $ ErrorTypes.ServerAuthErrorSQLRequestError $ ErrorTypes.SQLRequestError []
+    Right _ -> Throw.throwSqlRequestError h ("lookupTokenDB", "Developer error!")

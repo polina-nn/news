@@ -16,6 +16,7 @@ import qualified EndPoints.Lib.News.News as News
 import qualified EndPoints.Lib.News.NewsHelpTypes as NewsHelpTypes
 import qualified EndPoints.Lib.News.NewsIO as NewsIO
 import qualified EndPoints.Lib.OffsetLimit as OffsetLimit
+import qualified EndPoints.Lib.ThrowSqlRequestError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
 import Logger (logError, logInfo, (.<))
@@ -89,9 +90,7 @@ newsSearchListAtDb conn h search off lim = do
           IO (Either SQL.SqlError [(T.Text, TIME.Day, T.Text, String, T.Text, T.Text, SQLTypes.PGArray Int, Int, Bool, Int)])
       )
   case res of
-    Left err -> do
-      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.SQLRequestError ("newsSearchListAtDb: BAD!" <> show err))
-      EX.throwE $ ErrorTypes.GetNewsSQLRequestError $ ErrorTypes.SQLRequestError []
+    Left err -> Throw.throwSqlRequestError h ("newsSearchListAtDb", show err)
     Right newsList -> do
       let dbNews = Prelude.map News.toDbNews newsList
       return dbNews

@@ -4,6 +4,7 @@ module EndPoints.AddOneNews
   )
 where
 
+--import qualified Control.Exception.Safe as EXS
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import qualified Control.Monad.Trans.Except as EX
@@ -61,7 +62,7 @@ addNewsExcept conn (h, token, r) = do
   categories' <- checkCategoryId conn h r
   newsId' <- getNewsId conn h
   images' <- addAllImages conn h r
-  addNewsToDB conn h user categories' r newsId' images' --}
+  addNewsToDB conn h user categories' r newsId' images'
 
 checkImageFilesExist ::
   News.Handle IO ->
