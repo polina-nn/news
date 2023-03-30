@@ -4,12 +4,13 @@ module EndPoints.AddOneNews
   )
 where
 
---import qualified Control.Exception.Safe as EXS
+import qualified Control.Exception.Safe as EXS
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import qualified Control.Monad.Trans.Except as EX
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base64 as Base64
+import qualified Data.Int as I
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
@@ -18,6 +19,7 @@ import qualified EndPoints.Lib.Category.Category as Category
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.LibIO as LibIO
 import qualified EndPoints.Lib.News.NewsIO as NewsIO
+import qualified EndPoints.Lib.ThrowSqlRequestError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
 import Logger (logDebug, logError, logInfo, (.<))
@@ -59,7 +61,8 @@ addNewsExcept conn (h, token, r) = do
   _ <- checkImageFilesExist h r
   _ <- checkPngImages h r
   _ <- checkBase64Images h r
-  categories' <- checkCategoryId conn h r
+  path <- checkCategoryId conn h r
+  categories' <- getCategories conn h path
   newsId' <- getNewsId conn h
   images' <- addAllImages conn h r
   addNewsToDB conn h user categories' r newsId' images'
@@ -137,34 +140,30 @@ checkBase64Images h r@(DataTypes.CreateNewsRequest _ _ _ (Just req) _) = do
       EX.throwE $
         ErrorTypes.NotBase64ImageAddEditNews $ ErrorTypes.InvalidContent []
 
--- | checkCategory -- check if category with the id (from request) exists and get a list of categories from the root to this category
+-- | checkCategory -- check if category with the id (from request) exists and return its path
 checkCategoryId ::
   SQL.Connection ->
   News.Handle IO ->
   DataTypes.CreateNewsRequest ->
-  EX.ExceptT ErrorTypes.AddEditNewsError IO [DataTypes.Category]
+  EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.Path
 checkCategoryId conn h DataTypes.CreateNewsRequest {..} = do
   res <-
     liftIO
-      ( SQL.query
-          conn
-          [sql| SELECT category_path  FROM category WHERE category_id = ?|]
-          (SQL.Only newsCategoryId) ::
-          IO [SQL.Only String]
-      )
-  case res of
-    [val] -> do
-      let path = SQL.fromOnly val
-      result <-
-        liftIO
+      ( EXS.try
           ( SQL.query
               conn
-              [sql| SELECT category_path, category_id, category_name FROM category WHERE ? LIKE category_path||'%' ORDER BY category_path |]
-              (SQL.Only path)
-          )
-      let categories = Prelude.map Category.toCategories result
-      return categories
-    _ -> do
+              [sql| SELECT category_path  FROM category WHERE category_id = ?|]
+              (SQL.Only newsCategoryId) ::
+              IO [SQL.Only String]
+          ) ::
+          IO (Either SQL.SqlError [SQL.Only String])
+      )
+  case res of
+    Left err -> Throw.throwSqlRequestError h ("checkCategoryId", show err)
+    Right [SQL.Only path] -> do
+      liftIO $ Logger.logInfo (News.hLogHandle h) "checkCategoryId: OK!"
+      return path
+    Right _ -> do
       liftIO $
         Logger.logError
           (News.hLogHandle h)
@@ -176,6 +175,29 @@ checkCategoryId conn h DataTypes.CreateNewsRequest {..} = do
           )
       EX.throwE $ ErrorTypes.InvalidCategoryIdAddEditNews $ ErrorTypes.InvalidContent []
 
+-- | getCategories - get a list of categories from the root to this category
+getCategories ::
+  SQL.Connection ->
+  News.Handle IO ->
+  DataTypes.Path ->
+  EX.ExceptT ErrorTypes.AddEditNewsError IO [DataTypes.Category]
+getCategories conn h path = do
+  res <-
+    liftIO
+      ( EXS.try
+          ( SQL.query
+              conn
+              [sql| SELECT category_path, category_id, category_name FROM category WHERE ? LIKE category_path||'%' ORDER BY category_path |]
+              (SQL.Only path)
+          ) ::
+          IO (Either SQL.SqlError [(DataTypes.Path, DataTypes.Id, DataTypes.Name)])
+      )
+  case res of
+    Left err -> Throw.throwSqlRequestError h ("getCategories", show err)
+    Right value -> do
+      let categories = Prelude.map Category.toCategories value
+      return categories
+
 -- getNewsIdIO  get id for new news
 getNewsId ::
   SQL.Connection ->
@@ -184,24 +206,19 @@ getNewsId ::
 getNewsId conn h = do
   resId <-
     liftIO
-      ( SQL.query_
-          conn
-          [sql| select NEXTVAL('news_id_seq')|]
+      ( EXS.try
+          ( SQL.query_
+              conn
+              [sql| select NEXTVAL('news_id_seq')|]
+          ) ::
+          IO (Either SQL.SqlError [SQL.Only IdNews])
       )
   case resId of
-    [val] -> do
-      let idNews = SQL.fromOnly val
+    Left err -> Throw.throwSqlRequestError h ("getNewsId", show err)
+    Right [SQL.Only idNews] -> do
       liftIO $ Logger.logDebug (News.hLogHandle h) ("getNewsId: OK! News_id is " .< idNews)
       return idNews
-    _ -> do
-      liftIO $
-        Logger.logError (News.hLogHandle h) $
-          T.pack $
-            show $
-              ErrorTypes.AddEditNewsSQLRequestError $
-                ErrorTypes.SQLRequestError "getNewsId: BAD!"
-      EX.throwE $
-        ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
+    Right _ -> Throw.throwSqlRequestError h ("getNewsId", "Developer error")
 
 -- | addAllImagesIO Add all the pictures for the news.
 addAllImages ::
@@ -229,21 +246,25 @@ addNewsToDB conn h DataTypes.User {..} categories DataTypes.CreateNewsRequest {.
   created <- liftIO Lib.currentDay
   res <-
     liftIO
-      ( SQL.execute
-          conn
-          [sql| INSERT INTO news (news_images_id, news_id, news_title , news_created, news_author_login, news_category_id, news_text,  news_published ) VALUES (?, ?, ?, ?, ?, ?,?,? ) |]
-          ( SQLTypes.PGArray idImages,
-            idNews,
-            title,
-            show created,
-            userLogin,
-            newsCategoryId,
-            text,
-            published
-          )
+      ( EXS.try
+          ( SQL.execute
+              conn
+              [sql| INSERT INTO news (news_images_id, news_id, news_title , news_created, news_author_login, news_category_id, news_text,  news_published ) VALUES (?, ?, ?, ?, ?, ?,?,? ) |]
+              ( SQLTypes.PGArray idImages,
+                idNews,
+                title,
+                show created,
+                userLogin,
+                newsCategoryId,
+                text,
+                published
+              )
+          ) ::
+          IO (Either SQL.SqlError I.Int64)
       )
-  case read (show res) :: Int of
-    1 -> do
+  case res of
+    Left err -> Throw.throwSqlRequestError h ("addNewsToDB", show err)
+    Right 1 -> do
       let news =
             DataTypes.News
               { newsTitle = title,
@@ -257,14 +278,4 @@ addNewsToDB conn h DataTypes.User {..} categories DataTypes.CreateNewsRequest {.
               }
       liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["addNewsToDB: OK!", ToText.toText news]
       return news
-    _ -> do
-      liftIO $
-        Logger.logError
-          (News.hLogHandle h)
-          ( "ERROR "
-              .< ErrorTypes.AddEditNewsSQLRequestError
-                ( ErrorTypes.SQLRequestError "addNewsToDB! Don't INSERT INTO  news table"
-                )
-          )
-      EX.throwE $
-        ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError []
+    Right _ -> Throw.throwSqlRequestError h ("addNewsToDB", "Developer error")

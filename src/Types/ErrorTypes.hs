@@ -190,6 +190,3 @@ data GetImageError
   = InvalidImagedId InvalidId
   | GetImageSQLRequestError SQLRequestError
   deriving (Show, Eq)
-
-
-

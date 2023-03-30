@@ -16,7 +16,7 @@ import qualified EndPoints.Lib.OffsetLimit as OffsetLimit
 import qualified EndPoints.Lib.ThrowSqlRequestError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
-import Logger (logDebug, logError, logInfo, (.<))
+import Logger (logDebug, logInfo)
 import qualified News
 import Servant (Handler)
 import qualified Types.DataTypes as DataTypes

@@ -49,10 +49,10 @@ editCategoryExcept ::
   (News.Handle IO, DataTypes.Token, Int, DataTypes.EditCategoryRequest) ->
   EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.Category
 editCategoryExcept conn (h, token, catId, r) = do
+  _ <- checkId conn h catId
   user <- EX.withExceptT ErrorTypes.AddEditCategorySQLRequestError (LibIO.searchUser h conn token)
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Edit Category: \n", ToText.toText r, "with category id ", T.pack $ show catId, "\nby user: ", ToText.toText user]
   _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditCategory (Lib.checkUserAdmin h user)
-  _ <- checkId conn h catId
   _ <- checkSyntaxPath h r
   categories <- CategoryIO.getAllCategories conn h
   editCategoryFullRequest <- Category.checkLogicPathForEditCategory h catId r categories
@@ -88,7 +88,7 @@ checkId conn h' id' = do
       liftIO $ Logger.logDebug (News.hLogHandle h') "checkId: OK!  Category exist "
       return id'
     Right [SQL.Only False] -> do
-      liftIO $ Logger.logError (News.hLogHandle h') ("ERROR " .< ErrorTypes.InvalidImagedId (ErrorTypes.InvalidId "checkId: BAD! Category not exist"))
+      liftIO $ Logger.logError (News.hLogHandle h') ("ERROR " .< ErrorTypes.InvalidImagedId (ErrorTypes.InvalidId ("checkId: BAD! Not exists category with id " <> show id')))
       EX.throwE $ ErrorTypes.InvalidCategoryId $ ErrorTypes.InvalidId []
     Right _ -> Throw.throwSqlRequestError h' ("checkId", "Developer error")
 
