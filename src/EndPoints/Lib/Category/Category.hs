@@ -36,21 +36,16 @@ validSyntaxPath ys =
   checkPoints ys && foldr ((&&) . checkPath) True (wordsPath ys)
   where
     -- checkPoints - checking for a dot at the end and any characters inside path
-
     checkPoints :: DataTypes.Path -> Bool
-    checkPoints kx =
-      not (not (null kx) && (last kx == '.' || head kx == '.'))
-        && checkPoints' kx
-      where
-        checkPoints' :: DataTypes.Path -> Bool
-        checkPoints' [] = True
-        checkPoints' (x : xs)
-          | x == '.' && head xs == '.' = False
-          | otherwise = checkPoints' xs
+    checkPoints kx
+      | "." `L.isPrefixOf` kx = False
+      | ".." `L.isInfixOf` kx = False
+      | "." `L.isSuffixOf` kx = False
+      | otherwise = True
+
     -- checkPath - check if any piece of path starts from zero
     checkPath :: String -> Bool
-    checkPath zs =
-      not (not (null zs) && head zs == '0') && checkPathOnlyDigit zs
+    checkPath zs = not ("0" `L.isPrefixOf` zs) && checkPathOnlyDigit zs
     --  checkPathOnlyDigit - only numbers inside
     checkPathOnlyDigit :: String -> Bool
     checkPathOnlyDigit [] = True
@@ -179,7 +174,7 @@ curPathWithChildrenToZero eq mapCategories =
                     (childId, childZeroPath childPath e)
                     mapCat
             else mapCat
-    -- childZeroPath: Bite off the paf's head of the required length and attach it 0
+    -- childZeroPath: Bite off the beginning of the path required length and attach it 0
     childZeroPath ::
       DataTypes.Path ->
       CategoryHelpTypes.EditCategoryFullRequest ->

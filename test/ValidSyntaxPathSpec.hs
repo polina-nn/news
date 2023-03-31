@@ -24,6 +24,8 @@ spec =
       Category.validSyntaxPath "1.22.333.894.9005.a" `shouldBe` False
     it "Invalid syntax path such us 001.2.3" $
       Category.validSyntaxPath "001.22.333.894.9005.690" `shouldBe` False
+    it "Invalid syntax path such us .1.2.3" $
+      Category.validSyntaxPath ".1.2.3" `shouldBe` False
     it "Invalid syntax path such us 1/2/3" $
       Category.validSyntaxPath "1/2/3" `shouldBe` False
     it "Invalid syntax path such us 0" $
