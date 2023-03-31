@@ -1,7 +1,6 @@
 #!/bin/sh
-curl -i --user polina:polina \
+curl -i -POST \
+--header "Cookie: servant-auth-cookie=keypolina" \
 --header "Content-Type: application/json"   \
---request POST   \
---data '{"file":"white", "format":"png","image": "./_images/white_base64" }' \
-http://localhost:8080/login/image
-
+--data '{"file":"pink", "format":"png","image": "./_images/pink_base64" }' \
+http://localhost:8080/login/image \

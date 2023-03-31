@@ -1,11 +1,13 @@
 module Server
   ( server,
     serviceApi,
-    Handle (..),
     run,
   )
 where
 
+import qualified Control.Exception.Safe as EXS
+import Control.Monad.IO.Class (MonadIO (liftIO))
+import qualified Control.Monad.Trans.Except as EX
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BSC8
 import qualified Data.Pool as POOL
@@ -27,26 +29,31 @@ import qualified EndPoints.GetNewsSearchList as GetNewsSearchList
 import qualified EndPoints.GetOneImage as GetOneImage
 import qualified EndPoints.GetUserList as GetUserList
 import qualified EndPoints.Lib.Lib as Lib
-import qualified Logger
+import qualified EndPoints.Lib.ThrowSqlRequestError as Throw
+import Logger (logDebug, logError, (.<))
+import Network.Wai (Request, requestHeaders)
 import qualified Network.Wai.Handler.Warp
 import qualified News
 import Servant
   ( Application,
-    BasicAuthCheck (..),
-    BasicAuthData (..),
-    BasicAuthResult (..),
     Context (EmptyContext, (:.)),
+    Handler,
     Proxy (..),
     Server,
+    err401,
+    err403,
+    err500,
+    errBody,
+    errReasonPhrase,
     serveWithContext,
+    throwError,
     (:<|>) ((:<|>)),
   )
+import Servant.Server.Experimental.Auth (AuthHandler, mkAuthHandler) -- AuthServerData,
 import qualified Types.ApiTypes as ApiTypes
 import qualified Types.DataTypes as DataTypes
-
-newtype Handle = Handle
-  { hServerHandle :: News.Handle IO
-  }
+import qualified Types.ErrorTypes as ErrorTypes
+import Web.Cookie (parseCookies)
 
 server :: News.Handle IO -> DataTypes.Db -> Server ApiTypes.RestAPI
 server h db =
@@ -67,92 +74,64 @@ server h db =
 serviceApi :: Proxy ApiTypes.RestAPI
 serviceApi = Proxy
 
-run :: Handle -> IO ()
+run :: DataTypes.Handle -> IO ()
 run h = do
-  Logger.logDebug (News.hLogHandle (hServerHandle h)) "run: Server is running"
-  let dbConfig = News.hDbConfig (hServerHandle h)
-  let appConfig = News.hAppConfig (hServerHandle h)
+  Logger.logDebug (News.hLogHandle (DataTypes.hServerHandle h)) "run: Server is running"
+  let appConfig = News.hAppConfig (DataTypes.hServerHandle h)
   let appPort = News.appPort appConfig
-  pool <- DbServices.initConnPool dbConfig
+  pool <- DbServices.initConnPool h
   POOL.withResource
     pool
-    (`DbServices.migrateDb` (hServerHandle h, "_migrations"))
-  Network.Wai.Handler.Warp.run appPort $ app (hServerHandle h) pool
+    (`DbServices.migrateDb` (DataTypes.hServerHandle h, "_migrations"))
+  Network.Wai.Handler.Warp.run appPort $ app (DataTypes.hServerHandle h) pool
 
 app :: News.Handle IO -> POOL.Pool SQL.Connection -> Application
 app h connPool =
-  serveWithContext Server.serviceApi ctx $
-    Server.server h $ DbServices.createDb connPool
+  serveWithContext Server.serviceApi genAuthServerContext $ Server.server h $ DbServices.createDb connPool
   where
-    ctx = BasicAuthCheck authCfg :. EmptyContext
-    authCfg = myAuthCheck h connPool
+    genAuthServerContext :: Context (AuthHandler Request DataTypes.Token ': '[])
+    genAuthServerContext = authHandler :. EmptyContext
+    authHandler = authHandlerConn h connPool
 
--- | myAuthCheck function is the one that actually check the username
--- and password and return an value that indicate the status of authentication. Look in the 'app' function
--- to see how it is used. The value returned can be one of: Unauthorized, BadPassword, NoSuchUser, Authorized usr
-myAuthCheck ::
+authHandlerConn ::
   News.Handle IO ->
   POOL.Pool SQL.Connection ->
-  BasicAuthData ->
-  IO (BasicAuthResult DataTypes.User)
-myAuthCheck h conns (BasicAuthData u p) = do
-  isSuchUser <- withConnPool . flip suchUser $ u
-  if isSuchUser == 0
-    then do
-      Logger.logInfo
-        (News.hLogHandle h)
-        "myAuthCheck: suchUser: user not found "
-      return NoSuchUser
-    else do
-      isGoodPassword <- withConnPool . flip goodPassword $ (u, p)
-      if isGoodPassword == 0
-        then do
-          Logger.logInfo
-            (News.hLogHandle h)
-            "myAuthCheck: goodPassword: user found, but his password not valid"
-          return BadPassword
-        else do
-          users <- withConnPool . flip userAuthorized $ u
-          let a = head users
-          Logger.logInfo
-            (News.hLogHandle h)
-            "myAuthCheck: Ok! User is Authorized "
-          return $ Authorized a
+  AuthHandler Request DataTypes.Token
+authHandlerConn h conn = mkAuthHandler handler
   where
-    withConnPool = POOL.withResource conns
+    maybeToEither e = maybe (Left e) Right
+    throw401 msg = throwError $ err401 {errBody = msg}
+    handler :: Request -> Handler DataTypes.Token
+    handler req = either throw401 (lookupToken h conn) $ do
+      cookie <- maybeToEither "Missing cookie header" $ lookup "cookie" $ requestHeaders req
+      maybeToEither "Missing token in cookie" $ lookup "servant-auth-cookie" $ parseCookies cookie
 
-userAuthorized :: SQL.Connection -> ByteString -> IO [DataTypes.User]
-userAuthorized conn login = do
-  res <-
-    SQL.query
-      conn
-      [sql| SELECT usr_name, usr_login, usr_admin, usr_author, usr_created FROM usr WHERE usr_login= ? |]
-      (SQL.Only login)
-  return $ Prelude.map Lib.toUser res
+lookupToken :: News.Handle IO -> POOL.Pool SQL.Connection -> ByteString -> Handler DataTypes.Token
+lookupToken h conns key = do
+  token <- liftIO $ EX.runExceptT $ POOL.withResource conns . flip lookupTokenDB $ (h, key)
+  case token of
+    Left (ErrorTypes.ServerAuthErrorSQLRequestError a) -> throwError err500 {errReasonPhrase = show a}
+    Left (ErrorTypes.ServerAuthErrorInvalidToken a) -> throwError err403 {errReasonPhrase = show a}
+    Right value -> return value
 
--- | suchUser. If the query returned one value, then the user will find it, otherwise no.
--- Because logins are not repeated in the database
-suchUser :: SQL.Connection -> ByteString -> IO Int
-suchUser conn login = do
+lookupTokenDB :: SQL.Connection -> (News.Handle IO, ByteString) -> EX.ExceptT ErrorTypes.ServerAuthError IO DataTypes.Token
+lookupTokenDB conn (h, t) = do
+  let token = Lib.hashed $ BSC8.unpack t
   res <-
-    SQL.query
-      conn
-      [sql| SELECT COUNT (usr_login) FROM usr WHERE usr_login= ? |]
-      (SQL.Only login)
+    liftIO
+      ( EXS.try $
+          SQL.query
+            conn
+            [sql| SELECT EXISTS  (SELECT  token_key FROM token WHERE token_key = ?) |]
+            (SQL.Only token) ::
+          IO (Either SQL.SqlError [SQL.Only Bool])
+      )
   case res of
-    [SQL.Only m] -> return m
-    _ -> return 0
-
--- | goodPassword. If the query returned one value, then password is good, otherwise no.
--- Good password it means that the entered password equals the password in the database.
-goodPassword :: SQL.Connection -> (ByteString, ByteString) -> IO Int
-goodPassword conn (login, password) = do
-  let hashedPassword = BSC8.pack $ Lib.hashed $ BSC8.unpack password
-  res <-
-    SQL.query
-      conn
-      [sql| SELECT COUNT (usr_login) FROM usr WHERE usr_login= ? AND usr_password= ? |]
-      (login, hashedPassword)
-  case res of
-    [SQL.Only n] -> return n
-    _ -> return 0
+    Left err -> Throw.throwSqlRequestError h ("lookupTokenDB", show err)
+    Right [SQL.Only True] -> do
+      liftIO $ Logger.logDebug (News.hLogHandle h) "lookupTokenDB: OK! Token exist "
+      return DataTypes.Token {..}
+    Right [SQL.Only False] -> do
+      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidToken "lookupTokenDB: BAD! Token not exist")
+      EX.throwE $ ErrorTypes.ServerAuthErrorInvalidToken $ ErrorTypes.InvalidToken []
+    Right _ -> Throw.throwSqlRequestError h ("lookupTokenDB", "Developer error!")

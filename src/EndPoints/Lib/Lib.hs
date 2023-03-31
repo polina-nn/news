@@ -1,4 +1,4 @@
--- |  EndPoints.Lib.Lib - library of helper pure functions for EndPoints
+-- |  EndPoints.Lib.Lib - library of helper pure  functions for EndPoints
 module EndPoints.Lib.Lib
   ( checkUserAdmin,
     checkUserAuthor,
@@ -20,6 +20,7 @@ import qualified Data.Text.Encoding as TE
 import qualified Data.Time as TIME
 import Logger (logDebug, logError, (.<))
 import qualified News
+import qualified Types.DataTypes as DataType
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
 

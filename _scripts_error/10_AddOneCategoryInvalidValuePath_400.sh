@@ -1,5 +1,6 @@
 #!/bin/sh
-curl -i --user polina:polina \
+curl -i  \
+--header "Cookie: servant-auth-cookie=keypolina" \
 --header "Content-Type: application/json"   \
 --request POST   \
 --data '{ "path":"1000", "category":"Алина" }' \

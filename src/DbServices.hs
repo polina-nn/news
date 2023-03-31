@@ -6,7 +6,7 @@ module DbServices
   )
 where
 
-import qualified Data.ByteString.Char8 as BS8
+import qualified Control.Exception.Safe as EXS
 import qualified Data.Pool as POOL
 import qualified Database.PostgreSQL.Simple as SQL
 import qualified Database.PostgreSQL.Simple.Migration as Migration
@@ -23,31 +23,41 @@ import qualified EndPoints.GetNewsList as GetNewsList
 import qualified EndPoints.GetNewsSearchList as GetNewsSearchList
 import qualified EndPoints.GetOneImage as GetOneImage
 import qualified EndPoints.GetUserList as GetUserList
-import Logger (logDebug, (.<))
+import Logger (logDebug, logError, (.<))
 import qualified News
 import qualified Types.DataTypes as DataTypes
+import qualified Types.ExceptionTypes as ExceptionTypes
 
-initConnPool :: News.DbConfig -> IO (POOL.Pool SQL.Connection)
-initConnPool News.DbConfig {..} =
-  POOL.createPool
-    (SQL.connectPostgreSQL url)
-    SQL.close
-    noOfStripes
-    (realToFrac idleTime)
-    stripeSize
+initConnPool :: DataTypes.Handle -> IO (POOL.Pool SQL.Connection)
+initConnPool h = do
+  conn <- EXS.catch (tryInitConnectDb (DataTypes.hServerHandle h)) (ExceptionTypes.handleException (DataTypes.hServerHandle h))
+  POOL.createPool (pure conn) SQL.close noOfStripes' (realToFrac idleTime') stripeSize'
   where
-    url =
-      BS8.pack $
-        "host='"
-          ++ dbHost
-          ++ "' dbname='"
-          ++ dbName
-          ++ "' user='"
-          ++ user
-          ++ "' password='"
-          ++ password
-          ++ "' port="
-          ++ dbPort
+    noOfStripes' = News.noOfStripes (News.hDbConfig (DataTypes.hServerHandle h))
+    idleTime' = News.idleTime (News.hDbConfig (DataTypes.hServerHandle h))
+    stripeSize' = News.stripeSize (News.hDbConfig (DataTypes.hServerHandle h))
+
+-- | tryInitConnectDb  - throws an exception if it was not possible to connect to the database, use in DbServices.initConnPool.
+tryInitConnectDb :: News.Handle IO -> IO SQL.Connection
+tryInitConnectDb h = do
+  res <- EXS.try (SQL.connect (url h))
+  case res of
+    Left e -> do
+      Logger.logError (News.hLogHandle h) "tryInitConnectDb: BAD, not connection to the Data Base"
+      EXS.throw (ExceptionTypes.DbNotConnect e)
+    Right conn -> do
+      Logger.logDebug (News.hLogHandle h) "tryInitConnectDb: OK "
+      pure conn
+
+url :: News.Handle IO -> SQL.ConnectInfo
+url h =
+  SQL.ConnectInfo
+    { connectHost = News.dbHost (News.hDbConfig h),
+      connectPort = read $ News.dbPort (News.hDbConfig h),
+      connectUser = News.user (News.hDbConfig h),
+      connectPassword = News.password (News.hDbConfig h),
+      connectDatabase = News.dbName (News.hDbConfig h)
+    }
 
 createDb :: POOL.Pool SQL.Connection -> DataTypes.Db
 createDb pool =

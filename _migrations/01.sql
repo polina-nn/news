@@ -1,7 +1,7 @@
 
 CREATE TABLE IF NOT EXISTS usr (
     usr_login  VARCHAR(50) PRIMARY KEY,
-    usr_name VARCHAR(50) NOT NULL, 
+    usr_name   VARCHAR(50) NOT NULL, 
     usr_password VARCHAR(50) NOT NULL, 
     usr_created  DATE NOT NULL,
     usr_admin    BOOLEAN NOT NULL,  

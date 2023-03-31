@@ -42,6 +42,8 @@ dependencies:
 - directory            # for System.Directory (check if image files exist)
 - postgresql-simple-migration 
 - transformers 
+- wai
+- cookie
 
 # About ghc options read here. https://ghc.gitlab.haskell.org/ghc/doc/users_guide/using-warnings.html#
 ghc-options:

@@ -78,7 +78,7 @@ instance Show InvalidRequest where
   show (InvalidRequest a) = show a
 
 -- | 8
--- | SQLRequestError  - Error of executing SQL request. I couldn't construct case for generation this kind of error.
+-- | SQLRequestError  - Error of executing SQL request.
 newtype SQLRequestError
   = SQLRequestError String
   deriving (Eq)
@@ -86,6 +86,24 @@ newtype SQLRequestError
 instance Show SQLRequestError where
   show (SQLRequestError []) = show error500
   show (SQLRequestError a) = show a
+
+-- | 9
+-- | InvalidToken  - Invalid token
+newtype InvalidToken
+  = InvalidToken String
+  deriving (Eq)
+
+instance Show InvalidToken where
+  show (InvalidToken []) = show error403
+  show (InvalidToken a) = show a
+
+-------------------------------------------------------------
+
+-- | LIST OF ERRORS FOR SERVER Authentication
+data ServerAuthError
+  = ServerAuthErrorInvalidToken InvalidToken
+  | ServerAuthErrorSQLRequestError SQLRequestError
+  deriving (Show, Eq)
 
 -------------------------------------------------------------
 
