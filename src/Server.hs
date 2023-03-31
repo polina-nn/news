@@ -76,18 +76,16 @@ run h = do
   let appConfig = News.hAppConfig (DataTypes.hServerHandle h)
   let appPort = News.appPort appConfig
   pool <- DbServices.initConnPool h
-  POOL.withResource
-    pool
-    (`DbServices.migrateDb` (DataTypes.hServerHandle h, "_migrations"))
+  DbServices.migrate pool (DataTypes.hServerHandle h, "_migrations")
   Network.Wai.Handler.Warp.run appPort $ app (DataTypes.hServerHandle h) pool
 
-app :: News.Handle IO -> POOL.Pool SQL.Connection -> Application
-app h connPool =
-  serveWithContext Server.serviceApi genAuthServerContext $ Server.server h $ DbServices.createDb connPool
+app :: News.Handle IO -> DataTypes.StatePool -> Application
+app h pool =
+  serveWithContext Server.serviceApi genAuthServerContext $ Server.server h $ DbServices.createDb pool
   where
     genAuthServerContext :: Context (AuthHandler Request DataTypes.Account ': '[])
     genAuthServerContext = authHandler :. EmptyContext
-    authHandler = authHandlerConn h connPool
+    authHandler = authHandlerConn h pool
 
 authHandlerConn ::
   News.Handle IO ->
@@ -102,7 +100,7 @@ authHandlerConn h conn = mkAuthHandler handler
       cookie <- maybeToEither "Missing cookie header" $ lookup "cookie" $ requestHeaders req
       maybeToEither "Missing token in cookie" $ lookup "servant-auth-cookie" $ parseCookies cookie
 
-lookupAccount :: News.Handle IO -> POOL.Pool SQL.Connection -> ByteString -> Handler DataTypes.Account
+lookupAccount :: News.Handle IO -> DataTypes.StatePool -> ByteString -> Handler DataTypes.Account
 lookupAccount h pool key = do
   account <- liftIO $ EX.runExceptT $ POOL.withResource pool . flip LibIO.searchAccount $ (h, key)
   case account of
@@ -111,10 +109,3 @@ lookupAccount h pool key = do
     Right acc -> do
       liftIO $ Logger.logDebug (News.hLogHandle h) $ "lookupAccount = " .< acc
       return acc
-
-{--
-withPool :: (Connection -> IO a) -> ReaderT Environment IO a
-withPool f = do
-  pool <- asks dbPool
-  lift $ withResource pool f
---}

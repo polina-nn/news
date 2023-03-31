@@ -2,12 +2,16 @@
 module DbServices
   ( initConnPool,
     createDb,
-    migrateDb,
+    migrate,
   )
 where
 
 import qualified Control.Exception.Safe as EXS
+import qualified Data.Aeson as B
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Internal as BSI
 import qualified Data.Pool as POOL
+import Data.String
 import qualified Database.PostgreSQL.Simple as SQL
 import qualified Database.PostgreSQL.Simple.Migration as Migration
 import qualified DbConnect
@@ -31,12 +35,21 @@ import qualified Types.ExceptionTypes as ExceptionTypes
 
 initConnPool :: DataTypes.Handle -> IO DataTypes.StatePool
 initConnPool h = do
-  conn <- EXS.catch (DbConnect.tryInitConnectDb (DataTypes.hServerHandle h)) (ExceptionTypes.handleException (DataTypes.hServerHandle h))
-  POOL.createPool (pure conn) SQL.close noOfStripes' (realToFrac idleTime') stripeSize'
+  POOL.createPool (SQL.connectPostgreSQL $ SQL.postgreSQLConnectionString (url h)) SQL.close noOfStripes' (realToFrac idleTime') stripeSize'
   where
     noOfStripes' = News.noOfStripes (News.hDbConfig (DataTypes.hServerHandle h))
     idleTime' = News.idleTime (News.hDbConfig (DataTypes.hServerHandle h))
     stripeSize' = News.stripeSize (News.hDbConfig (DataTypes.hServerHandle h))
+
+url :: DataTypes.Handle -> SQL.ConnectInfo
+url h =
+  SQL.ConnectInfo
+    { connectHost = News.dbHost (News.hDbConfig (DataTypes.hServerHandle h)),
+      connectPort = read $ News.dbPort (News.hDbConfig (DataTypes.hServerHandle h)),
+      connectUser = News.user (News.hDbConfig (DataTypes.hServerHandle h)),
+      connectPassword = News.password (News.hDbConfig (DataTypes.hServerHandle h)),
+      connectDatabase = News.dbName (News.hDbConfig (DataTypes.hServerHandle h))
+    }
 
 createDb :: DataTypes.StatePool -> DataTypes.Db
 createDb pool =
@@ -57,25 +70,25 @@ createDb pool =
       dbNewsSearchList = GetNewsSearchList.newsSearchList pool
     }
 
-withPool :: DataTypes.Handle -> (DataTypes.StatePool -> IO c) -> IO c
-withPool h = EXS.bracket (initConnPool h) POOL.destroyAllResources
+migrate :: DataTypes.StatePool -> (News.Handle IO, String) -> IO ()
+migrate pool (h, xs) = POOL.withResource pool $ \conn -> do
+  initResult <-
+    SQL.withTransaction conn . Migration.runMigration $
+      Migration.MigrationContext Migration.MigrationInitialization True conn
+  Logger.logDebug
+    (News.hLogHandle h)
+    ("migrateDb: MigrationInitialization " .< initResult)
+  migrateResult <-
+    SQL.withTransaction conn . Migration.runMigration $
+      Migration.MigrationContext (Migration.MigrationDirectory xs) True conn
+  Logger.logDebug
+    (News.hLogHandle h)
+    ("migrateDb: Migration result " .< migrateResult)
+  case migrateResult of
+    Migration.MigrationError err -> EXS.throwString err
+    _ -> return ()
 
 {--
-withPool :: Config -> (State -> IO a) -> IO a
-withPool cfg action =
-  bracket initPool cleanPool action
-where
-    initPool = createPool openConn closeConn
-                (configStripeCount cfg)
-                (configIdleConnTimeout cfg)
-                (configMaxOpenConnPerStripe cfg)
-    cleanPool = destroyAllResources
-    openConn = connectPostgreSQL (configUrl cfg)
-    closeConn = close
---
--- where
---   withConnPool = POOL.withResource pool
-
 createDb :: POOL.Pool SQL.Connection -> DataTypes.Db
 createDb pool =
   DataTypes.Db
@@ -96,7 +109,6 @@ createDb pool =
     }
   where
     withConnPool = POOL.withResource pool
-    --}
 
 migrateDb :: SQL.Connection -> (News.Handle IO, String) -> IO ()
 migrateDb conn (h, xs) = do
@@ -112,3 +124,5 @@ migrateDb conn (h, xs) = do
   Logger.logDebug
     (News.hLogHandle h)
     ("migrateDb: Migration result " .< migrateResult)
+
+    --}
