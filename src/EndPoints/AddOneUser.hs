@@ -36,14 +36,13 @@ addUser ::
   DataTypes.StatePool ->
   (News.Handle IO, DataTypes.Account, DataTypes.CreateUserRequest) ->
   IO (Either ErrorTypes.AddUserError DataTypes.User)
-addUser conn (h, account, req) = undefined
+addUser pool (h, account, req) = POOL.withResource pool . flip addUser' $ (h, account, req)
 
-{--
-addUser ::
+addUser' ::
   SQL.Connection ->
   (News.Handle IO, DataTypes.Account, DataTypes.CreateUserRequest) ->
   IO (Either ErrorTypes.AddUserError DataTypes.User)
-addUser conn (h, account, req) = EX.runExceptT $ addUserExcept conn (h, account, req)
+addUser' conn (h, account, req) = EX.runExceptT $ addUserExcept conn (h, account, req)
 
 addUserExcept ::
   SQL.Connection ->
