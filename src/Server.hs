@@ -5,6 +5,7 @@ module Server
   )
 where
 
+import qualified Control.Exception.Safe as EXS
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Control.Monad.Trans.Except as EX
 import Data.ByteString (ByteString)
@@ -49,6 +50,7 @@ import Servant.Server.Experimental.Auth (AuthHandler, mkAuthHandler) -- AuthServ
 import qualified Types.ApiTypes as ApiTypes
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
+import qualified Types.ExceptionTypes as ExceptionTypes
 import Web.Cookie (parseCookies)
 
 server :: News.Handle IO -> DataTypes.Db -> Server ApiTypes.RestAPI
@@ -76,8 +78,15 @@ run h = do
   let appConfig = News.hAppConfig (DataTypes.hServerHandle h)
   let appPort = News.appPort appConfig
   pool <- DbServices.initConnPool h
-  DbServices.migrate pool (DataTypes.hServerHandle h, "_migrations")
-  Network.Wai.Handler.Warp.run appPort $ app (DataTypes.hServerHandle h) pool
+  res <- EXS.try $ DbServices.migrate pool (DataTypes.hServerHandle h, "_migrations")
+  case res of
+    Left e -> do
+      Logger.logError (News.hLogHandle (DataTypes.hServerHandle h)) "not connection to the Data Base"
+      putStrLn $ "tryConnectDb: BAD, not connection to the Data Base " ++ show e
+      EXS.throw (ExceptionTypes.DbNotConnect e)
+    Right conn -> do
+      Logger.logDebug (News.hLogHandle (DataTypes.hServerHandle h)) "tryInitConnectDb: OK "
+      Network.Wai.Handler.Warp.run appPort $ app (DataTypes.hServerHandle h) pool
 
 app :: News.Handle IO -> DataTypes.StatePool -> Application
 app h pool =
