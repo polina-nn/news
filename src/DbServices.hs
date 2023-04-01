@@ -30,13 +30,21 @@ import qualified Types.ExceptionTypes as ExceptionTypes
 
 initConnPool :: DataTypes.Handle -> IO (POOL.Pool SQL.Connection)
 initConnPool h = do
-  conn <- EXS.catch (tryInitConnectDb (DataTypes.hServerHandle h)) (ExceptionTypes.handleException (DataTypes.hServerHandle h))
-  POOL.createPool (pure conn) SQL.close noOfStripes' (realToFrac idleTime') stripeSize'
+  --conn <- EXS.catch (tryInitConnectDb (DataTypes.hServerHandle h)) (ExceptionTypes.handleException (DataTypes.hServerHandle h))
+  res <- EXS.try $ POOL.createPool (SQL.connectPostgreSQL $ SQL.postgreSQLConnectionString (url (DataTypes.hServerHandle h))) SQL.close noOfStripes' (realToFrac idleTime') stripeSize'
+  case res of
+    Left e -> do
+      Logger.logError (News.hLogHandle (DataTypes.hServerHandle h)) "initConnPool: BAD, not connection to the Data Base"
+      EXS.throw (ExceptionTypes.DbNotConnect e)
+    Right conn -> do
+      Logger.logDebug (News.hLogHandle (DataTypes.hServerHandle h)) "initConnPool: OK "
+      pure conn
   where
     noOfStripes' = News.noOfStripes (News.hDbConfig (DataTypes.hServerHandle h))
     idleTime' = News.idleTime (News.hDbConfig (DataTypes.hServerHandle h))
     stripeSize' = News.stripeSize (News.hDbConfig (DataTypes.hServerHandle h))
 
+{--
 -- | tryInitConnectDb  - throws an exception if it was not possible to connect to the database, use in DbServices.initConnPool.
 tryInitConnectDb :: News.Handle IO -> IO SQL.Connection
 tryInitConnectDb h = do
@@ -47,7 +55,7 @@ tryInitConnectDb h = do
       EXS.throw (ExceptionTypes.DbNotConnect e)
     Right conn -> do
       Logger.logDebug (News.hLogHandle h) "tryInitConnectDb: OK "
-      pure conn
+      pure conn --}
 
 url :: News.Handle IO -> SQL.ConnectInfo
 url h =
@@ -80,8 +88,8 @@ createDb pool =
   where
     withConnPool = POOL.withResource pool
 
-migrateDb :: SQL.Connection -> (News.Handle IO, String) -> IO ()
-migrateDb conn (h, xs) = do
+migrateDb :: POOL.Pool SQL.Connection -> (News.Handle IO, String) -> IO ()
+migrateDb pool (h, xs) = POOL.withResource pool $ \conn -> do
   initResult <-
     SQL.withTransaction conn . Migration.runMigration $
       Migration.MigrationContext Migration.MigrationInitialization True conn
@@ -94,3 +102,6 @@ migrateDb conn (h, xs) = do
   Logger.logDebug
     (News.hLogHandle h)
     ("migrateDb: Migration result " .< migrateResult)
+  case migrateResult of
+    Migration.MigrationError err -> EXS.throwString err
+    _ -> return ()
