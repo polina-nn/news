@@ -9,6 +9,7 @@ import Control.Monad.IO.Class (MonadIO (liftIO))
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import qualified Control.Monad.Trans.Except as EX
 import qualified Data.Int as I
+import qualified Data.Pool as POOL
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
@@ -37,26 +38,26 @@ addOneCategory h DataTypes.Db {..} user createCategoryReq =
     ToHttpResponse.toHttpResponse
 
 addCategory ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   (News.Handle IO, DataTypes.Token, DataTypes.CreateCategoryRequest) ->
   IO (Either ErrorTypes.AddEditCategoryError DataTypes.Category)
-addCategory conn (h, token, r) = EX.runExceptT $ addCategoryExcept conn (h, token, r)
+addCategory pool (h, token, r) = EX.runExceptT $ addCategoryExcept pool (h, token, r)
 
 addCategoryExcept ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   (News.Handle IO, DataTypes.Token, DataTypes.CreateCategoryRequest) ->
   EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.Category
-addCategoryExcept conn (h, token, r) =
+addCategoryExcept pool (h, token, r) =
   do
-    user <- EX.withExceptT ErrorTypes.AddEditCategorySQLRequestError (LibIO.searchUser h conn token)
+    user <- EX.withExceptT ErrorTypes.AddEditCategorySQLRequestError (LibIO.searchUser h pool token)
     liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add Category: \n", ToText.toText r, "by user: ", ToText.toText user]
     _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditCategory (Lib.checkUserAdmin h user)
     _ <- checkSyntaxPath h r
-    categories <- CategoryIO.getAllCategories conn h
+    categories <- CategoryIO.getAllCategories pool h
     _ <- Category.checkLogicPathForAddCategory h r categories
-    _ <- CategoryIO.changePathCategories conn h $ Category.changePathForAddCategory r categories
-    _ <- addCategoryToDb conn h r
-    getCategoryId conn h r
+    _ <- CategoryIO.changePathCategories pool h $ Category.changePathForAddCategory r categories
+    _ <- addCategoryToDb pool h r
+    getCategoryId pool h r
 
 checkSyntaxPath ::
   Monad m =>
@@ -79,20 +80,21 @@ checkSyntaxPath h r@DataTypes.CreateCategoryRequest {..} =
       EX.throwE $ ErrorTypes.InvalidSyntaxPath $ ErrorTypes.InvalidContent []
 
 addCategoryToDb ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   News.Handle IO ->
   DataTypes.CreateCategoryRequest ->
   EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.CreateCategoryRequest
-addCategoryToDb conn h r@DataTypes.CreateCategoryRequest {..} = do
+addCategoryToDb pool h r@DataTypes.CreateCategoryRequest {..} = do
   res <-
     liftIO
-      ( EXS.try
-          ( SQL.execute
-              conn
-              [sql| INSERT INTO  category (category_path, category_name)  VALUES (?,?) |]
-              (path, category)
-          ) ::
-          IO (Either SQL.SqlError I.Int64)
+      ( POOL.withResource pool $ \conn ->
+          EXS.try
+            ( SQL.execute
+                conn
+                [sql| INSERT INTO  category (category_path, category_name)  VALUES (?,?) |]
+                (path, category)
+            ) ::
+            IO (Either EXS.SomeException I.Int64)
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("addCategoryToDb", show err)
@@ -100,20 +102,21 @@ addCategoryToDb conn h r@DataTypes.CreateCategoryRequest {..} = do
     Right _ -> Throw.throwSqlRequestError h ("addCategoryToDb", "Developer error")
 
 getCategoryId ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   News.Handle IO ->
   DataTypes.CreateCategoryRequest ->
   EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.Category
-getCategoryId conn h DataTypes.CreateCategoryRequest {..} = do
+getCategoryId pool h DataTypes.CreateCategoryRequest {..} = do
   resId <-
     liftIO
-      ( EXS.try
-          ( SQL.query
-              conn
-              [sql| SELECT category_id  FROM category WHERE category_path = ? |]
-              (SQL.Only path)
-          ) ::
-          IO (Either SQL.SqlError [SQL.Only Int])
+      ( POOL.withResource pool $ \conn ->
+          EXS.try
+            ( SQL.query
+                conn
+                [sql| SELECT category_id  FROM category WHERE category_path = ? |]
+                (SQL.Only path)
+            ) ::
+            IO (Either EXS.SomeException [SQL.Only Int])
       )
   case resId of
     Left err -> Throw.throwSqlRequestError h ("getCategoryId", show err)

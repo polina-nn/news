@@ -23,39 +23,18 @@ import qualified EndPoints.GetNewsList as GetNewsList
 import qualified EndPoints.GetNewsSearchList as GetNewsSearchList
 import qualified EndPoints.GetOneImage as GetOneImage
 import qualified EndPoints.GetUserList as GetUserList
-import Logger (logDebug, logError, (.<))
+import Logger (logDebug, (.<))
 import qualified News
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ExceptionTypes as ExceptionTypes
 
 initConnPool :: DataTypes.Handle -> IO (POOL.Pool SQL.Connection)
-initConnPool h = do
-  --conn <- EXS.catch (tryInitConnectDb (DataTypes.hServerHandle h)) (ExceptionTypes.handleException (DataTypes.hServerHandle h))
-  res <- EXS.try $ POOL.createPool (SQL.connectPostgreSQL $ SQL.postgreSQLConnectionString (url (DataTypes.hServerHandle h))) SQL.close noOfStripes' (realToFrac idleTime') stripeSize'
-  case res of
-    Left e -> do
-      Logger.logError (News.hLogHandle (DataTypes.hServerHandle h)) "initConnPool: BAD, not connection to the Data Base"
-      EXS.throw (ExceptionTypes.DbNotConnect e)
-    Right conn -> do
-      Logger.logDebug (News.hLogHandle (DataTypes.hServerHandle h)) "initConnPool: OK "
-      pure conn
+initConnPool h =
+  POOL.createPool (SQL.connectPostgreSQL $ SQL.postgreSQLConnectionString (url (DataTypes.hServerHandle h))) SQL.close noOfStripes' (realToFrac idleTime') stripeSize'
   where
     noOfStripes' = News.noOfStripes (News.hDbConfig (DataTypes.hServerHandle h))
     idleTime' = News.idleTime (News.hDbConfig (DataTypes.hServerHandle h))
     stripeSize' = News.stripeSize (News.hDbConfig (DataTypes.hServerHandle h))
-
-{--
--- | tryInitConnectDb  - throws an exception if it was not possible to connect to the database, use in DbServices.initConnPool.
-tryInitConnectDb :: News.Handle IO -> IO SQL.Connection
-tryInitConnectDb h = do
-  res <- EXS.try (SQL.connect (url h))
-  case res of
-    Left e -> do
-      Logger.logError (News.hLogHandle h) "tryInitConnectDb: BAD, not connection to the Data Base"
-      EXS.throw (ExceptionTypes.DbNotConnect e)
-    Right conn -> do
-      Logger.logDebug (News.hLogHandle h) "tryInitConnectDb: OK "
-      pure conn --}
 
 url :: News.Handle IO -> SQL.ConnectInfo
 url h =
@@ -70,38 +49,32 @@ url h =
 createDb :: POOL.Pool SQL.Connection -> DataTypes.Db
 createDb pool =
   DataTypes.Db
-    { dbAddUser = withConnPool . flip AddOneUser.addUser,
-      dbAddCategory = withConnPool . flip AddOneCategory.addCategory,
-      dbAddNews = withConnPool . flip AddOneNews.addNews,
-      dbAddImage = withConnPool . flip AddOneImage.addImage,
-      dbEditCategory = withConnPool . flip EditOneCategory.editCategory,
-      dbEditNews = withConnPool . flip EditOneNews.editNews,
-      dbAuthorsNewsList = withConnPool . flip GetAuthorsNewsList.authorsNewsList,
+    { dbAddUser = AddOneUser.addUser pool,
+      dbAddCategory = AddOneCategory.addCategory pool,
+      dbAddNews = AddOneNews.addNews pool,
+      dbAddImage = AddOneImage.addImage pool,
+      dbEditCategory = EditOneCategory.editCategory pool,
+      dbEditNews = EditOneNews.editNews pool,
+      dbAuthorsNewsList = GetAuthorsNewsList.authorsNewsList pool,
       dbAuthorsNewsSearchList =
-        withConnPool . flip GetAuthorsNewsSearchList.authorsNewsSearchList,
-      dbUserList = withConnPool . flip GetUserList.userList,
-      dbOneImage = withConnPool . flip GetOneImage.oneImage,
-      dbCategoryList = withConnPool . flip GetCategoryList.categoryList,
-      dbNewsList = withConnPool . flip GetNewsList.newsList,
-      dbNewsSearchList = withConnPool . flip GetNewsSearchList.newsSearchList
+        GetAuthorsNewsSearchList.authorsNewsSearchList pool,
+      dbUserList = GetUserList.userList pool,
+      dbOneImage = GetOneImage.oneImage pool,
+      dbCategoryList = GetCategoryList.categoryList pool,
+      dbNewsList = GetNewsList.newsList pool,
+      dbNewsSearchList = GetNewsSearchList.newsSearchList pool
     }
-  where
-    withConnPool = POOL.withResource pool
 
 migrateDb :: POOL.Pool SQL.Connection -> (News.Handle IO, String) -> IO ()
-migrateDb pool (h, xs) = POOL.withResource pool $ \conn -> do
-  initResult <-
-    SQL.withTransaction conn . Migration.runMigration $
-      Migration.MigrationContext Migration.MigrationInitialization True conn
-  Logger.logDebug
-    (News.hLogHandle h)
-    ("migrateDb: MigrationInitialization " .< initResult)
-  migrateResult <-
-    SQL.withTransaction conn . Migration.runMigration $
-      Migration.MigrationContext (Migration.MigrationDirectory xs) True conn
-  Logger.logDebug
-    (News.hLogHandle h)
-    ("migrateDb: Migration result " .< migrateResult)
-  case migrateResult of
-    Migration.MigrationError err -> EXS.throwString err
-    _ -> return ()
+migrateDb pool (h, xs) =
+  POOL.withResource pool $ \conn -> do
+    initResult <-
+      SQL.withTransaction conn . Migration.runMigration $ Migration.MigrationContext Migration.MigrationInitialization True conn
+    Logger.logDebug (News.hLogHandle h) ("migrateDb: MigrationInitialization " .< initResult)
+    migrateResult <-
+      SQL.withTransaction conn . Migration.runMigration $ Migration.MigrationContext (Migration.MigrationDirectory xs) True conn
+    Logger.logDebug (News.hLogHandle h) ("migrateDb: Migration result " .< migrateResult)
+    case migrateResult of
+      Migration.MigrationError err ->
+        EXS.throw (ExceptionTypes.MigrationError err)
+      _ -> return ()

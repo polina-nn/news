@@ -8,6 +8,7 @@ import qualified Control.Exception.Safe as EXS
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Control.Monad.Trans.Except as EX
 import qualified Data.Int as I
+import qualified Data.Pool as POOL
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
@@ -20,7 +21,7 @@ import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
 
 changePathCategories ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   News.Handle IO ->
   [CategoryHelpTypes.EditCategory] ->
   EX.ExceptT ErrorTypes.AddEditCategoryError IO Int
@@ -30,28 +31,29 @@ changePathCategories _ h [] = do
       (News.hLogHandle h)
       "changePathCategories: OK! Request don't change path"
   return 0
-changePathCategories conn h rs = count
+changePathCategories pool h rs = count
   where
     count :: EX.ExceptT ErrorTypes.AddEditCategoryError IO Int
     count = do
-      rez <- mapM (changePathOneCategory conn h) rs
+      rez <- mapM (changePathOneCategory pool h) rs
       liftIO $ Logger.logDebug (News.hLogHandle h) $ T.concat ["changePathCategories: OK! Request change path of ", T.pack $ show $ sum rez, " categories "]
       return $ sum rez
 
 changePathOneCategory ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   News.Handle IO ->
   CategoryHelpTypes.EditCategory ->
   EX.ExceptT ErrorTypes.AddEditCategoryError IO Int
-changePathOneCategory conn h CategoryHelpTypes.EditCategory {..} = do
+changePathOneCategory pool h CategoryHelpTypes.EditCategory {..} = do
   res <-
     liftIO
-      ( EXS.try $
-          SQL.execute
-            conn
-            [sql| UPDATE  category SET category_path = ? WHERE category_id = ? |]
-            (newPath, permanentId) ::
-          IO (Either SQL.SqlError I.Int64)
+      ( POOL.withResource pool $ \conn ->
+          EXS.try $
+            SQL.execute
+              conn
+              [sql| UPDATE  category SET category_path = ? WHERE category_id = ? |]
+              (newPath, permanentId) ::
+            IO (Either EXS.SomeException I.Int64)
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("changePathOneCategory", show err)
@@ -63,18 +65,19 @@ changePathOneCategory conn h CategoryHelpTypes.EditCategory {..} = do
 -- | getAllCategories --
 -- when we add the first category to the response, we get an empty array in getAllCategories
 getAllCategories ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   News.Handle IO ->
   EX.ExceptT ErrorTypes.AddEditCategoryError IO [DataTypes.Category]
-getAllCategories conn h = do
+getAllCategories pool h = do
   res <-
     liftIO
-      ( EXS.try
-          ( SQL.query_
-              conn
-              [sql| SELECT category_path, category_id, category_name FROM category ORDER BY category_path |]
-          ) ::
-          IO (Either SQL.SqlError [(DataTypes.Path, DataTypes.Id, DataTypes.Name)])
+      ( POOL.withResource pool $ \conn ->
+          EXS.try
+            ( SQL.query_
+                conn
+                [sql| SELECT category_path, category_id, category_name FROM category ORDER BY category_path |]
+            ) ::
+            IO (Either EXS.SomeException [(DataTypes.Path, DataTypes.Id, DataTypes.Name)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("getAllCategories", show err)

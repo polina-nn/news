@@ -7,6 +7,7 @@ where
 import qualified Control.Exception.Safe as EXS
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Control.Monad.Trans.Except as EX
+import qualified Data.Pool as POOL
 import qualified Data.Text as T
 import qualified Data.Time as TIME
 import qualified Database.PostgreSQL.Simple as SQL
@@ -32,27 +33,28 @@ getUserList h DataTypes.Db {..} ma ml =
   (>>=) (liftIO $ dbUserList (h, ma, ml)) ToHttpResponse.toHttpResponse
 
 userList ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   (News.Handle IO, Maybe DataTypes.Offset, Maybe DataTypes.Limit) ->
   IO (Either ErrorTypes.GetContentError [DataTypes.User])
-userList conn (h, mo, ml) = do EX.runExceptT $ userListExcept conn (h, mo, ml)
+userList pool (h, mo, ml) = do EX.runExceptT $ userListExcept pool (h, mo, ml)
 
 userListExcept ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   (News.Handle IO, Maybe DataTypes.Offset, Maybe DataTypes.Limit) ->
   EX.ExceptT ErrorTypes.GetContentError IO [DataTypes.User]
-userListExcept conn (h, mo, ml) = do
+userListExcept pool (h, mo, ml) = do
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Get User List with offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
   (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetContent $ OffsetLimit.checkOffsetLimit h mo ml
   res <-
     liftIO
-      ( EXS.try $
-          SQL.query
-            conn
-            [sql|SELECT usr_name, usr_login, usr_admin, usr_author, usr_created
+      ( POOL.withResource pool $ \conn ->
+          EXS.try $
+            SQL.query
+              conn
+              [sql|SELECT usr_name, usr_login, usr_admin, usr_author, usr_created
                FROM usr ORDER BY usr_created LIMIT ?  OFFSET ? |]
-            (show limit, show offset) ::
-          IO (Either SQL.SqlError [(T.Text, String, Bool, Bool, TIME.Day)])
+              (show limit, show offset) ::
+            IO (Either EXS.SomeException [(T.Text, String, Bool, Bool, TIME.Day)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("userListExcept", show err)

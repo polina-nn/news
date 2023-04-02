@@ -53,6 +53,7 @@ import Servant.Server.Experimental.Auth (AuthHandler, mkAuthHandler) -- AuthServ
 import qualified Types.ApiTypes as ApiTypes
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
+import qualified Types.ExceptionTypes as ExceptionTypes
 import Web.Cookie (parseCookies)
 
 server :: News.Handle IO -> DataTypes.Db -> Server ApiTypes.RestAPI
@@ -80,7 +81,7 @@ run h = do
   let appConfig = News.hAppConfig (DataTypes.hServerHandle h)
   let appPort = News.appPort appConfig
   pool <- DbServices.initConnPool h
-  DbServices.migrateDb pool (DataTypes.hServerHandle h, "_migrations")
+  EXS.catch (DbServices.migrateDb pool (DataTypes.hServerHandle h, "_migrations")) (ExceptionTypes.handleException (DataTypes.hServerHandle h))
   Network.Wai.Handler.Warp.run appPort $ app (DataTypes.hServerHandle h) pool
 
 app :: News.Handle IO -> POOL.Pool SQL.Connection -> Application
@@ -105,24 +106,25 @@ authHandlerConn h conn = mkAuthHandler handler
       maybeToEither "Missing token in cookie" $ lookup "servant-auth-cookie" $ parseCookies cookie
 
 lookupToken :: News.Handle IO -> POOL.Pool SQL.Connection -> ByteString -> Handler DataTypes.Token
-lookupToken h conns key = do
-  token <- liftIO $ EX.runExceptT $ POOL.withResource conns . flip lookupTokenDB $ (h, key)
+lookupToken h pool key = do
+  token <- liftIO $ EX.runExceptT $ lookupTokenDB pool (h, key)
   case token of
     Left (ErrorTypes.ServerAuthErrorSQLRequestError a) -> throwError err500 {errReasonPhrase = show a}
     Left (ErrorTypes.ServerAuthErrorInvalidToken a) -> throwError err403 {errReasonPhrase = show a}
     Right value -> return value
 
-lookupTokenDB :: SQL.Connection -> (News.Handle IO, ByteString) -> EX.ExceptT ErrorTypes.ServerAuthError IO DataTypes.Token
-lookupTokenDB conn (h, t) = do
+lookupTokenDB :: POOL.Pool SQL.Connection -> (News.Handle IO, ByteString) -> EX.ExceptT ErrorTypes.ServerAuthError IO DataTypes.Token
+lookupTokenDB pool (h, t) = do
   let token = Lib.hashed $ BSC8.unpack t
   res <-
     liftIO
-      ( EXS.try $
-          SQL.query
-            conn
-            [sql| SELECT EXISTS  (SELECT  token_key FROM token WHERE token_key = ?) |]
-            (SQL.Only token) ::
-          IO (Either SQL.SqlError [SQL.Only Bool])
+      ( POOL.withResource pool $ \conn ->
+          EXS.try $
+            SQL.query
+              conn
+              [sql| SELECT EXISTS  (SELECT  token_key FROM token WHERE token_key = ?) |]
+              (SQL.Only token) ::
+            IO (Either EXS.SomeException [SQL.Only Bool])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("lookupTokenDB", show err)

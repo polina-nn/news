@@ -6,21 +6,24 @@
 
 module Types.ExceptionTypes where
 
-import qualified Control.Exception.Safe as EX
+import qualified Control.Exception.Safe as EXS
 import qualified Data.Text as T
 import qualified Logger
 import qualified News
 import qualified System.Exit as Exit
 
-newtype DbException
+data ServerException
   = -- | DbNotConnect  -- ERROR when there is no database connection
-    DbNotConnect EX.SomeException
-  deriving (EX.Exception)
+    DbNotConnect EXS.SomeException
+  | -- | MigrationError  -- ERROR throw during migrations
+    MigrationError String
+  deriving (EXS.Exception)
 
-instance Show DbException where
+instance Show ServerException where
   show (DbNotConnect msg) = "Failed, not connection to the Data Base!  " ++ show msg
+  show (MigrationError msg) = "Failed, during migrations  " ++ show msg
 
-handleException :: News.Handle IO -> EX.SomeException -> IO a
-handleException h (EX.SomeException e) = do
-  Logger.logError (News.hLogHandle h) $ T.concat ["catch SomeException: ERROR! ", T.pack $ show e]
+handleException :: News.Handle IO -> EXS.SomeException -> IO a
+handleException h (EXS.SomeException e) = do
+  Logger.logError (News.hLogHandle h) $ T.concat ["catch ServerException: ERROR! ", T.pack $ show e]
   Exit.exitFailure

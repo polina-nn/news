@@ -11,6 +11,7 @@ import qualified Control.Monad.Trans.Except as EX
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.Int as I
+import qualified Data.Pool as POOL
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
@@ -40,26 +41,24 @@ addOneImage h DataTypes.Db {..} user createImageReq =
     ToHttpResponse.toHttpResponse
 
 addImage ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   (News.Handle IO, DataTypes.Token, DataTypes.CreateImageRequest) ->
   IO (Either ErrorTypes.AddImageError DataTypes.URI)
-addImage conn (h, token, createImage) = EX.runExceptT $ addImageExcept conn (h, token, createImage)
+addImage pool (h, token, createImage) = EX.runExceptT $ addImageExcept pool (h, token, createImage)
 
 addImageExcept ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   (News.Handle IO, DataTypes.Token, DataTypes.CreateImageRequest) ->
   EX.ExceptT ErrorTypes.AddImageError IO DataTypes.URI
-addImageExcept conn (h, token, createImage) = do
-  user <- EX.withExceptT ErrorTypes.AddImageSQLRequestError (LibIO.searchUser h conn token)
+addImageExcept pool (h, token, createImage) = do
+  user <- EX.withExceptT ErrorTypes.AddImageSQLRequestError (LibIO.searchUser h pool token)
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add One Image ", ToText.toText createImage, "\nby user: ", ToText.toText user]
   _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddImage (Lib.checkUserAuthor h user)
   _ <- checkPngImage h createImage
   _ <- checkImageFileExist h createImage
   allCheckAndDecodeBase64ByteString <- checkAndDecodeBase64Image h createImage
-  imageId <- getImageId conn h
-  res <- addImageToDB conn h createImage allCheckAndDecodeBase64ByteString imageId
-  liftIO $ SQL.close conn
-  return res
+  imageId <- getImageId pool h
+  addImageToDB pool h createImage allCheckAndDecodeBase64ByteString imageId
 
 checkImageFileExist ::
   News.Handle IO ->
@@ -120,18 +119,19 @@ checkAndDecodeBase64Image h DataTypes.CreateImageRequest {..} = do
 
 -- | getImageId  get id for new image
 getImageId ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   News.Handle IO ->
   EX.ExceptT ErrorTypes.AddImageError IO Int
-getImageId conn h = do
+getImageId pool h = do
   resId <-
     liftIO
-      ( EXS.try
-          ( SQL.query_
-              conn
-              [sql| select NEXTVAL('image_id_seq')|]
-          ) ::
-          IO (Either SQL.SqlError [SQL.Only Int])
+      ( POOL.withResource pool $ \conn ->
+          EXS.try
+            ( SQL.query_
+                conn
+                [sql| select NEXTVAL('image_id_seq')|]
+            ) ::
+            IO (Either EXS.SomeException [SQL.Only Int])
       )
   case resId of
     Left err -> Throw.throwSqlRequestError h ("getImageId ", show err)
@@ -141,22 +141,23 @@ getImageId conn h = do
     Right _ -> Throw.throwSqlRequestError h ("getImageId ", "Developer error")
 
 addImageToDB ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   News.Handle IO ->
   DataTypes.CreateImageRequest ->
   ImageDecodeBase64ByteString ->
   Int ->
   EX.ExceptT ErrorTypes.AddImageError IO DataTypes.URI
-addImageToDB conn h DataTypes.CreateImageRequest {..} im idIm = do
+addImageToDB pool h DataTypes.CreateImageRequest {..} im idIm = do
   res <-
     liftIO
-      ( EXS.try
-          ( SQL.execute
-              conn
-              [sql| INSERT INTO image (image_id, image_name, image_type, image_content) VALUES (?,?,?,?) |]
-              (idIm, file, format, show im)
-          ) ::
-          IO (Either SQL.SqlError I.Int64)
+      ( POOL.withResource pool $ \conn ->
+          EXS.try
+            ( SQL.execute
+                conn
+                [sql| INSERT INTO image (image_id, image_name, image_type, image_content) VALUES (?,?,?,?) |]
+                (idIm, file, format, show im)
+            ) ::
+            IO (Either EXS.SomeException I.Int64)
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("addImageToDB", show err)

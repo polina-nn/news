@@ -8,6 +8,7 @@ import qualified Control.Exception.Safe as EXS
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Control.Monad.Trans.Except as EX
 import qualified Data.Int as I
+import qualified Data.Pool as POOL
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
@@ -34,39 +35,40 @@ addOneUser h DataTypes.Db {..} user createUserReq =
     ToHttpResponse.toHttpResponse
 
 addUser ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   (News.Handle IO, DataTypes.Token, DataTypes.CreateUserRequest) ->
   IO (Either ErrorTypes.AddUserError DataTypes.User)
-addUser conn (h, account, req) = EX.runExceptT $ addUserExcept conn (h, account, req)
+addUser pool (h, account, req) = EX.runExceptT $ addUserExcept pool (h, account, req)
 
 addUserExcept ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   (News.Handle IO, DataTypes.Token, DataTypes.CreateUserRequest) ->
   EX.ExceptT ErrorTypes.AddUserError IO DataTypes.User
-addUserExcept conn (h, token, req) = do
-  user <- EX.withExceptT ErrorTypes.AddUserSQLRequestError (LibIO.searchUser h conn token)
+addUserExcept pool (h, token, req) = do
+  user <- EX.withExceptT ErrorTypes.AddUserSQLRequestError (LibIO.searchUser h pool token)
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add User: \n", ToText.toText req, "by user: ", ToText.toText user]
   _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddUser (Lib.checkUserAdmin h user)
-  _ <- checkLogin conn h req
-  _ <- addTokenToDB conn h req
-  addUserToDB conn h req
+  _ <- checkLogin pool h req
+  _ <- addTokenToDB pool h req
+  addUserToDB pool h req
 
 -- | checkLogin - check the existence of the login. Duplication of login is not allowed
 checkLogin ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   News.Handle IO ->
   DataTypes.CreateUserRequest ->
   EX.ExceptT ErrorTypes.AddUserError IO DataTypes.CreateUserRequest
-checkLogin conn h' r@DataTypes.CreateUserRequest {..} = do
+checkLogin pool h' r@DataTypes.CreateUserRequest {..} = do
   res <-
     liftIO
-      ( EXS.try
-          ( SQL.query
-              conn
-              [sql| SELECT EXISTS (SELECT usr_login  FROM usr WHERE usr_login = ?) |]
-              (SQL.Only login)
-          ) ::
-          IO (Either SQL.SqlError [SQL.Only Bool])
+      ( POOL.withResource pool $ \conn ->
+          EXS.try
+            ( SQL.query
+                conn
+                [sql| SELECT EXISTS (SELECT usr_login  FROM usr WHERE usr_login = ?) |]
+                (SQL.Only login)
+            ) ::
+            IO (Either EXS.SomeException [SQL.Only Bool])
       )
 
   case res of
@@ -83,22 +85,23 @@ checkLogin conn h' r@DataTypes.CreateUserRequest {..} = do
     Right _ -> Throw.throwSqlRequestError h' ("checkLogin ", "Developer error!")
 
 addTokenToDB ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   News.Handle IO ->
   DataTypes.CreateUserRequest ->
   EX.ExceptT ErrorTypes.AddUserError IO DataTypes.CreateUserRequest
-addTokenToDB conn h r@DataTypes.CreateUserRequest {..} = do
+addTokenToDB pool h r@DataTypes.CreateUserRequest {..} = do
   let token = Lib.hashed ("key" ++ login)
   res <-
     liftIO
-      ( EXS.try
-          ( SQL.execute
-              conn
-              [sql|INSERT INTO token  (token_login, token_key )
+      ( POOL.withResource pool $ \conn ->
+          EXS.try
+            ( SQL.execute
+                conn
+                [sql|INSERT INTO token  (token_login, token_key )
              VALUES (?, ?) |]
-              (login, token)
-          ) ::
-          IO (Either SQL.SqlError I.Int64)
+                (login, token)
+            ) ::
+            IO (Either EXS.SomeException I.Int64)
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("addTokenToDB", show err)
@@ -108,22 +111,23 @@ addTokenToDB conn h r@DataTypes.CreateUserRequest {..} = do
     Right _ -> Throw.throwSqlRequestError h ("addTokenToDB", "Developer error")
 
 addUserToDB ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   News.Handle IO ->
   DataTypes.CreateUserRequest ->
   EX.ExceptT ErrorTypes.AddUserError IO DataTypes.User
-addUserToDB conn h DataTypes.CreateUserRequest {..} = do
+addUserToDB pool h DataTypes.CreateUserRequest {..} = do
   created <- liftIO Lib.currentDay
   res <-
     liftIO
-      ( EXS.try
-          ( SQL.execute
-              conn
-              [sql|INSERT INTO usr (usr_name, usr_login , usr_password, usr_created, usr_admin, usr_author )
+      ( POOL.withResource pool $ \conn ->
+          EXS.try
+            ( SQL.execute
+                conn
+                [sql|INSERT INTO usr (usr_name, usr_login , usr_password, usr_created, usr_admin, usr_author )
              VALUES (?, ?, ?, ?, ?, ?) |]
-              (name, login, Lib.hashed password, show created, admin, author)
-          ) ::
-          IO (Either SQL.SqlError I.Int64)
+                (name, login, Lib.hashed password, show created, admin, author)
+            ) ::
+            IO (Either EXS.SomeException I.Int64)
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("addUserToDB", show err)
