@@ -37,13 +37,13 @@ addImageNews pool h DataTypes.CreateImageRequest {..} = do
   content <- liftIO $ B.readFile image
   resId <-
     liftIO
-      ( POOL.withResource pool $ \conn ->
-          EXS.try
-            ( SQL.query_
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.query_
                 conn
                 [sql| select NEXTVAL('image_id_seq')|]
-            ) ::
-            IO (Either EXS.SomeException [SQL.Only IdImage])
+          ) ::
+          IO (Either EXS.SomeException [SQL.Only IdImage])
       )
   case resId of
     Left err -> Throw.throwSqlRequestError h ("addImageNews", show err)
@@ -51,14 +51,14 @@ addImageNews pool h DataTypes.CreateImageRequest {..} = do
       let imageDecodeBase64ByteString = Base64.decodeBase64Lenient content
       res <-
         liftIO
-          ( POOL.withResource pool $ \conn ->
-              EXS.try
-                ( SQL.execute
+          ( EXS.try
+              ( POOL.withResource pool $ \conn ->
+                  SQL.execute
                     conn
                     [sql| INSERT INTO image (image_id, image_name, image_type, image_content) VALUES (?,?,?,?)|]
                     (idIm, file, format, show imageDecodeBase64ByteString)
-                ) ::
-                IO (Either EXS.SomeException I.Int64)
+              ) ::
+              IO (Either EXS.SomeException I.Int64)
           )
       case res of
         Left err -> Throw.throwSqlRequestError h ("addImageNews", show err)
@@ -96,14 +96,15 @@ getCategories ::
 getCategories pool h' path = do
   res <-
     liftIO
-      ( POOL.withResource pool $ \con ->
-          EXS.try $
-            SQL.query
-              con
-              [sql| SELECT category_path, category_id, category_name FROM category 
+      ( EXS.try
+          ( POOL.withResource pool $ \con ->
+              SQL.query
+                con
+                [sql| SELECT category_path, category_id, category_name FROM category 
             WHERE ? LIKE category_path||'%' ORDER BY category_path |]
-              (SQL.Only path) ::
-            IO (Either EXS.SomeException [(String, IdImage, T.Text)])
+                (SQL.Only path)
+          ) ::
+          IO (Either EXS.SomeException [(String, IdImage, T.Text)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h' ("getCategories", show err)

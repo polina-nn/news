@@ -47,14 +47,15 @@ userListExcept pool (h, mo, ml) = do
   (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetContent $ OffsetLimit.checkOffsetLimit h mo ml
   res <-
     liftIO
-      ( POOL.withResource pool $ \conn ->
-          EXS.try $
-            SQL.query
-              conn
-              [sql|SELECT usr_name, usr_login, usr_admin, usr_author, usr_created
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.query
+                conn
+                [sql|SELECT usr_name, usr_login, usr_admin, usr_author, usr_created
                FROM usr ORDER BY usr_created LIMIT ?  OFFSET ? |]
-              (show limit, show offset) ::
-            IO (Either EXS.SomeException [(T.Text, String, Bool, Bool, TIME.Day)])
+                (show limit, show offset)
+          ) ::
+          IO (Either EXS.SomeException [(T.Text, String, Bool, Bool, TIME.Day)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("userListExcept", show err)

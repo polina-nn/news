@@ -47,13 +47,14 @@ changePathOneCategory ::
 changePathOneCategory pool h CategoryHelpTypes.EditCategory {..} = do
   res <-
     liftIO
-      ( POOL.withResource pool $ \conn ->
-          EXS.try $
-            SQL.execute
-              conn
-              [sql| UPDATE  category SET category_path = ? WHERE category_id = ? |]
-              (newPath, permanentId) ::
-            IO (Either EXS.SomeException I.Int64)
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.execute
+                conn
+                [sql| UPDATE  category SET category_path = ? WHERE category_id = ? |]
+                (newPath, permanentId)
+          ) ::
+          IO (Either EXS.SomeException I.Int64)
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("changePathOneCategory", show err)
@@ -71,13 +72,13 @@ getAllCategories ::
 getAllCategories pool h = do
   res <-
     liftIO
-      ( POOL.withResource pool $ \conn ->
-          EXS.try
-            ( SQL.query_
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.query_
                 conn
                 [sql| SELECT category_path, category_id, category_name FROM category ORDER BY category_path |]
-            ) ::
-            IO (Either EXS.SomeException [(DataTypes.Path, DataTypes.Id, DataTypes.Name)])
+          ) ::
+          IO (Either EXS.SomeException [(DataTypes.Path, DataTypes.Id, DataTypes.Name)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("getAllCategories", show err)

@@ -125,13 +125,13 @@ getImageId ::
 getImageId pool h = do
   resId <-
     liftIO
-      ( POOL.withResource pool $ \conn ->
-          EXS.try
-            ( SQL.query_
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.query_
                 conn
                 [sql| select NEXTVAL('image_id_seq')|]
-            ) ::
-            IO (Either EXS.SomeException [SQL.Only Int])
+          ) ::
+          IO (Either EXS.SomeException [SQL.Only Int])
       )
   case resId of
     Left err -> Throw.throwSqlRequestError h ("getImageId ", show err)
@@ -150,14 +150,14 @@ addImageToDB ::
 addImageToDB pool h DataTypes.CreateImageRequest {..} im idIm = do
   res <-
     liftIO
-      ( POOL.withResource pool $ \conn ->
-          EXS.try
-            ( SQL.execute
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.execute
                 conn
                 [sql| INSERT INTO image (image_id, image_name, image_type, image_content) VALUES (?,?,?,?) |]
                 (idIm, file, format, show im)
-            ) ::
-            IO (Either EXS.SomeException I.Int64)
+          ) ::
+          IO (Either EXS.SomeException I.Int64)
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("addImageToDB", show err)

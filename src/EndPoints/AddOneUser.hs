@@ -61,14 +61,14 @@ checkLogin ::
 checkLogin pool h' r@DataTypes.CreateUserRequest {..} = do
   res <-
     liftIO
-      ( POOL.withResource pool $ \conn ->
-          EXS.try
-            ( SQL.query
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.query
                 conn
                 [sql| SELECT EXISTS (SELECT usr_login  FROM usr WHERE usr_login = ?) |]
                 (SQL.Only login)
-            ) ::
-            IO (Either EXS.SomeException [SQL.Only Bool])
+          ) ::
+          IO (Either EXS.SomeException [SQL.Only Bool])
       )
 
   case res of
@@ -93,15 +93,15 @@ addTokenToDB pool h r@DataTypes.CreateUserRequest {..} = do
   let token = Lib.hashed ("key" ++ login)
   res <-
     liftIO
-      ( POOL.withResource pool $ \conn ->
-          EXS.try
-            ( SQL.execute
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.execute
                 conn
                 [sql|INSERT INTO token  (token_login, token_key )
              VALUES (?, ?) |]
                 (login, token)
-            ) ::
-            IO (Either EXS.SomeException I.Int64)
+          ) ::
+          IO (Either EXS.SomeException I.Int64)
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("addTokenToDB", show err)
@@ -119,15 +119,15 @@ addUserToDB pool h DataTypes.CreateUserRequest {..} = do
   created <- liftIO Lib.currentDay
   res <-
     liftIO
-      ( POOL.withResource pool $ \conn ->
-          EXS.try
-            ( SQL.execute
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.execute
                 conn
                 [sql|INSERT INTO usr (usr_name, usr_login , usr_password, usr_created, usr_admin, usr_author )
              VALUES (?, ?, ?, ?, ?, ?) |]
                 (name, login, Lib.hashed password, show created, admin, author)
-            ) ::
-            IO (Either EXS.SomeException I.Int64)
+          ) ::
+          IO (Either EXS.SomeException I.Int64)
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("addUserToDB", show err)

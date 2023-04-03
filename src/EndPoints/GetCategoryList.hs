@@ -46,16 +46,17 @@ categoryListExcept pool (h, mo, ml) = do
   (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetContent $ OffsetLimit.checkOffsetLimit h mo ml
   res <-
     liftIO
-      ( POOL.withResource pool $ \conn ->
-          EXS.try $
-            SQL.query
-              conn
-              [sql| SELECT category_path, category_id, category_name
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.query
+                conn
+                [sql| SELECT category_path, category_id, category_name
                 FROM category 
                 ORDER BY category_path 
                 LIMIT ?  OFFSET ? |]
-              (show limit, show offset) ::
-            IO (Either EXS.SomeException [(DataTypes.Path, DataTypes.Id, DataTypes.Name)])
+                (show limit, show offset)
+          ) ::
+          IO (Either EXS.SomeException [(DataTypes.Path, DataTypes.Id, DataTypes.Name)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("checkId", show err)

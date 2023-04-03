@@ -76,13 +76,14 @@ checkId ::
 checkId pool h' id' = do
   res <-
     liftIO
-      ( POOL.withResource pool $ \conn ->
-          EXS.try $
-            SQL.query
-              conn
-              [sql| SELECT EXISTS (SELECT category_id  FROM category WHERE category_id = ?) |]
-              (SQL.Only id') ::
-            IO (Either EXS.SomeException [SQL.Only Bool])
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.query
+                conn
+                [sql| SELECT EXISTS (SELECT category_id  FROM category WHERE category_id = ?) |]
+                (SQL.Only id')
+          ) ::
+          IO (Either EXS.SomeException [SQL.Only Bool])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h' ("checkId", show err)
@@ -127,13 +128,14 @@ editCategoryName ::
 editCategoryName pool h r@CategoryHelpTypes.EditCategoryFullRequest {..} = do
   res <-
     liftIO
-      ( POOL.withResource pool $ \conn ->
-          EXS.try $
-            SQL.execute
-              conn
-              [sql| UPDATE category SET category_name = ? WHERE category_id = ? |]
-              (newCategory', id') ::
-            IO (Either EXS.SomeException I.Int64)
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.execute
+                conn
+                [sql| UPDATE category SET category_name = ? WHERE category_id = ? |]
+                (newCategory', id')
+          ) ::
+          IO (Either EXS.SomeException I.Int64)
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("editCategoryName", show err)
@@ -148,13 +150,14 @@ getCategory ::
 getCategory pool h CategoryHelpTypes.EditCategoryFullRequest {..} = do
   resPath <-
     liftIO
-      ( POOL.withResource pool $ \conn ->
-          EXS.try $
-            SQL.query
-              conn
-              [sql| SELECT category_path FROM category WHERE category_id = ? |]
-              (SQL.Only id') ::
-            IO (Either EXS.SomeException [SQL.Only String])
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.query
+                conn
+                [sql| SELECT category_path FROM category WHERE category_id = ? |]
+                (SQL.Only id')
+          ) ::
+          IO (Either EXS.SomeException [SQL.Only String])
       )
   case resPath of
     Left err -> Throw.throwSqlRequestError h ("getCategory", show err)

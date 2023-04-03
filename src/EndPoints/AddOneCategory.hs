@@ -87,14 +87,14 @@ addCategoryToDb ::
 addCategoryToDb pool h r@DataTypes.CreateCategoryRequest {..} = do
   res <-
     liftIO
-      ( POOL.withResource pool $ \conn ->
-          EXS.try
-            ( SQL.execute
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.execute
                 conn
                 [sql| INSERT INTO  category (category_path, category_name)  VALUES (?,?) |]
                 (path, category)
-            ) ::
-            IO (Either EXS.SomeException I.Int64)
+          ) ::
+          IO (Either EXS.SomeException I.Int64)
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("addCategoryToDb", show err)
@@ -109,14 +109,14 @@ getCategoryId ::
 getCategoryId pool h DataTypes.CreateCategoryRequest {..} = do
   resId <-
     liftIO
-      ( POOL.withResource pool $ \conn ->
-          EXS.try
-            ( SQL.query
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.query
                 conn
                 [sql| SELECT category_id  FROM category WHERE category_path = ? |]
                 (SQL.Only path)
-            ) ::
-            IO (Either EXS.SomeException [SQL.Only Int])
+          ) ::
+          IO (Either EXS.SomeException [SQL.Only Int])
       )
   case resId of
     Left err -> Throw.throwSqlRequestError h ("getCategoryId", show err)

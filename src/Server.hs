@@ -118,13 +118,14 @@ lookupTokenDB pool (h, t) = do
   let token = Lib.hashed $ BSC8.unpack t
   res <-
     liftIO
-      ( POOL.withResource pool $ \conn ->
-          EXS.try $
-            SQL.query
-              conn
-              [sql| SELECT EXISTS  (SELECT  token_key FROM token WHERE token_key = ?) |]
-              (SQL.Only token) ::
-            IO (Either EXS.SomeException [SQL.Only Bool])
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.query
+                conn
+                [sql| SELECT EXISTS  (SELECT  token_key FROM token WHERE token_key = ?) |]
+                (SQL.Only token)
+          ) ::
+          IO (Either EXS.SomeException [SQL.Only Bool])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("lookupTokenDB", show err)

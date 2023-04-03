@@ -103,11 +103,11 @@ newsListCategory ::
 newsListCategory pool h off lim NewsHelpTypes.DbFilter {..} = do
   res <-
     liftIO
-      ( POOL.withResource pool $ \conn ->
-          EXS.try $
-            SQL.query
-              conn
-              [sql| SELECT news_title, news_created, usr_name, category_path, category_name, news_text, news_images_id, cardinality (news_images_id), news_published, news_id
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.query
+                conn
+                [sql| SELECT news_title, news_created, usr_name, category_path, category_name, news_text, news_images_id, cardinality (news_images_id), news_published, news_id
             FROM news
             INNER JOIN usr ON news.news_author_login = usr.usr_login INNER JOIN category ON news.news_category_id = category.category_id
             WHERE (news_published = true) 
@@ -118,17 +118,18 @@ newsListCategory pool h off lim NewsHelpTypes.DbFilter {..} = do
             AND news_category_id = ?
             ORDER BY news_created DESC 
             LIMIT ?  OFFSET ?|]
-              ( dbFilterDayAt,
-                dbFilterDayUntil,
-                dbFilterDaySince,
-                dbFilterAuthor,
-                dbFilterTitle,
-                dbFilterContent,
-                newsCat,
-                lim,
-                off
-              ) ::
-            IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, String, T.Text, T.Text, SQLTypes.PGArray Int, Int, Bool, Int)])
+                ( dbFilterDayAt,
+                  dbFilterDayUntil,
+                  dbFilterDaySince,
+                  dbFilterAuthor,
+                  dbFilterTitle,
+                  dbFilterContent,
+                  newsCat,
+                  lim,
+                  off
+                )
+          ) ::
+          IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, String, T.Text, T.Text, SQLTypes.PGArray Int, Int, Bool, Int)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("newsListCategory", show err)
@@ -148,11 +149,11 @@ newsListNotCategory ::
 newsListNotCategory pool h off lim NewsHelpTypes.DbFilter {..} = do
   res <-
     liftIO
-      ( POOL.withResource pool $ \conn ->
-          EXS.try $
-            SQL.query
-              conn
-              [sql| SELECT news_title, news_created, usr_name, category_path, category_name, news_text, news_images_id, cardinality (news_images_id), news_published, news_id
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.query
+                conn
+                [sql| SELECT news_title, news_created, usr_name, category_path, category_name, news_text, news_images_id, cardinality (news_images_id), news_published, news_id
             FROM news
             INNER JOIN usr ON news.news_author_login = usr.usr_login INNER JOIN category ON news.news_category_id = category.category_id
             WHERE (news_published = true) 
@@ -162,16 +163,17 @@ newsListNotCategory pool h off lim NewsHelpTypes.DbFilter {..} = do
             AND news_text LIKE ?
             ORDER BY news_created DESC 
             LIMIT ?  OFFSET ?|]
-              ( dbFilterDayAt,
-                dbFilterDayUntil,
-                dbFilterDaySince,
-                dbFilterAuthor,
-                dbFilterTitle,
-                dbFilterContent,
-                lim,
-                off
-              ) ::
-            IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, String, T.Text, T.Text, SQLTypes.PGArray Int, Int, Bool, Int)])
+                ( dbFilterDayAt,
+                  dbFilterDayUntil,
+                  dbFilterDaySince,
+                  dbFilterAuthor,
+                  dbFilterTitle,
+                  dbFilterContent,
+                  lim,
+                  off
+                )
+          ) ::
+          IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, String, T.Text, T.Text, SQLTypes.PGArray Int, Int, Bool, Int)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("newsListNotCategory", show err)

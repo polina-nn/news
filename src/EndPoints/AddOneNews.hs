@@ -150,15 +150,15 @@ checkCategoryId ::
 checkCategoryId pool h DataTypes.CreateNewsRequest {..} = do
   res <-
     liftIO
-      ( POOL.withResource pool $ \conn ->
-          EXS.try
-            ( SQL.query
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.query
                 conn
                 [sql| SELECT category_path  FROM category WHERE category_id = ?|]
                 (SQL.Only newsCategoryId) ::
                 IO [SQL.Only String]
-            ) ::
-            IO (Either EXS.SomeException [SQL.Only String])
+          ) ::
+          IO (Either EXS.SomeException [SQL.Only String])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("checkCategoryId", show err)
@@ -186,14 +186,14 @@ getCategories ::
 getCategories pool h path = do
   res <-
     liftIO
-      ( POOL.withResource pool $ \conn ->
-          EXS.try
-            ( SQL.query
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.query
                 conn
                 [sql| SELECT category_path, category_id, category_name FROM category WHERE ? LIKE category_path||'%' ORDER BY category_path |]
                 (SQL.Only path)
-            ) ::
-            IO (Either EXS.SomeException [(DataTypes.Path, DataTypes.Id, DataTypes.Name)])
+          ) ::
+          IO (Either EXS.SomeException [(DataTypes.Path, DataTypes.Id, DataTypes.Name)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("getCategories", show err)
@@ -209,13 +209,13 @@ getNewsId ::
 getNewsId pool h = do
   resId <-
     liftIO
-      ( POOL.withResource pool $ \conn ->
-          EXS.try
-            ( SQL.query_
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.query_
                 conn
                 [sql| select NEXTVAL('news_id_seq')|]
-            ) ::
-            IO (Either EXS.SomeException [SQL.Only IdNews])
+          ) ::
+          IO (Either EXS.SomeException [SQL.Only IdNews])
       )
   case resId of
     Left err -> Throw.throwSqlRequestError h ("getNewsId", show err)
@@ -250,9 +250,9 @@ addNewsToDB pool h DataTypes.User {..} categories DataTypes.CreateNewsRequest {.
   created <- liftIO Lib.currentDay
   res <-
     liftIO
-      ( POOL.withResource pool $ \conn ->
-          EXS.try
-            ( SQL.execute
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.execute
                 conn
                 [sql| INSERT INTO news (news_images_id, news_id, news_title , news_created, news_author_login, news_category_id, news_text,  news_published ) VALUES (?, ?, ?, ?, ?, ?,?,? ) |]
                 ( SQLTypes.PGArray idImages,
@@ -264,8 +264,8 @@ addNewsToDB pool h DataTypes.User {..} categories DataTypes.CreateNewsRequest {.
                   text,
                   published
                 )
-            ) ::
-            IO (Either EXS.SomeException I.Int64)
+          ) ::
+          IO (Either EXS.SomeException I.Int64)
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("addNewsToDB", show err)

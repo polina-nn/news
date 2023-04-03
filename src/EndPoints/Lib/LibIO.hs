@@ -24,15 +24,16 @@ searchUser ::
 searchUser h pool DataTypes.Token {..} = do
   res <-
     liftIO
-      ( POOL.withResource pool $ \conn ->
-          EXS.try $
-            SQL.query
-              conn
-              [sql|SELECT usr_name, usr_login, usr_admin, usr_author, usr_created 
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.query
+                conn
+                [sql|SELECT usr_name, usr_login, usr_admin, usr_author, usr_created 
                FROM usr LEFT JOIN token ON usr.usr_login = token.token_login
                WHERE token_key = ? |]
-              (SQL.Only token) ::
-            IO (Either EXS.SomeException [(T.Text, String, Bool, Bool, TIME.Day)])
+                (SQL.Only token)
+          ) ::
+          IO (Either EXS.SomeException [(T.Text, String, Bool, Bool, TIME.Day)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("searchUser", show err)

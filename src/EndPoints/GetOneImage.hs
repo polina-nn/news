@@ -38,14 +38,14 @@ oneImageExcept pool (h, id') = do
   _ <- checkId pool h id'
   res <-
     liftIO
-      ( POOL.withResource pool $ \conn ->
-          EXS.try
-            ( SQL.query
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.query
                 conn
                 [sql|SELECT image_content FROM image WHERE image_id = ?|]
                 (SQL.Only id')
-            ) ::
-            IO (Either EXS.SomeException [SQL.Only String])
+          ) ::
+          IO (Either EXS.SomeException [SQL.Only String])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("oneImageExcept", show err)
@@ -62,13 +62,14 @@ checkId ::
 checkId pool h' id' = do
   res <-
     liftIO
-      ( POOL.withResource pool $ \conn ->
-          EXS.try $
-            SQL.query
-              conn
-              [sql|SELECT EXISTS (SELECT image_id  FROM image WHERE image_id = ?)|]
-              (SQL.Only id') ::
-            IO (Either EXS.SomeException [SQL.Only Bool])
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.query
+                conn
+                [sql|SELECT EXISTS (SELECT image_id  FROM image WHERE image_id = ?)|]
+                (SQL.Only id')
+          ) ::
+          IO (Either EXS.SomeException [SQL.Only Bool])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h' ("checkId", show err)
