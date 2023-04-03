@@ -155,26 +155,6 @@ getLoggerConfig conf = do
         Logger.Impl.confMinLevel = confMinLevel
       }
 
-{--
--- | Gets the Logger config. In any case it can provide reasonable default values.
-getLoggerConfig :: IO Logger.Impl.Config
-getLoggerConfig = do
-  loadedConf <-
-    Exc.try $ C.load [C.Required "config.conf"] :: IO (Either Exc.IOException C.Config)
-  case loadedConf of
-    Left exception -> do
-      putStrLn $
-        "getLoggerConfig:OK use default logger config. Did not load config file: "
-          ++ show exception
-      stdError <- validateFileHandle $ ConfigurationTypes.stdError configDefault
-      return
-        Logger.Impl.Config
-          { Logger.Impl.confFileHandle = stdError,
-            Logger.Impl.confMinLevel = ConfigurationTypes.minLogLevel configDefault
-          }
-    Right loadedConf' -> makeLogConfig loadedConf'
---}
-
 validateFileHandle :: String -> IO System.IO.Handle
 validateFileHandle fileText =
   case fileText of
@@ -205,34 +185,3 @@ validateLogLevel levelText =
     _ -> do
       putStrLn "validateLogLevel: minLogLevel  is invalid in config.conf file"
       return Logger.Info
-
-{--
-
-makeLogConfig :: C.Config -> IO Logger.Impl.Config
-makeLogConfig conf = do
-  maybeReadStdError <- C.lookup conf "config.stdError"
-  readStdError <- fromMaybeWithMessage maybeReadStdError (ConfigurationTypes.stdError configDefault) ConfigurationTypes.StdError
-  maybeReadMinLogLevel <- C.lookup conf "config.minLogLevel"
-  readMinLogLevel <- fromMaybeWithMessage maybeReadMinLogLevel (ConfigurationTypes.minLogLevel configDefault) ConfigurationTypes.MinLogLevel
-  confFileHandle <- validateFileHandle readStdError
-  putStrLn "makeLogConfig: OK"
-  return
-    Logger.Impl.Config
-      { Logger.Impl.confFileHandle = confFileHandle,
-        Logger.Impl.confMinLevel = readMinLogLevel
-      }
-
-validateFileHandle :: ConfigurationTypes.StdError -> IO System.IO.Handle
-validateFileHandle ConfigurationTypes.Terminal = return System.IO.stderr
-validateFileHandle ConfigurationTypes.File = appendLog "logs.txt"
-
--- | appendLog  - check the existence of the file, if it does't  exist, create and append
-appendLog :: FilePath -> IO System.IO.Handle
-appendLog path = do
-  rez <- SD.doesFileExist path
-  if rez
-    then System.IO.openFile "logs.txt" System.IO.AppendMode
-    else do
-      putStrLn "Create the file logs.txt"
-      System.IO.writeFile "logs.txt" []
-      System.IO.openFile "logs.txt" System.IO.AppendMode--}
