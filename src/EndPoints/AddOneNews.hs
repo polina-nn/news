@@ -11,6 +11,7 @@ import qualified Control.Monad.Trans.Except as EX
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.Int as I
+import qualified Data.Pool as POOL
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
@@ -45,27 +46,27 @@ addOneNews h DataTypes.Db {..} user createNewsReq =
     ToHttpResponse.toHttpResponse
 
 addNews ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   (News.Handle IO, DataTypes.Token, DataTypes.CreateNewsRequest) ->
   IO (Either ErrorTypes.AddEditNewsError DataTypes.News)
-addNews conn (h, token, r) = EX.runExceptT $ addNewsExcept conn (h, token, r)
+addNews pool (h, token, r) = EX.runExceptT $ addNewsExcept pool (h, token, r)
 
 addNewsExcept ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   (News.Handle IO, DataTypes.Token, DataTypes.CreateNewsRequest) ->
   EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.News
-addNewsExcept conn (h, token, r) = do
-  user <- EX.withExceptT ErrorTypes.AddEditNewsSQLRequestError (LibIO.searchUser h conn token)
+addNewsExcept pool (h, token, r) = do
+  user <- EX.withExceptT ErrorTypes.AddEditNewsSQLRequestError (LibIO.searchUser h pool token)
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add One News: \n", ToText.toText r, "by user: ", ToText.toText user]
   _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditNews (Lib.checkUserAuthor h user)
   _ <- checkImageFilesExist h r
   _ <- checkPngImages h r
   _ <- checkBase64Images h r
-  path <- checkCategoryId conn h r
-  categories' <- getCategories conn h path
-  newsId' <- getNewsId conn h
-  images' <- addAllImages conn h r
-  addNewsToDB conn h user categories' r newsId' images'
+  path <- checkCategoryId pool h r
+  categories' <- getCategories pool h path
+  newsId' <- getNewsId pool h
+  images' <- addAllImages pool h r
+  addNewsToDB pool h user categories' r newsId' images'
 
 checkImageFilesExist ::
   News.Handle IO ->
@@ -142,21 +143,22 @@ checkBase64Images h r@(DataTypes.CreateNewsRequest _ _ _ (Just req) _) = do
 
 -- | checkCategory -- check if category with the id (from request) exists and return its path
 checkCategoryId ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   News.Handle IO ->
   DataTypes.CreateNewsRequest ->
   EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.Path
-checkCategoryId conn h DataTypes.CreateNewsRequest {..} = do
+checkCategoryId pool h DataTypes.CreateNewsRequest {..} = do
   res <-
     liftIO
       ( EXS.try
-          ( SQL.query
-              conn
-              [sql| SELECT category_path  FROM category WHERE category_id = ?|]
-              (SQL.Only newsCategoryId) ::
-              IO [SQL.Only String]
+          ( POOL.withResource pool $ \conn ->
+              SQL.query
+                conn
+                [sql| SELECT category_path  FROM category WHERE category_id = ?|]
+                (SQL.Only newsCategoryId) ::
+                IO [SQL.Only String]
           ) ::
-          IO (Either SQL.SqlError [SQL.Only String])
+          IO (Either EXS.SomeException [SQL.Only String])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("checkCategoryId", show err)
@@ -177,20 +179,21 @@ checkCategoryId conn h DataTypes.CreateNewsRequest {..} = do
 
 -- | getCategories - get a list of categories from the root to this category
 getCategories ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   News.Handle IO ->
   DataTypes.Path ->
   EX.ExceptT ErrorTypes.AddEditNewsError IO [DataTypes.Category]
-getCategories conn h path = do
+getCategories pool h path = do
   res <-
     liftIO
       ( EXS.try
-          ( SQL.query
-              conn
-              [sql| SELECT category_path, category_id, category_name FROM category WHERE ? LIKE category_path||'%' ORDER BY category_path |]
-              (SQL.Only path)
+          ( POOL.withResource pool $ \conn ->
+              SQL.query
+                conn
+                [sql| SELECT category_path, category_id, category_name FROM category WHERE ? LIKE category_path||'%' ORDER BY category_path |]
+                (SQL.Only path)
           ) ::
-          IO (Either SQL.SqlError [(DataTypes.Path, DataTypes.Id, DataTypes.Name)])
+          IO (Either EXS.SomeException [(DataTypes.Path, DataTypes.Id, DataTypes.Name)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("getCategories", show err)
@@ -200,18 +203,19 @@ getCategories conn h path = do
 
 -- getNewsIdIO  get id for new news
 getNewsId ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   News.Handle IO ->
   EX.ExceptT ErrorTypes.AddEditNewsError IO IdNews
-getNewsId conn h = do
+getNewsId pool h = do
   resId <-
     liftIO
       ( EXS.try
-          ( SQL.query_
-              conn
-              [sql| select NEXTVAL('news_id_seq')|]
+          ( POOL.withResource pool $ \conn ->
+              SQL.query_
+                conn
+                [sql| select NEXTVAL('news_id_seq')|]
           ) ::
-          IO (Either SQL.SqlError [SQL.Only IdNews])
+          IO (Either EXS.SomeException [SQL.Only IdNews])
       )
   case resId of
     Left err -> Throw.throwSqlRequestError h ("getNewsId", show err)
@@ -222,18 +226,18 @@ getNewsId conn h = do
 
 -- | addAllImagesIO Add all the pictures for the news.
 addAllImages ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   News.Handle IO ->
   DataTypes.CreateNewsRequest ->
   EX.ExceptT ErrorTypes.AddEditNewsError IO [IdImage]
 addAllImages _ _ (DataTypes.CreateNewsRequest _ _ _ Nothing _) = return []
-addAllImages conn h (DataTypes.CreateNewsRequest _ _ _ (Just req) _) = do
-  rez <- mapM (NewsIO.addImageNews conn h) req
+addAllImages pool h (DataTypes.CreateNewsRequest _ _ _ (Just req) _) = do
+  rez <- mapM (NewsIO.addImageNews pool h) req
   liftIO $ Logger.logDebug (News.hLogHandle h) "addAllImages: OK!"
   return rez
 
 addNewsToDB ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   News.Handle IO ->
   DataTypes.User ->
   [DataTypes.Category] ->
@@ -241,26 +245,27 @@ addNewsToDB ::
   IdNews ->
   [IdImage] ->
   EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.News
-addNewsToDB conn h DataTypes.User {..} categories DataTypes.CreateNewsRequest {..} idNews idImages = do
+addNewsToDB pool h DataTypes.User {..} categories DataTypes.CreateNewsRequest {..} idNews idImages = do
   let imageUris = map (Lib.imageIdToURI h) idImages
   created <- liftIO Lib.currentDay
   res <-
     liftIO
       ( EXS.try
-          ( SQL.execute
-              conn
-              [sql| INSERT INTO news (news_images_id, news_id, news_title , news_created, news_author_login, news_category_id, news_text,  news_published ) VALUES (?, ?, ?, ?, ?, ?,?,? ) |]
-              ( SQLTypes.PGArray idImages,
-                idNews,
-                title,
-                show created,
-                userLogin,
-                newsCategoryId,
-                text,
-                published
-              )
+          ( POOL.withResource pool $ \conn ->
+              SQL.execute
+                conn
+                [sql| INSERT INTO news (news_images_id, news_id, news_title , news_created, news_author_login, news_category_id, news_text,  news_published ) VALUES (?, ?, ?, ?, ?, ?,?,? ) |]
+                ( SQLTypes.PGArray idImages,
+                  idNews,
+                  title,
+                  show created,
+                  userLogin,
+                  newsCategoryId,
+                  text,
+                  published
+                )
           ) ::
-          IO (Either SQL.SqlError I.Int64)
+          IO (Either EXS.SomeException I.Int64)
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("addNewsToDB", show err)

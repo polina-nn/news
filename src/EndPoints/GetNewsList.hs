@@ -8,6 +8,7 @@ import qualified Control.Exception.Safe as EXS
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Control.Monad.Trans.Except as EX
 import Data.Maybe (fromMaybe, isJust)
+import qualified Data.Pool as POOL
 import qualified Data.Text as T
 import qualified Data.Time as TIME
 import qualified Database.PostgreSQL.Simple as SQL
@@ -48,7 +49,7 @@ getNewsList h DataTypes.Db {..} da du ds ar i t c mSort mo ml =
     filter' = News.toFilter da du ds ar i t c
 
 newsList ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   ( News.Handle IO,
     DataTypes.Filter,
     Maybe DataTypes.SortBy,
@@ -56,10 +57,10 @@ newsList ::
     Maybe DataTypes.Limit
   ) ->
   IO (Either ErrorTypes.GetNewsError [DataTypes.News])
-newsList conn (h, f, mSort, mo, ml) = do EX.runExceptT $ newsListExcept conn (h, f, mSort, mo, ml)
+newsList pool (h, f, mSort, mo, ml) = do EX.runExceptT $ newsListExcept pool (h, f, mSort, mo, ml)
 
 newsListExcept ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   ( News.Handle IO,
     DataTypes.Filter,
     Maybe DataTypes.SortBy,
@@ -67,45 +68,46 @@ newsListExcept ::
     Maybe DataTypes.Limit
   ) ->
   EX.ExceptT ErrorTypes.GetNewsError IO [DataTypes.News]
-newsListExcept conn (h, f, mSort, mo, ml) = do
+newsListExcept pool (h, f, mSort, mo, ml) = do
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Get News List with filter ", ToText.toText f, " offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
   (offset, limit, dbFilter) <- News.checkOffsetLimitFilter (h, f, mo, ml)
   liftIO $ Logger.logDebug (News.hLogHandle h) $ T.concat ["dbFilter: OK! \n", T.pack $ show dbFilter]
-  dbNews <- newsListFromDb conn h offset limit dbFilter
+  dbNews <- newsListFromDb pool h offset limit dbFilter
   sortedDbNews <- News.sortNews h mSort dbNews
-  news <- Prelude.mapM (NewsIO.toNews conn h) sortedDbNews
+  news <- Prelude.mapM (NewsIO.toNews pool h) sortedDbNews
   let toTextNews = T.concat $ map ToText.toText news
   liftIO $ Logger.logDebug (News.hLogHandle h) $ T.concat ["newsListExcept: OK! \n", toTextNews]
   return news
 
 -- | newsListFromDb  get the full list of news if the array is empty, there is no news
 newsListFromDb ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   News.Handle IO ->
   DataTypes.Offset ->
   DataTypes.Limit ->
   NewsHelpTypes.DbFilter ->
   EX.ExceptT ErrorTypes.GetNewsError IO [NewsHelpTypes.DbNews]
-newsListFromDb conn h mo ml f@NewsHelpTypes.DbFilter {..}
+newsListFromDb pool h mo ml f@NewsHelpTypes.DbFilter {..}
   --  category specified in db_filer_category_id
-  | isJust dbFilterCategoryId = newsListCategory conn h mo ml f
+  | isJust dbFilterCategoryId = newsListCategory pool h mo ml f
   -- category not specified
-  | otherwise = newsListNotCategory conn h mo ml f
+  | otherwise = newsListNotCategory pool h mo ml f
 
 newsListCategory ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   News.Handle IO ->
   DataTypes.Offset ->
   DataTypes.Limit ->
   NewsHelpTypes.DbFilter ->
   EX.ExceptT ErrorTypes.GetNewsError IO [NewsHelpTypes.DbNews]
-newsListCategory conn h off lim NewsHelpTypes.DbFilter {..} = do
+newsListCategory pool h off lim NewsHelpTypes.DbFilter {..} = do
   res <-
     liftIO
-      ( EXS.try $
-          SQL.query
-            conn
-            [sql| SELECT news_title, news_created, usr_name, category_path, category_name, news_text, news_images_id, cardinality (news_images_id), news_published, news_id
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.query
+                conn
+                [sql| SELECT news_title, news_created, usr_name, category_path, category_name, news_text, news_images_id, cardinality (news_images_id), news_published, news_id
             FROM news
             INNER JOIN usr ON news.news_author_login = usr.usr_login INNER JOIN category ON news.news_category_id = category.category_id
             WHERE (news_published = true) 
@@ -116,17 +118,18 @@ newsListCategory conn h off lim NewsHelpTypes.DbFilter {..} = do
             AND news_category_id = ?
             ORDER BY news_created DESC 
             LIMIT ?  OFFSET ?|]
-            ( dbFilterDayAt,
-              dbFilterDayUntil,
-              dbFilterDaySince,
-              dbFilterAuthor,
-              dbFilterTitle,
-              dbFilterContent,
-              newsCat,
-              lim,
-              off
-            ) ::
-          IO (Either SQL.SqlError [(T.Text, TIME.Day, T.Text, String, T.Text, T.Text, SQLTypes.PGArray Int, Int, Bool, Int)])
+                ( dbFilterDayAt,
+                  dbFilterDayUntil,
+                  dbFilterDaySince,
+                  dbFilterAuthor,
+                  dbFilterTitle,
+                  dbFilterContent,
+                  newsCat,
+                  lim,
+                  off
+                )
+          ) ::
+          IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, String, T.Text, T.Text, SQLTypes.PGArray Int, Int, Bool, Int)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("newsListCategory", show err)
@@ -137,19 +140,20 @@ newsListCategory conn h off lim NewsHelpTypes.DbFilter {..} = do
     newsCat = fromMaybe 0 dbFilterCategoryId
 
 newsListNotCategory ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   News.Handle IO ->
   DataTypes.Offset ->
   DataTypes.Limit ->
   NewsHelpTypes.DbFilter ->
   EX.ExceptT ErrorTypes.GetNewsError IO [NewsHelpTypes.DbNews]
-newsListNotCategory conn h off lim NewsHelpTypes.DbFilter {..} = do
+newsListNotCategory pool h off lim NewsHelpTypes.DbFilter {..} = do
   res <-
     liftIO
-      ( EXS.try $
-          SQL.query
-            conn
-            [sql| SELECT news_title, news_created, usr_name, category_path, category_name, news_text, news_images_id, cardinality (news_images_id), news_published, news_id
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.query
+                conn
+                [sql| SELECT news_title, news_created, usr_name, category_path, category_name, news_text, news_images_id, cardinality (news_images_id), news_published, news_id
             FROM news
             INNER JOIN usr ON news.news_author_login = usr.usr_login INNER JOIN category ON news.news_category_id = category.category_id
             WHERE (news_published = true) 
@@ -159,16 +163,17 @@ newsListNotCategory conn h off lim NewsHelpTypes.DbFilter {..} = do
             AND news_text LIKE ?
             ORDER BY news_created DESC 
             LIMIT ?  OFFSET ?|]
-            ( dbFilterDayAt,
-              dbFilterDayUntil,
-              dbFilterDaySince,
-              dbFilterAuthor,
-              dbFilterTitle,
-              dbFilterContent,
-              lim,
-              off
-            ) ::
-          IO (Either SQL.SqlError [(T.Text, TIME.Day, T.Text, String, T.Text, T.Text, SQLTypes.PGArray Int, Int, Bool, Int)])
+                ( dbFilterDayAt,
+                  dbFilterDayUntil,
+                  dbFilterDaySince,
+                  dbFilterAuthor,
+                  dbFilterTitle,
+                  dbFilterContent,
+                  lim,
+                  off
+                )
+          ) ::
+          IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, String, T.Text, T.Text, SQLTypes.PGArray Int, Int, Bool, Int)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("newsListNotCategory", show err)

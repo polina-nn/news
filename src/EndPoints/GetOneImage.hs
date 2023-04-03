@@ -8,6 +8,7 @@ import qualified Control.Exception.Safe as EXS
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Control.Monad.Trans.Except as EX
 import qualified Data.ByteString as B
+import qualified Data.Pool as POOL
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.ThrowSqlRequestError as Throw
@@ -23,27 +24,28 @@ getOneImage h DataTypes.Db {..} idImage =
   (>>=) (liftIO $ dbOneImage (h, idImage)) ToHttpResponse.toHttpResponse
 
 oneImage ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   (News.Handle IO, Integer) ->
   IO (Either ErrorTypes.GetImageError B.ByteString)
-oneImage conn (h, id') = EX.runExceptT $ oneImageExcept conn (h, id')
+oneImage pool (h, id') = EX.runExceptT $ oneImageExcept pool (h, id')
 
 oneImageExcept ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   (News.Handle IO, Integer) ->
   EX.ExceptT ErrorTypes.GetImageError IO B.ByteString
-oneImageExcept conn (h, id') = do
+oneImageExcept pool (h, id') = do
   liftIO $ Logger.logInfo (News.hLogHandle h) $ "Request: Get One Image with id " .< id'
-  _ <- checkId conn h id'
+  _ <- checkId pool h id'
   res <-
     liftIO
       ( EXS.try
-          ( SQL.query
-              conn
-              [sql|SELECT image_content FROM image WHERE image_id = ?|]
-              (SQL.Only id')
+          ( POOL.withResource pool $ \conn ->
+              SQL.query
+                conn
+                [sql|SELECT image_content FROM image WHERE image_id = ?|]
+                (SQL.Only id')
           ) ::
-          IO (Either SQL.SqlError [SQL.Only String])
+          IO (Either EXS.SomeException [SQL.Only String])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("oneImageExcept", show err)
@@ -53,19 +55,21 @@ oneImageExcept conn (h, id') = do
     Right _ -> Throw.throwSqlRequestError h ("oneImageExcept", "Developer error!")
 
 checkId ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   News.Handle IO ->
   Integer ->
   EX.ExceptT ErrorTypes.GetImageError IO Integer
-checkId conn h' id' = do
+checkId pool h' id' = do
   res <-
     liftIO
-      ( EXS.try $
-          SQL.query
-            conn
-            [sql|SELECT EXISTS (SELECT image_id  FROM image WHERE image_id = ?)|]
-            (SQL.Only id') ::
-          IO (Either SQL.SqlError [SQL.Only Bool])
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.query
+                conn
+                [sql|SELECT EXISTS (SELECT image_id  FROM image WHERE image_id = ?)|]
+                (SQL.Only id')
+          ) ::
+          IO (Either EXS.SomeException [SQL.Only Bool])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h' ("checkId", show err)

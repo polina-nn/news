@@ -7,6 +7,7 @@ where
 import qualified Control.Exception.Safe as EXS
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Control.Monad.Trans.Except as EX
+import qualified Data.Pool as POOL
 import qualified Data.Text as T
 import qualified Data.Time as TIME
 import qualified Database.PostgreSQL.Simple as SQL
@@ -38,17 +39,17 @@ getNewsSearchList h DataTypes.Db {..} mSearch mo ml =
     ToHttpResponse.toHttpResponse
 
 newsSearchList ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   ( News.Handle IO,
     Maybe T.Text,
     Maybe DataTypes.Offset,
     Maybe DataTypes.Limit
   ) ->
   IO (Either ErrorTypes.GetNewsError [DataTypes.News])
-newsSearchList conn (h, search, mo, ml) = do EX.runExceptT $ newsSearchListExcept conn (h, search, mo, ml)
+newsSearchList pool (h, search, mo, ml) = do EX.runExceptT $ newsSearchListExcept pool (h, search, mo, ml)
 
 newsSearchListExcept ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   ( News.Handle IO,
     Maybe T.Text,
     Maybe DataTypes.Offset,
@@ -58,36 +59,38 @@ newsSearchListExcept ::
 newsSearchListExcept _ (h, Nothing, _, _) = do
   liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidSearchGetNews (ErrorTypes.InvalidRequest "newsSearchListExcept: BAD! Not text for searching \n"))
   EX.throwE $ ErrorTypes.InvalidSearchGetNews $ ErrorTypes.InvalidRequest []
-newsSearchListExcept conn (h, Just search, mo, ml) = do
+newsSearchListExcept pool (h, Just search, mo, ml) = do
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Get News Search List ", search, " offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
   (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetNews $ OffsetLimit.checkOffsetLimit h mo ml
-  res <- newsSearchListAtDb conn h search offset limit
-  news <- Prelude.mapM (NewsIO.toNews conn h) res
+  res <- newsSearchListAtDb pool h search offset limit
+  news <- Prelude.mapM (NewsIO.toNews pool h) res
   let toTextNews = T.concat $ map ToText.toText news
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["newsSearchListExcept: OK! \n", toTextNews]
   return news
 
 newsSearchListAtDb ::
-  SQL.Connection ->
+  POOL.Pool SQL.Connection ->
   News.Handle IO ->
   T.Text ->
   DataTypes.Offset ->
   DataTypes.Limit ->
   EX.ExceptT ErrorTypes.GetNewsError IO [NewsHelpTypes.DbNews]
-newsSearchListAtDb conn h search off lim = do
+newsSearchListAtDb pool h search off lim = do
   res <-
     liftIO
-      ( EXS.try $
-          SQL.query
-            conn
-            [sql| SELECT news_title, news_created, usr_name, category_path, category_name, news_text, news_images_id, cardinality (news_images_id), news_published, news_id
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.query
+                conn
+                [sql| SELECT news_title, news_created, usr_name, category_path, category_name, news_text, news_images_id, cardinality (news_images_id), news_published, news_id
             FROM news
             INNER JOIN usr ON news.news_author_login = usr.usr_login INNER JOIN category ON news.news_category_id = category.category_id
             where (news_published = true) and (to_tsvector(news_title) || to_tsvector(usr_name) || to_tsvector(category_name) || to_tsvector(news_text) @@ plainto_tsquery(?))
             ORDER BY news_created DESC 
             LIMIT ?  OFFSET ? |]
-            (search, show lim, show off) ::
-          IO (Either SQL.SqlError [(T.Text, TIME.Day, T.Text, String, T.Text, T.Text, SQLTypes.PGArray Int, Int, Bool, Int)])
+                (search, show lim, show off)
+          ) ::
+          IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, String, T.Text, T.Text, SQLTypes.PGArray Int, Int, Bool, Int)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("newsSearchListAtDb", show err)

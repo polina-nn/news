@@ -10,11 +10,21 @@ where
 import Control.Exception.Safe (throwString)
 import qualified Data.Configurator as C
 import qualified Data.Configurator.Types as C
+import qualified Data.Text as T
 import qualified Logger
 import qualified Logger.Impl
 import qualified News
 import qualified System.Directory as SD
 import qualified System.IO
+import Text.Read (readMaybe)
+
+-- | StdError  - use for choice in config. (I expect to see in the config.conf the words Terminal or File in stdError field)
+data StdError = Terminal | File
+  deriving (Show, Eq, Ord, Read)
+
+instance C.Configured StdError where
+  convert (C.String str) = readMaybe (T.unpack str)
+  convert _ = Nothing
 
 data MaybeDbConfig = MaybeDbConfig
   { maybeDbHost :: Maybe String,
@@ -131,7 +141,7 @@ getDbConfig conf = do
         )
     checkDbConfig _ = Nothing
 
--- | getLoggerConfig if there are problems with reading the logging config -> log to the console and the info level
+-- | getLoggerConfig
 getLoggerConfig :: C.Config -> IO Logger.Impl.Config
 getLoggerConfig conf = do
   readStdError <- C.lookupDefault "Terminal" conf "config.stdError" :: IO String
