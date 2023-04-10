@@ -33,7 +33,7 @@ Category object in response:
 | ------------- | ---------|-------------------|
 | categoryId | number | Category id is assigned by the server automatically. |
 | categoryName | string | Category name|
-| categoryPath	 | string | Category path |
+| categoryParent	 | number  | Category parent |
 
 
 ## Error Responses

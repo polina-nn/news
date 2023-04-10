@@ -1,5 +1,6 @@
 module EndPoints.Lib.ThrowSqlRequestError
   ( throwSqlRequestError,
+    ThrowSqlRequestError (),
   )
 where
 

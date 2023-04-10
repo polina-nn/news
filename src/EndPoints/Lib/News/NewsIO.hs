@@ -1,6 +1,6 @@
 module EndPoints.Lib.News.NewsIO
-  ( addImageNews, -- use in EndPoints.AddOneNews, EndPoints.EditOneNews
-    toNews, --use in EndPoints.GetNewsList,  EndPoints.GetAuthorsNewsList
+  ( addImageNews,
+    toNews,
   )
 where
 
@@ -11,10 +11,9 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.Int as I
 import qualified Data.Pool as POOL
-import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
-import qualified EndPoints.Lib.Category.Category as Category
+import qualified EndPoints.Lib.Category.CategoryIO as CategoryIO
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.News.NewsHelpTypes as NewsHelpTypes
 import qualified EndPoints.Lib.ThrowSqlRequestError as Throw
@@ -24,8 +23,6 @@ import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
 
 type IdImage = Int
-
-type CategoryPath = String
 
 -- | addImageNews adding one pictures to the table of pictures when working with news
 addImageNews ::
@@ -74,7 +71,7 @@ toNews ::
   NewsHelpTypes.DbNews ->
   EX.ExceptT ErrorTypes.GetNewsError IO DataTypes.News
 toNews con h NewsHelpTypes.DbNews {..} = do
-  categories <- getCategories con h dbNewsCategoryPath
+  categories <- CategoryIO.getCategoriesById con h dbNewsCategoryId
   let news =
         DataTypes.News
           { newsTitle = dbNewsTitle,
@@ -87,28 +84,3 @@ toNews con h NewsHelpTypes.DbNews {..} = do
             newsId = dbNewsId
           }
   return news
-
-getCategories ::
-  POOL.Pool SQL.Connection ->
-  News.Handle IO ->
-  CategoryPath ->
-  EX.ExceptT ErrorTypes.GetNewsError IO [DataTypes.Category]
-getCategories pool h' path = do
-  res <-
-    liftIO
-      ( EXS.try
-          ( POOL.withResource pool $ \con ->
-              SQL.query
-                con
-                [sql| SELECT category_path, category_id, category_name FROM category 
-            WHERE ? LIKE category_path||'%' ORDER BY category_path |]
-                (SQL.Only path)
-          ) ::
-          IO (Either EXS.SomeException [(String, IdImage, T.Text)])
-      )
-  case res of
-    Left err -> Throw.throwSqlRequestError h' ("getCategories", show err)
-    Right [] -> Throw.throwSqlRequestError h' ("getCategories", "Developer error")
-    Right val -> do
-      let categories = Prelude.map Category.toCategories val
-      return categories

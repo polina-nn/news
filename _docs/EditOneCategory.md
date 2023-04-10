@@ -4,36 +4,25 @@
 curl -i --user polina:polina \
 --header "Content-Type: application/json"   \
 --request PUT   \
---data '{ "newPath":"2.5", "newCategory": "Авелина"}' \
+--data '{ "newParent":"2.5", "newCategory": "Авелина"}' \
 http://localhost:8080/login/category/1
 
 
 ## Example of categories
  
-CategoryId is the last parameter in uri.  
-CategoryPath is unique, category names can be the same.  
-The request specifies a new puff and a new category name. Puffs of other categories are rebuilt automatically if necessary.
-
-Use this example to determine the path (syntax and logic. No holes or cycles in the numbering).
-Category {categoryPath = 1, categoryId = 1, categoryName = Ася }   
-Category {categoryPath = 1.1, categoryId = 11, categoryName = Ася Борисовна }   
-Category {categoryPath = 1.2, categoryId = 9, categoryName = Ася Михайловна }   
-Category {categoryPath = 1.2.1, categoryId = 10, categoryName = Ася Михайловна Иванова }   
-Category {categoryPath = 1.2.1.1, categoryId = 12, categoryName = Ася Михайловна Иванова-Борисова }   
-Category {categoryPath = 1.2.1.2, categoryId = 13, categoryName = Ася Михайловна Иванова-Власова }  
-Category {categoryPath = 2, categoryId = 2, categoryName = Борис  }  
-Category {categoryPath = 3, categoryId = 8, categoryName = Вася }   
-Category {categoryPath = 4, categoryId = 3, categoryName = Женя  }   
-
+Category id is the last parameter in uri.  
+Category name is unique.
+Category parent for root categories is 0.
 
 ## Parameters of request 
 
-All parameters are required.
+All parameters are not required.
 
 | Field         | Type 	   | Description       |
 | ------------- | ---------|-------------------|
-| newPath | string | path to category |
+| newParent | int | parent to category |
 | newCategory	| string | category name |
+
 
 
 
@@ -55,7 +44,7 @@ User object in response:
 | ------------- | ---------|-------------------|
 | categoryId | number | Category id |
 | categoryName | string | Category name|
-| categoryPath	 | string | Category path |
+| categoryParent	 |  number | Category parent |
 
 
 
@@ -68,7 +57,7 @@ Possible causes handled on this request with a detailed description in logs.
 | Error code          | Why?                                                                |
 | ----------------- | ------------------------------------------------------------------ |
 | 404 | Invalid permission for add category (user not admin)|
-| 400 | Invalid syntax or value of the path |
+| 400 | Invalid parent or name |
 | 404 | Invalid category id (not exists) |
 | 500 | SQL request error (need to contact the developer) |
 

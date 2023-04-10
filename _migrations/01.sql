@@ -23,12 +23,11 @@ CREATE TABLE IF NOT EXISTS image (
     image_content TEXT NOT NULL);
 
  
-
+ 
 CREATE TABLE IF NOT EXISTS category (
-    category_path  VARCHAR(50) NOT NULL , 
-    category_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY, 
-    category_name VARCHAR(50) NOT NULL);
-
+   category_id SERIAL PRIMARY KEY,
+   category_name TEXT NOT NULL UNIQUE,
+   category_parent_id INT NOT NULL); 
 
 
 CREATE SEQUENCE IF NOT EXISTS  news_id_seq; 

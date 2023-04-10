@@ -18,7 +18,7 @@ instance FromHttpApiData SortBy where
     | T.toLower value == T.pack "author" = Right SortByAuthor
     | T.toLower value == T.pack "category" = Right SortByCategory
     | T.toLower value == T.pack "data" = Right SortByData
-    | T.toLower value == T.pack "foto" = Right SortByFoto
+    | T.toLower value == T.pack "photo" = Right SortByPhoto
     | otherwise = Left $ T.pack "Invalid sort_by value"
 
 

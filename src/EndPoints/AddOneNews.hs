@@ -16,7 +16,7 @@ import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified Database.PostgreSQL.Simple.Types as SQLTypes
-import qualified EndPoints.Lib.Category.Category as Category
+import qualified EndPoints.Lib.Category.CategoryIO as CategoryIO
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.LibIO as LibIO
 import qualified EndPoints.Lib.News.NewsIO as NewsIO
@@ -55,15 +55,15 @@ addNewsExcept ::
   POOL.Pool SQL.Connection ->
   (News.Handle IO, DataTypes.Token, DataTypes.CreateNewsRequest) ->
   EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.News
-addNewsExcept pool (h, token, r) = do
+addNewsExcept pool (h, token, r@DataTypes.CreateNewsRequest {..}) = do
   user <- EX.withExceptT ErrorTypes.AddEditNewsSQLRequestError (LibIO.searchUser h pool token)
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add One News: \n", ToText.toText r, "by user: ", ToText.toText user]
   _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditNews (Lib.checkUserAuthor h user)
   _ <- checkImageFilesExist h r
   _ <- checkPngImages h r
   _ <- checkBase64Images h r
-  path <- checkCategoryId pool h r
-  categories' <- getCategories pool h path
+  _ <- checkCategoryId pool h r
+  categories' <- CategoryIO.getCategoriesById pool h newsCategoryId
   newsId' <- getNewsId pool h
   images' <- addAllImages pool h r
   addNewsToDB pool h user categories' r newsId' images'
@@ -146,62 +146,29 @@ checkCategoryId ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
   DataTypes.CreateNewsRequest ->
-  EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.Path
-checkCategoryId pool h DataTypes.CreateNewsRequest {..} = do
+  EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.CreateNewsRequest
+checkCategoryId pool h r@DataTypes.CreateNewsRequest {..} = do
   res <-
     liftIO
       ( EXS.try
           ( POOL.withResource pool $ \conn ->
               SQL.query
                 conn
-                [sql| SELECT category_path  FROM category WHERE category_id = ?|]
-                (SQL.Only newsCategoryId) ::
-                IO [SQL.Only String]
+                [sql| SELECT EXISTS (SELECT category_id  FROM category WHERE category_id = ?) |]
+                (SQL.Only newsCategoryId)
           ) ::
-          IO (Either EXS.SomeException [SQL.Only String])
+          IO (Either EXS.SomeException [SQL.Only Bool])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("checkCategoryId", show err)
-    Right [SQL.Only path] -> do
-      liftIO $ Logger.logInfo (News.hLogHandle h) "checkCategoryId: OK!"
-      return path
-    Right _ -> do
-      liftIO $
-        Logger.logError
-          (News.hLogHandle h)
-          ( "ERROR "
-              .< ErrorTypes.InvalidCategoryIdAddEditNews
-                ( ErrorTypes.InvalidContent
-                    "checkCategoryId: BAD! Category not exists"
-                )
-          )
+    Right [SQL.Only True] -> do
+      liftIO $ Logger.logDebug (News.hLogHandle h) "checkCategoryId: OK!  Category exist "
+      return r
+    Right [SQL.Only False] -> do
+      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidImagedId (ErrorTypes.InvalidId ("checkId: BAD! Not exists category with id " <> show newsCategoryId)))
       EX.throwE $ ErrorTypes.InvalidCategoryIdAddEditNews $ ErrorTypes.InvalidContent []
+    Right _ -> Throw.throwSqlRequestError h ("checkCategoryId", "Developer error")
 
--- | getCategories - get a list of categories from the root to this category
-getCategories ::
-  POOL.Pool SQL.Connection ->
-  News.Handle IO ->
-  DataTypes.Path ->
-  EX.ExceptT ErrorTypes.AddEditNewsError IO [DataTypes.Category]
-getCategories pool h path = do
-  res <-
-    liftIO
-      ( EXS.try
-          ( POOL.withResource pool $ \conn ->
-              SQL.query
-                conn
-                [sql| SELECT category_path, category_id, category_name FROM category WHERE ? LIKE category_path||'%' ORDER BY category_path |]
-                (SQL.Only path)
-          ) ::
-          IO (Either EXS.SomeException [(DataTypes.Path, DataTypes.Id, DataTypes.Name)])
-      )
-  case res of
-    Left err -> Throw.throwSqlRequestError h ("getCategories", show err)
-    Right value -> do
-      let categories = Prelude.map Category.toCategories value
-      return categories
-
--- getNewsIdIO  get id for new news
 getNewsId ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->

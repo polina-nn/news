@@ -6,21 +6,17 @@ where
 
 import qualified Control.Exception.Safe as EXS
 import Control.Monad.IO.Class (MonadIO (liftIO))
-import Control.Monad.Trans.Class (MonadTrans (lift))
 import qualified Control.Monad.Trans.Except as EX
-import qualified Data.Int as I
 import qualified Data.Pool as POOL
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
-import qualified EndPoints.Lib.Category.Category as Category
-import qualified EndPoints.Lib.Category.CategoryIO as CategoryIO
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.LibIO as LibIO
 import qualified EndPoints.Lib.ThrowSqlRequestError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
-import Logger (logError, logInfo, (.<))
+import Logger (logDebug, logError, logInfo, (.<))
 import qualified News
 import Servant (Handler)
 import qualified Types.DataTypes as DataTypes
@@ -50,85 +46,102 @@ addCategoryExcept ::
 addCategoryExcept pool (h, token, r) =
   do
     user <- EX.withExceptT ErrorTypes.AddEditCategorySQLRequestError (LibIO.searchUser h pool token)
-    liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add Category: \n", ToText.toText r, "by user: ", ToText.toText user]
+    liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["\n\nRequest: Add Category: \n", ToText.toText r, "by user: ", ToText.toText user]
     _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditCategory (Lib.checkUserAdmin h user)
-    _ <- checkSyntaxPath h r
-    categories <- CategoryIO.getAllCategories pool h
-    _ <- Category.checkLogicPathForAddCategory h r categories
-    _ <- CategoryIO.changePathCategories pool h $ Category.changePathForAddCategory r categories
-    _ <- addCategoryToDb pool h r
-    getCategoryId pool h r
+    _ <- checkCategoryName pool h r
+    _ <- checkParentId pool h r
+    addCategoryToDb pool h r
 
-checkSyntaxPath ::
-  Monad m =>
-  News.Handle m ->
-  DataTypes.CreateCategoryRequest ->
-  EX.ExceptT ErrorTypes.AddEditCategoryError m DataTypes.CreateCategoryRequest
-checkSyntaxPath h r@DataTypes.CreateCategoryRequest {..} =
-  if Category.validSyntaxPath path
-    then return r
-    else do
-      lift $
-        Logger.logError
-          (News.hLogHandle h)
-          ( "ERROR "
-              .< ErrorTypes.InvalidSyntaxPath
-                ( ErrorTypes.InvalidContent
-                    "checkSyntaxPath: BAD! Path is not valid! Only digits(not zero begin) and points must have! "
-                )
-          )
-      EX.throwE $ ErrorTypes.InvalidSyntaxPath $ ErrorTypes.InvalidContent []
-
-addCategoryToDb ::
+-- | checkCategoryName - check the existence of the category with the same name. Duplication of category name is not allowed
+checkCategoryName ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
   DataTypes.CreateCategoryRequest ->
   EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.CreateCategoryRequest
-addCategoryToDb pool h r@DataTypes.CreateCategoryRequest {..} = do
+checkCategoryName pool h' r@DataTypes.CreateCategoryRequest {..} = do
   res <-
-    liftIO
-      ( EXS.try
-          ( POOL.withResource pool $ \conn ->
-              SQL.execute
-                conn
-                [sql| INSERT INTO  category (category_path, category_name)  VALUES (?,?) |]
-                (path, category)
-          ) ::
-          IO (Either EXS.SomeException I.Int64)
-      )
-  case res of
-    Left err -> Throw.throwSqlRequestError h ("addCategoryToDb", show err)
-    Right 1 -> return r
-    Right _ -> Throw.throwSqlRequestError h ("addCategoryToDb", "Developer error")
-
-getCategoryId ::
-  POOL.Pool SQL.Connection ->
-  News.Handle IO ->
-  DataTypes.CreateCategoryRequest ->
-  EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.Category
-getCategoryId pool h DataTypes.CreateCategoryRequest {..} = do
-  resId <-
     liftIO
       ( EXS.try
           ( POOL.withResource pool $ \conn ->
               SQL.query
                 conn
-                [sql| SELECT category_id  FROM category WHERE category_path = ? |]
-                (SQL.Only path)
+                [sql| SELECT EXISTS (SELECT category_name  FROM category WHERE category_name = ?) |]
+                (SQL.Only category)
+          ) ::
+          IO (Either EXS.SomeException [SQL.Only Bool])
+      )
+  case res of
+    Left err -> Throw.throwSqlRequestError h' ("checkCategoryName", show err)
+    Right [SQL.Only True] -> do
+      liftIO $
+        Logger.logError
+          (News.hLogHandle h')
+          ("ERROR " .< ErrorTypes.CategoryAlreadyExisted (ErrorTypes.InvalidContent "checkCategoryName: BAD! Category with this name already exists "))
+      EX.throwE $ ErrorTypes.CategoryAlreadyExisted $ ErrorTypes.InvalidContent []
+    Right [SQL.Only False] -> do
+      liftIO $ Logger.logDebug (News.hLogHandle h') "checkCategoryName: OK!"
+      return r
+    Right _ -> Throw.throwSqlRequestError h' ("checkCategoryName", "Developer error!")
+
+-- | checkParentId  - check the existence of the parent category
+checkParentId ::
+  POOL.Pool SQL.Connection ->
+  News.Handle IO ->
+  DataTypes.CreateCategoryRequest ->
+  EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.CreateCategoryRequest
+checkParentId _ _ r@DataTypes.CreateCategoryRequest {parent = 0} = return r
+checkParentId pool h' r@DataTypes.CreateCategoryRequest {..} = do
+  res <-
+    liftIO
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.query
+                conn
+                [sql| SELECT EXISTS (SELECT category_id  FROM category WHERE category_id = ?) |]
+                (SQL.Only parent)
+          ) ::
+          IO (Either EXS.SomeException [SQL.Only Bool])
+      )
+  case res of
+    Left err -> Throw.throwSqlRequestError h' ("checkParentId", show err)
+    Right [SQL.Only False] -> do
+      liftIO $
+        Logger.logError
+          (News.hLogHandle h')
+          ("ERROR " .< ErrorTypes.CategoryParentNotExisted (ErrorTypes.InvalidContent "checkParentId: BAD! Category with this id not exists"))
+      EX.throwE $ ErrorTypes.CategoryParentNotExisted $ ErrorTypes.InvalidContent []
+    Right [SQL.Only True] -> do
+      liftIO $ Logger.logDebug (News.hLogHandle h') "checkParentId: OK!"
+      return r
+    Right _ -> Throw.throwSqlRequestError h' ("checkParentId", "Developer error!")
+
+addCategoryToDb ::
+  POOL.Pool SQL.Connection ->
+  News.Handle IO ->
+  DataTypes.CreateCategoryRequest ->
+  EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.Category
+addCategoryToDb pool h DataTypes.CreateCategoryRequest {..} = do
+  res <-
+    liftIO
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.query
+                conn
+                [sql| INSERT INTO  category (category_parent_id, category_name)  VALUES (?,?) RETURNING category_id  |]
+                (parent, category)
           ) ::
           IO (Either EXS.SomeException [SQL.Only Int])
       )
-  case resId of
-    Left err -> Throw.throwSqlRequestError h ("getCategoryId", show err)
-    Right [SQL.Only val] ->
-      do
-        let newCategory =
-              ( DataTypes.Category
-                  { categoryPath = path,
-                    categoryId = val,
-                    categoryName = category
-                  }
-              )
-        liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Added new category: ", ToText.toText newCategory]
-        return newCategory
-    Right _ -> Throw.throwSqlRequestError h ("getCategoryId", "Developer error")
+  case res of
+    Left err -> Throw.throwSqlRequestError h ("addCategoryToDb", show err)
+    Right [SQL.Only val] -> do
+      let newCategory =
+            ( DataTypes.Category
+                { categoryParentId = parent,
+                  categoryId = val,
+                  categoryName = category
+                }
+            )
+      liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["addCategoryToDb: added new category: ", ToText.toText newCategory]
+      return newCategory
+    Right _ -> Throw.throwSqlRequestError h ("addCategoryToDb", "Developer error")

@@ -5,7 +5,6 @@ where
 
 import qualified Data.Maybe as M
 import qualified Data.Text as T
-import qualified EndPoints.Lib.Category.CategoryHelpTypes as CategoryHelpTypes
 import qualified Types.DataTypes as DataTypes
 
 class ToText a where
@@ -16,7 +15,7 @@ class ToText a where
 instance ToText DataTypes.CreateUserRequest where
   toText DataTypes.CreateUserRequest {..} =
     T.concat
-      [ "CreateUserRequest {user_name = ",
+      [ "CreateUserRequest {userName = ",
         name,
         ", login = ",
         T.pack login,
@@ -30,17 +29,17 @@ instance ToText DataTypes.CreateUserRequest where
 instance ToText DataTypes.User where
   toText DataTypes.User {..} =
     T.concat
-      [ "User {user_name = ",
+      [ "User {userName = ",
         userName,
-        ", user_login = ",
+        ", userLogin = ",
         T.pack userLogin,
-        ", user_password = ",
+        ", userPassword = ",
         T.pack $ show userPassword,
-        ", user_created = ",
+        ", userCreated = ",
         T.pack $ show userCreated,
-        ", user_admin = ",
+        ", userAdmin = ",
         T.pack $ show userAdmin,
-        ", user_author = ",
+        ", userAuthor = ",
         T.pack $ show userAuthor,
         "} \n"
       ]
@@ -64,8 +63,8 @@ instance ToText DataTypes.CreateImageRequest where
 instance ToText DataTypes.CreateCategoryRequest where
   toText DataTypes.CreateCategoryRequest {..} =
     T.concat
-      [ "CreateCategoryRequest {path = ",
-        T.pack path,
+      [ "CreateCategoryRequest {parent = ",
+        T.pack $ show parent,
         ", category = ",
         category,
         "} \n"
@@ -74,44 +73,22 @@ instance ToText DataTypes.CreateCategoryRequest where
 instance ToText DataTypes.EditCategoryRequest where
   toText DataTypes.EditCategoryRequest {..} =
     T.concat
-      [ "EditCategoryRequest {newPath = ",
-        T.pack $ M.fromMaybe "" newPath,
+      [ "EditCategoryRequest {newParent = ",
+        T.pack $ show newParent,
         ", newCategory = ",
-        M.fromMaybe "" newCategory,
+        M.fromMaybe "Nothing" newCategory,
         "} \n"
       ]
 
 instance ToText DataTypes.Category where
   toText DataTypes.Category {..} =
     T.concat
-      [ "Category {category_path = ",
-        T.pack categoryPath,
-        ", category_id = ",
+      [ "Category {categoryParentId = ",
+        T.pack $ show categoryParentId,
+        ", categoryId = ",
         T.pack $ show categoryId,
-        ", category_name = ",
+        ", categoryName = ",
         categoryName,
-        "} \n"
-      ]
-
-instance ToText CategoryHelpTypes.EditCategoryFullRequest where
-  toText CategoryHelpTypes.EditCategoryFullRequest {..} =
-    T.concat
-      [ "EditCategoryFullRequest {id' = ",
-        T.pack $ show id',
-        ", cur_path' = ",
-        T.pack curPath',
-        ", cur_category' = ",
-        curCategory',
-        ", cur_level' = ",
-        T.pack $ show curLevel',
-        ", new_path' = ",
-        T.pack newPath',
-        ", new_category' = ",
-        newCategory',
-        ", new_level' = ",
-        T.pack $ show newLevel',
-        ", new_path_stay_after_id' = ",
-        T.pack $ show newPathStayAfterId',
         "} \n"
       ]
 
@@ -152,21 +129,21 @@ instance ToText DataTypes.CreateNewsRequest where
 instance ToText DataTypes.News where
   toText DataTypes.News {..} =
     T.concat
-      [ "\nNews {\nnews_title = ",
+      [ "\nNews {\nnewsTitle = ",
         newsTitle,
-        ", \nnews_created = ",
+        ", \nnewsCreated = ",
         T.pack $ show newsCreated,
-        ", \nnews_author = ",
+        ", \nnewsAuthor = ",
         newsAuthor,
-        ", \nnews_category = ",
+        ", \nnewsCategory = ",
         T.concat $ map toText' newsCategory,
-        ", \nnews_text = ",
+        ", \nnewsText = ",
         newsText,
-        ",  \nnews_images = ",
+        ",  \nnewsImages = ",
         T.pack $ show newsImages,
-        ",  \nnews_published = ",
+        ",  \nnewsPublished = ",
         T.pack $ show newsPublished,
-        ",  \nnews_id = ",
+        ",  \nnewsId = ",
         T.pack $ show newsId,
         "} \n"
       ]
@@ -174,11 +151,11 @@ instance ToText DataTypes.News where
 toText' :: DataTypes.Category -> T.Text
 toText' DataTypes.Category {..} =
   T.concat
-    [ "\n     Category {category_path = ",
-      T.pack categoryPath,
-      ", category_id = ",
+    [ "\n     Category {categoryParentId = ",
+      T.pack $ show categoryParentId,
+      ", categoryId = ",
       T.pack $ show categoryId,
-      ", category_name = ",
+      ", categoryName = ",
       categoryName,
       "}"
     ]
