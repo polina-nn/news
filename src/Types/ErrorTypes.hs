@@ -115,9 +115,8 @@ data AddEditCategoryError
   = InvalidPermissionAddEditCategory InvalidAdminPermission
   | -- CategoryAlreadyExisted error when the category with the same name already exists. Duplication of category name is not allowed
     CategoryAlreadyExisted InvalidContent
-  | -- CategoryParentNotExisted error when the category parent not exists.
-    CategoryParentNotExisted InvalidContent
-  | InvalidParentId InvalidContent
+  | -- InvalidParentId when the category parent not exists or parent is its child
+    InvalidParentIdAddEditCategory InvalidContent
   | AddEditCategorySQLRequestError SQLRequestError
   | -- InvalidCategoryId - use only in edit request
     InvalidCategoryId InvalidId

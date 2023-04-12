@@ -1,6 +1,8 @@
-module EndPoints.Lib.ThrowSqlRequestError
+module EndPoints.Lib.ThrowRequestError
   ( throwSqlRequestError,
     ThrowSqlRequestError (),
+    throwInvalidContentCategoryId,
+    ThrowInvalidContentCategoryId (),
   )
 where
 
@@ -50,3 +52,20 @@ instance ThrowSqlRequestError ErrorTypes.GetContentError b where
 
 instance ThrowSqlRequestError ErrorTypes.GetNewsError b where
   throwSqlRequestError h (f, e) = EX.withExceptT ErrorTypes.GetNewsSQLRequestError $ throwSqlRequestError' h (f, e)
+
+class ThrowInvalidContentCategoryId a b where
+  throwInvalidContentCategoryId :: News.Handle IO -> ErrorDescription -> EX.ExceptT a IO b
+
+throwInvalidContentCategoryId' :: MonadIO m => News.Handle IO -> ErrorDescription -> EX.ExceptT ErrorTypes.InvalidContent m b
+throwInvalidContentCategoryId' h (f, e) = do
+  liftIO $
+    Logger.logError
+      (News.hLogHandle h)
+      ("ERROR " .< ErrorTypes.InvalidContent (f <> ": BAD! " <> e))
+  EX.throwE $ ErrorTypes.InvalidContent []
+
+instance ThrowInvalidContentCategoryId ErrorTypes.AddEditNewsError b where
+  throwInvalidContentCategoryId h (f, e) = EX.withExceptT ErrorTypes.InvalidCategoryIdAddEditNews $ throwInvalidContentCategoryId' h (f, e)
+
+instance ThrowInvalidContentCategoryId ErrorTypes.AddEditCategoryError b where
+  throwInvalidContentCategoryId h (f, e) = EX.withExceptT ErrorTypes.InvalidParentIdAddEditCategory $ throwInvalidContentCategoryId' h (f, e)

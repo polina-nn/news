@@ -21,7 +21,7 @@ import qualified EndPoints.Lib.Category.CategoryIO as CategoryIO
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.LibIO as LibIO
 import qualified EndPoints.Lib.News.NewsIO as NewsIO
-import qualified EndPoints.Lib.ThrowSqlRequestError as Throw
+import qualified EndPoints.Lib.ThrowRequestError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
 import Logger (logDebug, logError, logInfo, (.<))
@@ -404,33 +404,10 @@ checkCategoryId ::
 checkCategoryId _ _ r@DataTypes.EditNewsRequest {newCategoryId = Nothing} =
   return r
 checkCategoryId pool h r@DataTypes.EditNewsRequest {newCategoryId = Just categoryId} = do
-  res <-
-    liftIO
-      ( EXS.try
-          ( POOL.withResource pool $ \conn ->
-              SQL.query
-                conn
-                [sql|SELECT EXISTS (SELECT category_id  FROM category WHERE category_id = ?)|]
-                (SQL.Only categoryId)
-          ) ::
-          IO (Either EXS.SomeException [SQL.Only Bool])
-      )
+  res <- liftIO (EX.runExceptT (CategoryIO.checkCategoryExistsById pool h categoryId :: EX.ExceptT ErrorTypes.AddEditNewsError IO Int))
   case res of
-    Left err -> Throw.throwSqlRequestError h ("checkCategoryId", show err)
-    Right [SQL.Only True] -> do
-      liftIO $ Logger.logDebug (News.hLogHandle h) "checkCategoryId: OK!  Image exist "
-      return r
-    Right [SQL.Only False] -> do
-      liftIO $
-        Logger.logError
-          (News.hLogHandle h)
-          ( "ERROR "
-              .< ErrorTypes.InvalidCategoryIdAddEditNews
-                ( ErrorTypes.InvalidContent "checkCategoryId: BAD! Not exists category with id "
-                )
-          )
-      EX.throwE $ ErrorTypes.InvalidCategoryIdAddEditNews $ ErrorTypes.InvalidContent []
-    Right _ -> Throw.throwSqlRequestError h ("checkId", "Developer error!")
+    Left err -> EX.throwE err
+    Right _ -> return r
 
 checkPngImages ::
   Monad m =>

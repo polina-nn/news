@@ -10,7 +10,6 @@ import Control.Monad.Trans.Class (MonadTrans (lift))
 import qualified Control.Monad.Trans.Except as EX
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base64 as Base64
-import qualified Data.Int as I
 import qualified Data.Pool as POOL
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
@@ -20,7 +19,7 @@ import qualified EndPoints.Lib.Category.CategoryIO as CategoryIO
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.LibIO as LibIO
 import qualified EndPoints.Lib.News.NewsIO as NewsIO
-import qualified EndPoints.Lib.ThrowSqlRequestError as Throw
+import qualified EndPoints.Lib.ThrowRequestError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
 import Logger (logDebug, logError, logInfo, (.<))
@@ -29,8 +28,6 @@ import Servant (Handler)
 import qualified System.Directory as SD
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
-
-type IdNews = Int
 
 type IdImage = Int
 
@@ -62,11 +59,10 @@ addNewsExcept pool (h, token, r@DataTypes.CreateNewsRequest {..}) = do
   _ <- checkImageFilesExist h r
   _ <- checkPngImages h r
   _ <- checkBase64Images h r
-  _ <- checkCategoryId pool h r
+  _ <- CategoryIO.checkCategoryExistsById pool h newsCategoryId
   categories' <- CategoryIO.getCategoriesById pool h newsCategoryId
-  newsId' <- getNewsId pool h
   images' <- addAllImages pool h r
-  addNewsToDB pool h user categories' r newsId' images'
+  addNewsToDB pool h user categories' r images'
 
 checkImageFilesExist ::
   News.Handle IO ->
@@ -141,56 +137,6 @@ checkBase64Images h r@(DataTypes.CreateNewsRequest _ _ _ (Just req) _) = do
       EX.throwE $
         ErrorTypes.NotBase64ImageAddEditNews $ ErrorTypes.InvalidContent []
 
--- | checkCategory -- check if category with the id (from request) exists and return its path
-checkCategoryId ::
-  POOL.Pool SQL.Connection ->
-  News.Handle IO ->
-  DataTypes.CreateNewsRequest ->
-  EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.CreateNewsRequest
-checkCategoryId pool h r@DataTypes.CreateNewsRequest {..} = do
-  res <-
-    liftIO
-      ( EXS.try
-          ( POOL.withResource pool $ \conn ->
-              SQL.query
-                conn
-                [sql| SELECT EXISTS (SELECT category_id  FROM category WHERE category_id = ?) |]
-                (SQL.Only newsCategoryId)
-          ) ::
-          IO (Either EXS.SomeException [SQL.Only Bool])
-      )
-  case res of
-    Left err -> Throw.throwSqlRequestError h ("checkCategoryId", show err)
-    Right [SQL.Only True] -> do
-      liftIO $ Logger.logDebug (News.hLogHandle h) "checkCategoryId: OK!  Category exist "
-      return r
-    Right [SQL.Only False] -> do
-      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidImagedId (ErrorTypes.InvalidId ("checkId: BAD! Not exists category with id " <> show newsCategoryId)))
-      EX.throwE $ ErrorTypes.InvalidCategoryIdAddEditNews $ ErrorTypes.InvalidContent []
-    Right _ -> Throw.throwSqlRequestError h ("checkCategoryId", "Developer error")
-
-getNewsId ::
-  POOL.Pool SQL.Connection ->
-  News.Handle IO ->
-  EX.ExceptT ErrorTypes.AddEditNewsError IO IdNews
-getNewsId pool h = do
-  resId <-
-    liftIO
-      ( EXS.try
-          ( POOL.withResource pool $ \conn ->
-              SQL.query_
-                conn
-                [sql| select NEXTVAL('news_id_seq')|]
-          ) ::
-          IO (Either EXS.SomeException [SQL.Only IdNews])
-      )
-  case resId of
-    Left err -> Throw.throwSqlRequestError h ("getNewsId", show err)
-    Right [SQL.Only idNews] -> do
-      liftIO $ Logger.logDebug (News.hLogHandle h) ("getNewsId: OK! News_id is " .< idNews)
-      return idNews
-    Right _ -> Throw.throwSqlRequestError h ("getNewsId", "Developer error")
-
 -- | addAllImagesIO Add all the pictures for the news.
 addAllImages ::
   POOL.Pool SQL.Connection ->
@@ -209,21 +155,19 @@ addNewsToDB ::
   DataTypes.User ->
   [DataTypes.Category] ->
   DataTypes.CreateNewsRequest ->
-  IdNews ->
   [IdImage] ->
   EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.News
-addNewsToDB pool h DataTypes.User {..} categories DataTypes.CreateNewsRequest {..} idNews idImages = do
+addNewsToDB pool h DataTypes.User {..} categories DataTypes.CreateNewsRequest {..} idImages = do
   let imageUris = map (Lib.imageIdToURI h) idImages
   created <- liftIO Lib.currentDay
   res <-
     liftIO
       ( EXS.try
           ( POOL.withResource pool $ \conn ->
-              SQL.execute
+              SQL.query
                 conn
-                [sql| INSERT INTO news (news_images_id, news_id, news_title , news_created, news_author_login, news_category_id, news_text,  news_published ) VALUES (?, ?, ?, ?, ?, ?,?,? ) |]
+                [sql| INSERT INTO news (news_images_id,  news_title , news_created, news_author_login, news_category_id, news_text,  news_published ) VALUES (?, ?, ?, ?, ?, ?,? ) RETURNING news_id |]
                 ( SQLTypes.PGArray idImages,
-                  idNews,
                   title,
                   show created,
                   userLogin,
@@ -232,11 +176,11 @@ addNewsToDB pool h DataTypes.User {..} categories DataTypes.CreateNewsRequest {.
                   published
                 )
           ) ::
-          IO (Either EXS.SomeException I.Int64)
+          IO (Either EXS.SomeException [SQL.Only Int])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("addNewsToDB", show err)
-    Right 1 -> do
+    Right [SQL.Only idNews] -> do
       let news =
             DataTypes.News
               { newsTitle = title,

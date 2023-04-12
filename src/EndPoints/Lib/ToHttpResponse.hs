@@ -29,9 +29,7 @@ instance ToHttpResponse ErrorTypes.AddEditCategoryError DataTypes.Category where
     throwError err404 {errReasonPhrase = show a}
   toHttpResponse (Left (ErrorTypes.CategoryAlreadyExisted a)) =
     throwError err400 {errReasonPhrase = show a}
-  toHttpResponse (Left (ErrorTypes.CategoryParentNotExisted a)) =
-    throwError err400 {errReasonPhrase = show a}
-  toHttpResponse (Left (ErrorTypes.InvalidParentId a)) =
+  toHttpResponse (Left (ErrorTypes.InvalidParentIdAddEditCategory a)) =
     throwError err400 {errReasonPhrase = show a}
   toHttpResponse (Left (ErrorTypes.InvalidCategoryId a)) =
     throwError err404 {errReasonPhrase = show a}

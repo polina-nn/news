@@ -15,7 +15,7 @@ import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.Category.CategoryIO as CategoryIO
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.LibIO as LibIO
-import qualified EndPoints.Lib.ThrowSqlRequestError as Throw
+import qualified EndPoints.Lib.ThrowRequestError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
 import Logger (logDebug, logError, logInfo, (.<))
@@ -51,7 +51,6 @@ editCategoryExcept pool (h, token, catId, r) = do
   user <- EX.withExceptT ErrorTypes.AddEditCategorySQLRequestError (LibIO.searchUser h pool token)
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["\n\nRequest: Edit Category: \n", ToText.toText r, "with category id ", T.pack $ show catId, "\nby user: ", ToText.toText user]
   _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditCategory (Lib.checkUserAdmin h user)
-  _ <- checkCategoryName pool h r
   _ <- checkParentId pool h r
   _ <- checkParentNotHisChild pool h catId r
   _ <- editCategoryParent pool h catId r
@@ -64,59 +63,28 @@ checkId ::
   News.Handle IO ->
   Int ->
   EX.ExceptT ErrorTypes.AddEditCategoryError IO Int
-checkId pool h' id' = do
-  res <-
-    liftIO
-      ( EXS.try
-          ( POOL.withResource pool $ \conn ->
-              SQL.query
-                conn
-                [sql| SELECT EXISTS (SELECT category_id  FROM category WHERE category_id = ?) |]
-                (SQL.Only id')
-          ) ::
-          IO (Either EXS.SomeException [SQL.Only Bool])
-      )
-  case res of
-    Left err -> Throw.throwSqlRequestError h' ("checkId", show err)
-    Right [SQL.Only True] -> do
-      liftIO $ Logger.logDebug (News.hLogHandle h') "checkId: OK!  Category exist "
-      return id'
-    Right [SQL.Only False] -> do
-      liftIO $ Logger.logError (News.hLogHandle h') ("ERROR " .< ErrorTypes.InvalidImagedId (ErrorTypes.InvalidId ("checkId: BAD! Not exists category with id " <> show id')))
-      EX.throwE $ ErrorTypes.InvalidCategoryId $ ErrorTypes.InvalidId []
-    Right _ -> Throw.throwSqlRequestError h' ("checkId", "Developer error")
-
--- | checkCategoryName - check the existence of the category with the same name. Duplication of category name is not allowed
-checkCategoryName ::
-  POOL.Pool SQL.Connection ->
-  News.Handle IO ->
-  DataTypes.EditCategoryRequest ->
-  EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.EditCategoryRequest
-checkCategoryName _ _ r@DataTypes.EditCategoryRequest {newCategory = Nothing} = return r
-checkCategoryName pool h' r@DataTypes.EditCategoryRequest {newCategory = Just name} = do
-  res <-
-    liftIO
-      ( EXS.try
-          ( POOL.withResource pool $ \conn ->
-              SQL.query
-                conn
-                [sql| SELECT EXISTS (SELECT category_name  FROM category WHERE category_name = ?) |]
-                (SQL.Only name)
-          ) ::
-          IO (Either EXS.SomeException [SQL.Only Bool])
-      )
-  case res of
-    Left err -> Throw.throwSqlRequestError h' ("checkCategoryName", show err)
-    Right [SQL.Only True] -> do
-      liftIO $
-        Logger.logError
-          (News.hLogHandle h')
-          ("ERROR " .< ErrorTypes.CategoryAlreadyExisted (ErrorTypes.InvalidContent "checkCategoryName: BAD! Category with this name already exists "))
-      EX.throwE $ ErrorTypes.CategoryAlreadyExisted $ ErrorTypes.InvalidContent []
-    Right [SQL.Only False] -> do
-      liftIO $ Logger.logDebug (News.hLogHandle h') "checkCategoryName: OK!"
-      return r
-    Right _ -> Throw.throwSqlRequestError h' ("checkCategoryName", "Developer error!")
+checkId pool h' id' =
+  do
+    res <-
+      liftIO
+        ( EXS.try
+            ( POOL.withResource pool $ \conn ->
+                SQL.query
+                  conn
+                  [sql| SELECT EXISTS (SELECT category_id  FROM category WHERE category_id = ?) |]
+                  (SQL.Only id')
+            ) ::
+            IO (Either EXS.SomeException [SQL.Only Bool])
+        )
+    case res of
+      Left err -> Throw.throwSqlRequestError h' ("checkId", show err)
+      Right [SQL.Only True] -> do
+        liftIO $ Logger.logDebug (News.hLogHandle h') "checkId: OK!  Category exist "
+        return id'
+      Right [SQL.Only False] -> do
+        liftIO $ Logger.logError (News.hLogHandle h') ("ERROR " .< ErrorTypes.InvalidImagedId (ErrorTypes.InvalidId ("checkId: BAD! Not exists category with id " <> show id')))
+        EX.throwE $ ErrorTypes.InvalidCategoryId $ ErrorTypes.InvalidId []
+      Right _ -> Throw.throwSqlRequestError h' ("checkId", "Developer error")
 
 -- | checkParentId  - check the existence of the parent category
 checkParentId ::
@@ -127,29 +95,10 @@ checkParentId ::
 checkParentId _ _ r@DataTypes.EditCategoryRequest {newParent = Nothing} = return r
 checkParentId _ _ r@DataTypes.EditCategoryRequest {newParent = Just 0} = return r
 checkParentId pool h' r@DataTypes.EditCategoryRequest {newParent = Just parent} = do
-  res <-
-    liftIO
-      ( EXS.try
-          ( POOL.withResource pool $ \conn ->
-              SQL.query
-                conn
-                [sql| SELECT EXISTS (SELECT category_id  FROM category WHERE category_id = ?) |]
-                (SQL.Only parent)
-          ) ::
-          IO (Either EXS.SomeException [SQL.Only Bool])
-      )
+  res <- liftIO (EX.runExceptT (CategoryIO.checkCategoryExistsById pool h' parent :: EX.ExceptT ErrorTypes.AddEditCategoryError IO Int))
   case res of
-    Left err -> Throw.throwSqlRequestError h' ("checkParentId", show err)
-    Right [SQL.Only False] -> do
-      liftIO $
-        Logger.logError
-          (News.hLogHandle h')
-          ("ERROR " .< ErrorTypes.CategoryParentNotExisted (ErrorTypes.InvalidContent "checkParentId: BAD! Category with this id not exists"))
-      EX.throwE $ ErrorTypes.CategoryParentNotExisted $ ErrorTypes.InvalidContent []
-    Right [SQL.Only True] -> do
-      liftIO $ Logger.logDebug (News.hLogHandle h') "checkParentId: OK!"
-      return r
-    Right _ -> Throw.throwSqlRequestError h' ("checkParentId", "Developer error!")
+    Left err -> EX.throwE err
+    Right _ -> return r
 
 checkParentNotHisChild ::
   POOL.Pool SQL.Connection ->
@@ -160,16 +109,12 @@ checkParentNotHisChild ::
 checkParentNotHisChild _ _ _ r@DataTypes.EditCategoryRequest {newParent = Nothing} = return r
 checkParentNotHisChild _ _ _ r@DataTypes.EditCategoryRequest {newParent = Just 0} = return r
 checkParentNotHisChild pool h id' r@DataTypes.EditCategoryRequest {newParent = Just parent}
-  | parent == id' = do
-    liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidParentId (ErrorTypes.InvalidContent "checkParentNotHisChild:  BAD!"))
-    EX.throwE $ ErrorTypes.InvalidParentId $ ErrorTypes.InvalidContent []
+  | parent == id' = Throw.throwInvalidContentCategoryId h ("checkParentNotHisChild", "New parent " <> show parent <> " is his child")
   | otherwise = do
     currentCategory <- CategoryIO.getCategoryById pool h id'
     categoriesFutureParent <- CategoryIO.getCategoriesById pool h parent
     if any (\x -> DataTypes.categoryName x == DataTypes.categoryName currentCategory) categoriesFutureParent
-      then do
-        liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidParentId (ErrorTypes.InvalidContent "checkParentNotHisChild:  BAD! "))
-        EX.throwE $ ErrorTypes.InvalidParentId $ ErrorTypes.InvalidContent []
+      then Throw.throwInvalidContentCategoryId h ("checkParentNotHisChild", "New parent " <> show parent <> " is his child")
       else do
         liftIO $ Logger.logDebug (News.hLogHandle h) "checkParentNotHisChild: OK!"
         return r
@@ -194,9 +139,17 @@ editCategoryName pool h id' r@DataTypes.EditCategoryRequest {newCategory = Just 
           IO (Either EXS.SomeException I.Int64)
       )
   case res of
-    Left err -> Throw.throwSqlRequestError h ("editCategoryName", show err)
+    Left err -> handleError err
     Right 1 -> return r
     Right _ -> Throw.throwSqlRequestError h ("editCategoryName", "Developer error")
+  where
+    handleError (EXS.SomeException e) =
+      let errMsg = EXS.displayException e
+       in if "duplicate key value" `T.isInfixOf` T.pack errMsg
+            then do
+              liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.CategoryAlreadyExisted (ErrorTypes.InvalidContent "editCategoryName: BAD! Category with this name already exists "))
+              EX.throwE $ ErrorTypes.CategoryAlreadyExisted $ ErrorTypes.InvalidContent []
+            else Throw.throwSqlRequestError h ("editCategoryName", show e)
 
 editCategoryParent ::
   POOL.Pool SQL.Connection ->

@@ -10,14 +10,13 @@ import Control.Monad.Trans.Class (MonadTrans (lift))
 import qualified Control.Monad.Trans.Except as EX
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base64 as Base64
-import qualified Data.Int as I
 import qualified Data.Pool as POOL
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.LibIO as LibIO
-import qualified EndPoints.Lib.ThrowSqlRequestError as Throw
+import qualified EndPoints.Lib.ThrowRequestError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
 import Logger (logDebug, logError, logInfo, (.<))
@@ -57,8 +56,7 @@ addImageExcept pool (h, token, createImage) = do
   _ <- checkPngImage h createImage
   _ <- checkImageFileExist h createImage
   allCheckAndDecodeBase64ByteString <- checkAndDecodeBase64Image h createImage
-  imageId <- getImageId pool h
-  addImageToDB pool h createImage allCheckAndDecodeBase64ByteString imageId
+  addImageToDB pool h createImage allCheckAndDecodeBase64ByteString
 
 checkImageFileExist ::
   News.Handle IO ->
@@ -117,51 +115,27 @@ checkAndDecodeBase64Image h DataTypes.CreateImageRequest {..} = do
       liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.NotBase64Image (ErrorTypes.InvalidContent ("checkAndDecodeBase64Image: BAD!" ++ show err)))
       EX.throwE $ ErrorTypes.NotBase64Image $ ErrorTypes.InvalidContent []
 
--- | getImageId  get id for new image
-getImageId ::
-  POOL.Pool SQL.Connection ->
-  News.Handle IO ->
-  EX.ExceptT ErrorTypes.AddImageError IO Int
-getImageId pool h = do
-  resId <-
-    liftIO
-      ( EXS.try
-          ( POOL.withResource pool $ \conn ->
-              SQL.query_
-                conn
-                [sql| select NEXTVAL('image_id_seq')|]
-          ) ::
-          IO (Either EXS.SomeException [SQL.Only Int])
-      )
-  case resId of
-    Left err -> Throw.throwSqlRequestError h ("getImageId ", show err)
-    Right [SQL.Only imageId] -> do
-      liftIO $ Logger.logDebug (News.hLogHandle h) ("getImageId : OK! Image id is " .< imageId)
-      return imageId
-    Right _ -> Throw.throwSqlRequestError h ("getImageId ", "Developer error")
-
 addImageToDB ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
   DataTypes.CreateImageRequest ->
   ImageDecodeBase64ByteString ->
-  Int ->
   EX.ExceptT ErrorTypes.AddImageError IO DataTypes.URI
-addImageToDB pool h DataTypes.CreateImageRequest {..} im idIm = do
+addImageToDB pool h DataTypes.CreateImageRequest {..} im = do
   res <-
     liftIO
       ( EXS.try
           ( POOL.withResource pool $ \conn ->
-              SQL.execute
+              SQL.query
                 conn
-                [sql| INSERT INTO image (image_id, image_name, image_type, image_content) VALUES (?,?,?,?) |]
-                (idIm, file, format, show im)
+                [sql| INSERT INTO image ( image_name, image_type, image_content) VALUES (?,?,?) RETURNING  image_id |]
+                (file, format, show im)
           ) ::
-          IO (Either EXS.SomeException I.Int64)
+          IO (Either EXS.SomeException [SQL.Only Int])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("addImageToDB", show err)
-    Right 1 -> do
+    Right [SQL.Only idIm] -> do
       let uriBegin = show $ News.hURIConfig h
           uriEnd = show $ DataTypes.URI' {uriPath = "image", uriId = idIm}
       liftIO $ Logger.logDebug (News.hLogHandle h) ("addImageToDB: OK! " .< (uriBegin ++ uriEnd))

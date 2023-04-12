@@ -1,6 +1,7 @@
 module EndPoints.Lib.Category.CategoryIO
   ( getCategoriesById,
     getCategoryById,
+    checkCategoryExistsById,
   )
 where
 
@@ -12,12 +13,13 @@ import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.Category.Category as Category
-import qualified EndPoints.Lib.ThrowSqlRequestError as Throw
+import qualified EndPoints.Lib.ThrowRequestError as Throw
 import qualified EndPoints.Lib.ToText as ToText
-import Logger (logInfo)
+import Logger (logDebug, logInfo)
 import qualified News
 import qualified Types.DataTypes as DataTypes
 
+-- | getCategoriesById  - return categories from node to root, by categoryId
 getCategoriesById ::
   Throw.ThrowSqlRequestError a [DataTypes.Category] =>
   POOL.Pool SQL.Connection ->
@@ -49,6 +51,7 @@ getCategoriesById pool h' id' = do
       let categories = Prelude.map Category.toCategory val
       return categories
 
+-- | getCategoriesById  - return category by categoryId
 getCategoryById ::
   Throw.ThrowSqlRequestError a DataTypes.Category =>
   POOL.Pool SQL.Connection ->
@@ -74,3 +77,31 @@ getCategoryById pool h id' = do
       liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["getCategory: ", ToText.toText editedCategory]
       return editedCategory
     Right _ -> Throw.throwSqlRequestError h ("getCategory", "Developer error")
+
+-- | checkCategoryExistsById  - return categories id if category exists
+checkCategoryExistsById ::
+  Throw.ThrowSqlRequestError a Int =>
+  Throw.ThrowInvalidContentCategoryId a Int =>
+  POOL.Pool SQL.Connection ->
+  News.Handle IO ->
+  Int ->
+  EX.ExceptT a IO Int
+checkCategoryExistsById pool h categoryId = do
+  res <-
+    liftIO
+      ( EXS.try
+          ( POOL.withResource pool $ \conn ->
+              SQL.query
+                conn
+                [sql| SELECT EXISTS (SELECT category_id  FROM category WHERE category_id = ?) |]
+                (SQL.Only categoryId)
+          ) ::
+          IO (Either EXS.SomeException [SQL.Only Bool])
+      )
+  case res of
+    Left err -> Throw.throwSqlRequestError h ("checkCategoryExistsById", show err)
+    Right [SQL.Only True] -> do
+      liftIO $ Logger.logDebug (News.hLogHandle h) "checkCategoryExistsById: OK!  Category exists "
+      return categoryId
+    Right [SQL.Only False] -> Throw.throwInvalidContentCategoryId h ("checkCategoryExistsById", "Category with categoryId " <> show categoryId <> " not exists")
+    Right _ -> Throw.throwSqlRequestError h ("checkCategoryId", "Developer error")

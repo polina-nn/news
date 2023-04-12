@@ -11,7 +11,7 @@ import qualified Data.ByteString as B
 import qualified Data.Pool as POOL
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
-import qualified EndPoints.Lib.ThrowSqlRequestError as Throw
+import qualified EndPoints.Lib.ThrowRequestError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import Logger (logDebug, logError, logInfo, (.<))
 import qualified News

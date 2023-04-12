@@ -134,7 +134,7 @@ news/
 │ │   │  ├── News/  # Lib for News End Points
 │ │   │  ├── Lib.hs # Some function for many End Points
 │ │   │  ├── OffsetLimit.hs     # Offset limit for End Points 
-│ │   │  ├── ThrowSqlRequestError.hs # Class for throw sql requests errors
+│ │   │  ├── ThrowRequestError.hs # Class for throw requests errors
 │ │   │  ├── ToHttpResponse.hs # class ToHttpResponse for throwError by servant
 │ │   │  └── ToText.hs # class ToText.hs for present in logging results of requests
 │ │   ├── AddOneCategory.hs #  Create one category (authentication admin required)

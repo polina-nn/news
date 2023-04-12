@@ -20,7 +20,7 @@ import qualified EndPoints.Lib.News.News as News
 import qualified EndPoints.Lib.News.NewsHelpTypes as NewsHelpTypes
 import qualified EndPoints.Lib.News.NewsIO as NewsIO
 import qualified EndPoints.Lib.OffsetLimit as OffsetLimit
-import qualified EndPoints.Lib.ThrowSqlRequestError as Throw
+import qualified EndPoints.Lib.ThrowRequestError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
 import Logger (logDebug, logInfo)
