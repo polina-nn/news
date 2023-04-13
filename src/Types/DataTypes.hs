@@ -160,6 +160,15 @@ instance Show URI' where
   show (URI' uriPath' uriId') = "/" ++ uriPath' ++ "/" ++ show uriId'
 
 -------- CATEGORY ----------------
+{--
+data Category =
+   Category
+     { categoryPath :: Path
+     , categoryId :: Id
+     , categoryName :: Name
+     }
+
+newtype Id a = Id {getId :: Int} --}
 
 -- | Category - one category.It has category_path, category_name, category_id (created automatically by Data Base)
 data Category = Category
