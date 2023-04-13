@@ -114,9 +114,6 @@ type Id = Int
 -- | type Name - name for user, category, image, news
 type Name = T.Text
 
--- | type Path - path for category (e.g.  1.23.8.1)
-type Path = String
-
 type URI = String
 
 ---------USER-------------
@@ -166,16 +163,16 @@ instance Show URI' where
 
 -- | Category - one category.It has category_path, category_name, category_id (created automatically by Data Base)
 data Category = Category
-  { categoryPath :: Path,
-    categoryId :: Id,
-    categoryName :: Name
+  { categoryId :: Id,
+    categoryName :: Name,
+    categoryParentId :: Id
   }
   deriving (Show, Generic, Ord, Eq, A.ToJSON, A.FromJSON)
 
 -- |  CreateCategoryRequest - for create category  in request.
 -- You must fill all fields in curl request
 data CreateCategoryRequest = CreateCategoryRequest
-  { path :: Path,
+  { parent :: Id,
     category :: Name
   }
   deriving (Show, Generic, Eq, A.ToJSON, A.FromJSON)
@@ -183,7 +180,7 @@ data CreateCategoryRequest = CreateCategoryRequest
 -- | EditCategoryRequest - for edit category  in request.
 -- You must fill some fields in curl request
 data EditCategoryRequest = EditCategoryRequest
-  { newPath :: Maybe Path,
+  { newParent :: Maybe Id,
     newCategory :: Maybe Name
   }
   deriving (Show, Generic, Eq, A.ToJSON, A.FromJSON)

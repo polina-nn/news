@@ -1,9 +1,8 @@
 module EndPoints.Lib.News.News
-  ( checkUserOffsetLimitFilter, -- use in EndPoints.GetAuthorsNewsList
-    checkOffsetLimitFilter, -- use in EndPoints.GetNewsList
-    toDbNews, -- use in EndPoints.GetNewsList,  EndPoints.GetAuthorsNewsList
-    toFilter, -- use in EndPoints.GetNewsList,  EndPoints.GetAuthorsNewsList
-    sortNews, -- use in EndPoints.GetNewsList,  EndPoints.GetAuthorsNewsList
+  ( toDbNews,
+    toFilter,
+    sortNews,
+    checkFilter,
   )
 where
 
@@ -14,9 +13,7 @@ import qualified Data.Maybe as M
 import qualified Data.Text as T
 import qualified Data.Time as TIME
 import qualified Database.PostgreSQL.Simple.Types as SQLTypes
-import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.News.NewsHelpTypes as NewsHelpTypes
-import qualified EndPoints.Lib.OffsetLimit as OffsetLimit
 import qualified Logger
 import qualified News
 import qualified Types.DataTypes as DataTypes
@@ -41,27 +38,6 @@ toFilter ::
   DataTypes.Filter
 toFilter filterDayAt filterDayUntil filterDaySince filterAuthor filterCategoryId filterTitle filterContent =
   DataTypes.Filter {..}
-
--- | checkUserOffsetLimitFilter - Check the validity of all data in the request. If ok, then a service DbFilter, otherwise an error
--- the validity of SortBy is checked automatically by servant
-checkUserOffsetLimitFilter ::
-  Monad m =>
-  (News.Handle m, DataTypes.User, DataTypes.Filter, Maybe DataTypes.Offset, Maybe DataTypes.Limit) ->
-  EX.ExceptT ErrorTypes.GetNewsError m (DataTypes.Offset, DataTypes.Limit, NewsHelpTypes.DbFilter)
-checkUserOffsetLimitFilter (h, user, f, mo, ml) = do
-  _ <- EX.withExceptT ErrorTypes.InvalidPermissionGetNews (Lib.checkUserAuthor h user)
-  checkOffsetLimitFilter (h, f, mo, ml)
-
--- | checkOffsetLimitFilter - Check the validity of all data in the request. If ok, then a service DbFilter, otherwise an error
--- the validity of SortBy is checked automatically by servant
-checkOffsetLimitFilter ::
-  Monad m =>
-  (News.Handle m, DataTypes.Filter, Maybe DataTypes.Offset, Maybe DataTypes.Limit) ->
-  EX.ExceptT ErrorTypes.GetNewsError m (DataTypes.Offset, DataTypes.Limit, NewsHelpTypes.DbFilter)
-checkOffsetLimitFilter (h, f, mo, ml) = do
-  (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetNews $ OffsetLimit.checkOffsetLimit h mo ml
-  dbFilter <- checkFilter f
-  return (offset, limit, dbFilter)
 
 -- | checkFilter - Check the values in the filters and send the default values for sql request
 checkFilter ::
@@ -169,7 +145,7 @@ toDbNews ::
   ( T.Text,
     TIME.Day,
     T.Text,
-    String,
+    Int,
     T.Text,
     T.Text,
     SQLTypes.PGArray Int,
@@ -178,6 +154,6 @@ toDbNews ::
     Int
   ) ->
   NewsHelpTypes.DbNews
-toDbNews (dbNewsTitle, dbNewsCreated, dbNewsAuthor, dbNewsCategoryPath, dbNewsCategoryName, dbNewsText, dbNewsImagesId', dbNewsImagesQuantity, dbNewsPublished, dbNewsId) =
+toDbNews (dbNewsTitle, dbNewsCreated, dbNewsAuthor, dbNewsCategoryId, dbNewsCategoryName, dbNewsText, dbNewsImagesId', dbNewsImagesQuantity, dbNewsPublished, dbNewsId) =
   let dbNewsImagesId = SQLTypes.fromPGArray dbNewsImagesId'
    in NewsHelpTypes.DbNews {..}

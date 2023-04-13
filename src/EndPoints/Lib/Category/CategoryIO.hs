@@ -1,86 +1,107 @@
 module EndPoints.Lib.Category.CategoryIO
-  ( changePathCategories,
-    getAllCategories,
+  ( getCategoriesById,
+    getCategoryById,
+    checkCategoryExistsById,
   )
 where
 
 import qualified Control.Exception.Safe as EXS
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Control.Monad.Trans.Except as EX
-import qualified Data.Int as I
 import qualified Data.Pool as POOL
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.Category.Category as Category
-import qualified EndPoints.Lib.Category.CategoryHelpTypes as CategoryHelpTypes
-import qualified EndPoints.Lib.ThrowSqlRequestError as Throw
-import Logger (logDebug)
+import qualified EndPoints.Lib.ThrowRequestError as Throw
+import qualified EndPoints.Lib.ToText as ToText
+import Logger (logDebug, logInfo)
 import qualified News
 import qualified Types.DataTypes as DataTypes
-import qualified Types.ErrorTypes as ErrorTypes
 
-changePathCategories ::
+-- | getCategoriesById  - return categories from node to root, by categoryId
+getCategoriesById ::
+  Throw.ThrowSqlRequestError a [DataTypes.Category] =>
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
-  [CategoryHelpTypes.EditCategory] ->
-  EX.ExceptT ErrorTypes.AddEditCategoryError IO Int
-changePathCategories _ h [] = do
-  liftIO $
-    Logger.logDebug
-      (News.hLogHandle h)
-      "changePathCategories: OK! Request don't change path"
-  return 0
-changePathCategories pool h rs = count
-  where
-    count :: EX.ExceptT ErrorTypes.AddEditCategoryError IO Int
-    count = do
-      rez <- mapM (changePathOneCategory pool h) rs
-      liftIO $ Logger.logDebug (News.hLogHandle h) $ T.concat ["changePathCategories: OK! Request change path of ", T.pack $ show $ sum rez, " categories "]
-      return $ sum rez
+  DataTypes.Id ->
+  EX.ExceptT a IO [DataTypes.Category]
+getCategoriesById pool h' id' = do
+  res <-
+    liftIO
+      ( EXS.try
+          ( POOL.withResource pool $ \con ->
+              SQL.query
+                con
+                [sql| WITH RECURSIVE temp1 (category_id, category_parent_id,category_name, path) AS (
+                      SELECT t1.category_id, t1.category_parent_id, t1.category_name, CAST (t1.category_name AS varchar (300)) AS path
+                      FROM category t1 WHERE t1.category_id = ?
+                      UNION
+                      SELECT t2.category_id, t2.category_parent_id, t2.category_name, CAST (temp1.path || '->'|| t2.category_name AS varchar(300))
+                      FROM category t2 INNER JOIN temp1 ON (temp1.category_parent_id = t2.category_id))
+                      SELECT category_id,  category_name, category_parent_id from temp1 |]
+                (SQL.Only id')
+          ) ::
+          IO (Either EXS.SomeException [(DataTypes.Id, DataTypes.Name, DataTypes.Id)])
+      )
+  case res of
+    Left err -> Throw.throwSqlRequestError h' ("getCategoriesById", show err)
+    Right [] -> Throw.throwSqlRequestError h' ("getCategoriesById", "Developer error")
+    Right val -> do
+      let categories = Prelude.map Category.toCategory val
+      return categories
 
-changePathOneCategory ::
+-- | getCategoriesById  - return category by categoryId
+getCategoryById ::
+  Throw.ThrowSqlRequestError a DataTypes.Category =>
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
-  CategoryHelpTypes.EditCategory ->
-  EX.ExceptT ErrorTypes.AddEditCategoryError IO Int
-changePathOneCategory pool h CategoryHelpTypes.EditCategory {..} = do
+  Int ->
+  EX.ExceptT a IO DataTypes.Category
+getCategoryById pool h id' = do
   res <-
     liftIO
       ( EXS.try
           ( POOL.withResource pool $ \conn ->
-              SQL.execute
+              SQL.query
                 conn
-                [sql| UPDATE  category SET category_path = ? WHERE category_id = ? |]
-                (newPath, permanentId)
+                [sql| SELECT category_id, category_name, category_parent_id FROM category WHERE category_id = ? |]
+                (SQL.Only id')
           ) ::
-          IO (Either EXS.SomeException I.Int64)
+          IO (Either EXS.SomeException [(DataTypes.Id, DataTypes.Name, DataTypes.Id)])
       )
   case res of
-    Left err -> Throw.throwSqlRequestError h ("changePathOneCategory", show err)
-    Right 1 -> do
-      liftIO $ Logger.logDebug (News.hLogHandle h) $ T.concat ["changePathOneCategory: OK! \n  id = ", T.pack $ show permanentId, " path = ", T.pack $ show newPath]
-      return 1
-    Right _ -> Throw.throwSqlRequestError h ("changePathOneCategory", "Developer error")
+    Left err -> Throw.throwSqlRequestError h ("getCategory", show err)
+    Right [val] -> do
+      let editedCategory = Category.toCategory val
+      liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["getCategory: ", ToText.toText editedCategory]
+      return editedCategory
+    Right _ -> Throw.throwSqlRequestError h ("getCategory", "Developer error")
 
--- | getAllCategories --
--- when we add the first category to the response, we get an empty array in getAllCategories
-getAllCategories ::
+-- | checkCategoryExistsById  - return categories id if category exists
+checkCategoryExistsById ::
+  Throw.ThrowSqlRequestError a Int =>
+  Throw.ThrowInvalidContentCategoryId a Int =>
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
-  EX.ExceptT ErrorTypes.AddEditCategoryError IO [DataTypes.Category]
-getAllCategories pool h = do
+  Int ->
+  EX.ExceptT a IO Int
+checkCategoryExistsById pool h categoryId = do
   res <-
     liftIO
       ( EXS.try
           ( POOL.withResource pool $ \conn ->
-              SQL.query_
+              SQL.query
                 conn
-                [sql| SELECT category_path, category_id, category_name FROM category ORDER BY category_path |]
+                [sql| SELECT EXISTS (SELECT category_id  FROM category WHERE category_id = ?) |]
+                (SQL.Only categoryId)
           ) ::
-          IO (Either EXS.SomeException [(DataTypes.Path, DataTypes.Id, DataTypes.Name)])
+          IO (Either EXS.SomeException [SQL.Only Bool])
       )
   case res of
-    Left err -> Throw.throwSqlRequestError h ("getAllCategories", show err)
-    Right [] -> return []
-    Right val -> return $ Prelude.map Category.toCategories val
+    Left err -> Throw.throwSqlRequestError h ("checkCategoryExistsById", show err)
+    Right [SQL.Only True] -> do
+      liftIO $ Logger.logDebug (News.hLogHandle h) "checkCategoryExistsById: OK!  Category exists "
+      return categoryId
+    Right [SQL.Only False] -> Throw.throwInvalidContentCategoryId h ("checkCategoryExistsById", "Category with categoryId " <> show categoryId <> " not exists")
+    Right _ -> Throw.throwSqlRequestError h ("checkCategoryId", "Developer error")

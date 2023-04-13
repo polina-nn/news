@@ -2,5 +2,5 @@
 curl -i -POST \
 --header "Cookie: servant-auth-cookie=keypolina" \
 --header "Content-Type: application/json"   \
---data '{ "path":"1", "category":"Алиcа" }' \
+--data '{ "category": "Анна", "parent": 0  }' \
 http://localhost:8080/login/category \

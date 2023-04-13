@@ -19,7 +19,8 @@ What can be improved in [# ToDoList](#todolist)
 | сonfigurator | to work with config |
 | time  | to work with time in logging and creation news/users|
 | servant|  for writing type-safe web applications |
-| postgresql-simple |  for use the PostgreSQL database |\
+| Data.Pool |  to work with pool |
+| postgresql-simple |  for use the PostgreSQL database |
 | cryptonite | for password hashing |
 
 If you have never worked with servant -
@@ -133,6 +134,7 @@ news/
 │ │   │  ├── News/  # Lib for News End Points
 │ │   │  ├── Lib.hs # Some function for many End Points
 │ │   │  ├── OffsetLimit.hs     # Offset limit for End Points 
+│ │   │  ├── ThrowRequestError.hs # Class for throw requests errors
 │ │   │  ├── ToHttpResponse.hs # class ToHttpResponse for throwError by servant
 │ │   │  └── ToText.hs # class ToText.hs for present in logging results of requests
 │ │   ├── AddOneCategory.hs #  Create one category (authentication admin required)
@@ -155,7 +157,8 @@ news/
 │ ├── Types/        
 │ │   ├── ApiTypes.hs   # RestAPI  
 │ │   ├── DataTypes.hs  # all types except api, config, error
-│ │   └── ErrorTypes.hs # Error for endpoints
+│ │   ├── ErrorTypes.hs # Error for endpoints
+│ │   └── ExceptionTypes.hs  # Exceptions
 │ │
 │ ├── Config.hs  # Configuration reader and default config value
 │ ├── DbServices.hs # Connection pool to DB used in module Server
@@ -201,7 +204,7 @@ I define general list of errors, and errors list for each endpoint or group of e
 
 | Code          | Description                                                           |
 | ----------------- | ------------------------------------------------------------------ |
-| 400 | Bad Request (Invalid limit or offset, invalid content by type or value|
+| 400 | Bad Request (Invalid limit or offset, invalid content by type or value)|
 | 403 | Forbidden Error (Invalid author permission)|
 | 404 | Not Found (Invalid admin permission, Invalid id)|
 | 500 | Internal Server Error (Error of executing SQL request) |

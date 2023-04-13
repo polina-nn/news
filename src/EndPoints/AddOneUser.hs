@@ -14,10 +14,10 @@ import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.LibIO as LibIO
-import qualified EndPoints.Lib.ThrowSqlRequestError as Throw
+import qualified EndPoints.Lib.ThrowRequestError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
-import Logger (logDebug, logError, logInfo, (.<))
+import Logger (logError, logInfo, (.<))
 import qualified News
 import Servant (Handler)
 import qualified Types.DataTypes as DataTypes
@@ -48,49 +48,16 @@ addUserExcept pool (h, token, req) = do
   user <- EX.withExceptT ErrorTypes.AddUserSQLRequestError (LibIO.searchUser h pool token)
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add User: \n", ToText.toText req, "by user: ", ToText.toText user]
   _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddUser (Lib.checkUserAdmin h user)
-  _ <- checkLogin pool h req
-  _ <- addTokenToDB pool h req
-  addUserToDB pool h req
-
--- | checkLogin - check the existence of the login. Duplication of login is not allowed
-checkLogin ::
-  POOL.Pool SQL.Connection ->
-  News.Handle IO ->
-  DataTypes.CreateUserRequest ->
-  EX.ExceptT ErrorTypes.AddUserError IO DataTypes.CreateUserRequest
-checkLogin pool h' r@DataTypes.CreateUserRequest {..} = do
-  res <-
-    liftIO
-      ( EXS.try
-          ( POOL.withResource pool $ \conn ->
-              SQL.query
-                conn
-                [sql| SELECT EXISTS (SELECT usr_login  FROM usr WHERE usr_login = ?) |]
-                (SQL.Only login)
-          ) ::
-          IO (Either EXS.SomeException [SQL.Only Bool])
-      )
-
-  case res of
-    Left err -> Throw.throwSqlRequestError h' ("checkLogin ", show err)
-    Right [SQL.Only True] -> do
-      liftIO $
-        Logger.logError
-          (News.hLogHandle h')
-          ("ERROR " .< ErrorTypes.UserAlreadyExisted (ErrorTypes.InvalidContent "checkLogin: BAD! User with this login already exists "))
-      EX.throwE $ ErrorTypes.UserAlreadyExisted $ ErrorTypes.InvalidContent []
-    Right [SQL.Only False] -> do
-      liftIO $ Logger.logDebug (News.hLogHandle h') "checkLogin: OK!"
-      return r
-    Right _ -> Throw.throwSqlRequestError h' ("checkLogin ", "Developer error!")
+  newUser <- addUserToDB pool h req
+  addTokenToDB pool h newUser
 
 addTokenToDB ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
-  DataTypes.CreateUserRequest ->
-  EX.ExceptT ErrorTypes.AddUserError IO DataTypes.CreateUserRequest
-addTokenToDB pool h r@DataTypes.CreateUserRequest {..} = do
-  let token = Lib.hashed ("key" ++ login)
+  DataTypes.User ->
+  EX.ExceptT ErrorTypes.AddUserError IO DataTypes.User
+addTokenToDB pool h r@DataTypes.User {..} = do
+  let token = Lib.hashed ("key" ++ userLogin)
   res <-
     liftIO
       ( EXS.try
@@ -99,7 +66,7 @@ addTokenToDB pool h r@DataTypes.CreateUserRequest {..} = do
                 conn
                 [sql|INSERT INTO token  (token_login, token_key )
              VALUES (?, ?) |]
-                (login, token)
+                (userLogin, token)
           ) ::
           IO (Either EXS.SomeException I.Int64)
       )
@@ -130,7 +97,7 @@ addUserToDB pool h DataTypes.CreateUserRequest {..} = do
           IO (Either EXS.SomeException I.Int64)
       )
   case res of
-    Left err -> Throw.throwSqlRequestError h ("addUserToDB", show err)
+    Left err -> handleError err
     Right 1 -> do
       let newUser =
             ( DataTypes.User
@@ -145,3 +112,11 @@ addUserToDB pool h DataTypes.CreateUserRequest {..} = do
       liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["addUserToDB: OK!", ToText.toText newUser]
       return newUser
     Right _ -> Throw.throwSqlRequestError h ("addUserToDB", "Developer error")
+  where
+    handleError (EXS.SomeException e) =
+      let errMsg = EXS.displayException e
+       in if "duplicate key value" `T.isInfixOf` T.pack errMsg
+            then do
+              liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.UserAlreadyExisted (ErrorTypes.InvalidContent "addUserToDB: BAD! User with this login already exists "))
+              EX.throwE $ ErrorTypes.UserAlreadyExisted $ ErrorTypes.InvalidContent []
+            else Throw.throwSqlRequestError h ("addUserToDB", show e)

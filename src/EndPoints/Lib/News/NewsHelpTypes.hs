@@ -10,8 +10,8 @@ data DbNews = DbNews
   { dbNewsTitle :: DataTypes.Name,
     dbNewsCreated :: TIME.Day,
     dbNewsAuthor :: DataTypes.Name,
-    dbNewsCategoryPath :: DataTypes.Path,
-    dbNewsCategoryName :: DataTypes.Name, -- recursively all categories
+    dbNewsCategoryId :: DataTypes.Id,
+    dbNewsCategoryName :: DataTypes.Name,
     dbNewsText :: T.Text,
     dbNewsImagesId :: [Int],
     dbNewsImagesQuantity :: Int,

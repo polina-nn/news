@@ -29,7 +29,7 @@ import qualified EndPoints.GetNewsSearchList as GetNewsSearchList
 import qualified EndPoints.GetOneImage as GetOneImage
 import qualified EndPoints.GetUserList as GetUserList
 import qualified EndPoints.Lib.Lib as Lib
-import qualified EndPoints.Lib.ThrowSqlRequestError as Throw
+import qualified EndPoints.Lib.ThrowRequestError as Throw
 import Logger (logDebug, logError, (.<))
 import Network.Wai (Request, requestHeaders)
 import qualified Network.Wai.Handler.Warp

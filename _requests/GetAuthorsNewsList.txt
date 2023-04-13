@@ -1,5 +1,5 @@
 list of query parameters:
-  :<|> BasicAuth "Get news by new's author" DataTypes.User :> "login" :> "news"
+  :<|> AuthProtect "cookie-auth" :> "login"  :> "news"
       :> QueryParam "created_at" DataTypes.DayAt
       :> QueryParam "created_until" DataTypes.DayUntil
       :> QueryParam "created_since" DataTypes.DaySince
@@ -18,7 +18,7 @@ instance FromHttpApiData SortBy where
     | T.toLower value == T.pack "author" = Right SortByAuthor
     | T.toLower value == T.pack "category" = Right SortByCategory
     | T.toLower value == T.pack "data" = Right SortByData
-    | T.toLower value == T.pack "foto" = Right SortByFoto
+    | T.toLower value == T.pack "photo" = Right SortByPhoto
     | otherwise = Left $ T.pack "Invalid sort_by value"
 
 
@@ -64,7 +64,7 @@ curl -v "http://polina:polina@localhost:8080/login/news?sort_by=category&limit=1
 3. Sort news by category data (latest news is the first)
 curl -v "http://polina:polina@localhost:8080/login/news?sort_by=data&limit=10"
 
-4. Sort news by category foto
+4. Sort news by category photo
 curl -v "http://polina:polina@localhost:8080/login/news?sort_by=photo&limit=25"
 
 ----- Check filters & sort & limit  -----

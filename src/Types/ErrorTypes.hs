@@ -113,10 +113,10 @@ data ServerAuthError
 -- | AddEditCategoryError - Add and edit category errors
 data AddEditCategoryError
   = InvalidPermissionAddEditCategory InvalidAdminPermission
-  | -- InvalidSyntaxPath error in path such as new_path": "700-a"
-    InvalidSyntaxPath InvalidContent
-  | -- InvalidValuePath error in path such as new_path": "1.12.100" then "1.12.100"  is not exist
-    InvalidValuePath InvalidContent
+  | -- CategoryAlreadyExisted error when the category with the same name already exists. Duplication of category name is not allowed
+    CategoryAlreadyExisted InvalidContent
+  | -- InvalidParentId when the category parent not exists or parent is its child
+    InvalidParentIdAddEditCategory InvalidContent
   | AddEditCategorySQLRequestError SQLRequestError
   | -- InvalidCategoryId - use only in edit request
     InvalidCategoryId InvalidId
