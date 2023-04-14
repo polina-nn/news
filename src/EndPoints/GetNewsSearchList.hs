@@ -60,12 +60,12 @@ newsSearchListExcept _ (h, Nothing, _, _) = do
   liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidSearchGetNews (ErrorTypes.InvalidRequest "newsSearchListExcept: BAD! Not text for searching \n"))
   EX.throwE $ ErrorTypes.InvalidSearchGetNews $ ErrorTypes.InvalidRequest []
 newsSearchListExcept pool (h, Just search, mo, ml) = do
-  liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Get News Search List ", search, " offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
+  liftIO $ Logger.logInfo (News.hLogHandle h) $ "\n\nRequest: Get News Search List " <> search <> ", offset = " .< mo <> ", limit = " .< ml
   (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetNews $ OffsetLimit.checkOffsetLimit h mo ml
   res <- newsSearchListAtDb pool h search offset limit
   news <- Prelude.mapM (NewsIO.toNews pool h) res
   let toTextNews = T.concat $ map ToText.toText news
-  liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["newsSearchListExcept: OK! \n", toTextNews]
+  liftIO $ Logger.logInfo (News.hLogHandle h) $ "newsSearchListExcept: OK! \n" <> toTextNews
   return news
 
 newsSearchListAtDb ::
@@ -75,7 +75,7 @@ newsSearchListAtDb ::
   DataTypes.Offset ->
   DataTypes.Limit ->
   EX.ExceptT ErrorTypes.GetNewsError IO [NewsHelpTypes.DbNews]
-newsSearchListAtDb pool h search off lim = do
+newsSearchListAtDb pool h search DataTypes.Offset {..} DataTypes.Limit {..} = do
   res <-
     liftIO
       ( EXS.try
@@ -88,7 +88,7 @@ newsSearchListAtDb pool h search off lim = do
             where (news_published = true) and (to_tsvector(news_title) || to_tsvector(usr_name) || to_tsvector(category_name) || to_tsvector(news_text) @@ plainto_tsquery(?))
             ORDER BY news_created DESC
             LIMIT ?  OFFSET ? |]
-                (search, show lim, show off)
+                (search, show limit, show offset)
           ) ::
           IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, Int, T.Text, T.Text, SQLTypes.PGArray Int, Int, Bool, Int)])
       )

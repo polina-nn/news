@@ -8,7 +8,6 @@ where
 
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import qualified Control.Monad.Trans.Except as EX
-import qualified Data.Text as T
 import Logger (logDebug, logError, (.<))
 import qualified News
 import qualified Types.DataTypes as DataTypes
@@ -20,19 +19,14 @@ checkOffset ::
   News.Handle m ->
   Maybe DataTypes.Offset ->
   EX.ExceptT ErrorTypes.InvalidOffsetOrLimit m DataTypes.Offset
-checkOffset _ Nothing = return 0
-checkOffset h (Just offset)
-  | offset >= 0 = return offset
+checkOffset _ Nothing = return DataTypes.Offset {offset = 0}
+checkOffset h (Just r@DataTypes.Offset {..})
+  | offset >= 0 = return r
   | otherwise = do
     lift $
       Logger.logError
         (News.hLogHandle h)
-        ( "ERROR "
-            .< ErrorTypes.InvalidOffset
-              ( "checkOffset: Offset in request is a negative number. Offset = "
-                  ++ show offset
-              )
-        )
+        ("ERROR " .< ErrorTypes.InvalidOffset "checkOffset: Offset in request is a negative number.")
     EX.throwE $ ErrorTypes.InvalidOffset []
 
 -- | checkLimit -- return limit of request result
@@ -46,20 +40,15 @@ checkLimit ::
   -- | don`t show more then limit from AppConfig
   EX.ExceptT ErrorTypes.InvalidOffsetOrLimit m DataTypes.Limit
 checkLimit _ Nothing appConfigLimit =
-  return appConfigLimit
-checkLimit h (Just limit) appConfigLimit
-  | limit > appConfigLimit = return appConfigLimit
-  | limit <= appConfigLimit && (limit > 0) = return limit
+  return DataTypes.Limit {limit = appConfigLimit}
+checkLimit h (Just r@DataTypes.Limit {..}) appConfigLimit
+  | limit > appConfigLimit = return DataTypes.Limit {limit = appConfigLimit}
+  | limit <= appConfigLimit && (limit > 0) = return r
   | otherwise = do
     lift $
       Logger.logError
         (News.hLogHandle h)
-        ( "ERROR "
-            .< ErrorTypes.InvalidLimit
-              ( "checkLimit: Limit in request is a negative number or zero. Limit = "
-                  ++ show limit
-              )
-        )
+        ("ERROR " .< ErrorTypes.InvalidLimit "checkLimit: Limit in request is a negative number or zero.")
     EX.throwE $ ErrorTypes.InvalidLimit []
 
 checkOffsetLimit ::
@@ -69,7 +58,7 @@ checkOffsetLimit ::
   Maybe DataTypes.Limit ->
   EX.ExceptT ErrorTypes.InvalidOffsetOrLimit m (DataTypes.Offset, DataTypes.Limit)
 checkOffsetLimit h mo ml = do
-  offset <- checkOffset h mo
-  limit <- checkLimit h ml (News.appShowLimit $ News.hAppConfig h)
-  lift $ Logger.logDebug (News.hLogHandle h) $ T.concat ["checkOffsetLimit: OK! Offset = ", T.pack $ show offset, "Limit  = ", T.pack $ show limit]
-  return (offset, limit)
+  offset' <- checkOffset h mo
+  limit' <- checkLimit h ml (News.appShowLimit $ News.hAppConfig h)
+  lift $ Logger.logDebug (News.hLogHandle h) $ "checkOffsetLimit: OK! Offset = " .< DataTypes.offset offset' <> ", Limit  = " .< DataTypes.limit limit'
+  return (offset', limit')

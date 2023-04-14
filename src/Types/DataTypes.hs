@@ -9,9 +9,10 @@ import qualified Data.Text as T
 import qualified Data.Time as TIME
 import GHC.Generics (Generic)
 import qualified News
-import Servant.API (FromHttpApiData (parseQueryParam))
+import Servant (FromHttpApiData (..))
 import Servant.API.Experimental.Auth (AuthProtect)
 import Servant.Server.Experimental.Auth (AuthServerData)
+import Text.Read
 import qualified Types.ErrorTypes as ErrorTypes
 
 newtype Handle = Handle
@@ -103,10 +104,24 @@ type DayUntil = TIME.Day
 type DaySince = TIME.Day
 
 -- | type Limit -  maximum array length per get request
-type Limit = Int
+newtype Limit = Limit {limit :: Int}
+  deriving (Show, Read, Generic)
+
+instance FromHttpApiData Limit where
+  parseUrlPiece lim =
+    case readEither (T.unpack lim) :: Either String Int of
+      Left err -> Left (T.pack err)
+      Right val -> Right Limit {limit = val}
 
 -- | type Offset - offset from the beginning of  get response array
-type Offset = Int
+newtype Offset = Offset {offset :: Int}
+  deriving (Show, Read, Generic)
+
+instance FromHttpApiData Offset where
+  parseUrlPiece off =
+    case readEither (T.unpack off) :: Either String Int of
+      Left err -> Left (T.pack err)
+      Right val -> Right Offset {offset = val}
 
 -- | type Id - id for user, category, image
 type Id = Int

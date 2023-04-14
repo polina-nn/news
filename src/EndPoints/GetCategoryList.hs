@@ -18,7 +18,7 @@ import qualified EndPoints.Lib.OffsetLimit as OffsetLimit
 import qualified EndPoints.Lib.ThrowRequestError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
-import Logger (logDebug, logInfo)
+import Logger (logDebug, logInfo, (.<))
 import qualified News
 import Servant (Handler)
 import qualified Types.DataTypes as DataTypes
@@ -44,7 +44,7 @@ categoryListExcept ::
   (News.Handle IO, Maybe DataTypes.Offset, Maybe DataTypes.Limit) ->
   EX.ExceptT ErrorTypes.GetContentError IO [DataTypes.Category]
 categoryListExcept pool (h, mo, ml) = do
-  liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Get Category List  with offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
+  liftIO $ Logger.logInfo (News.hLogHandle h) $ "\n\nRequest: Get Category List  with offset = " .< mo <> " limit = " .< ml
   (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetContent $ OffsetLimit.checkOffsetLimit h mo ml
   getAllCategories pool h offset limit
 
@@ -79,7 +79,7 @@ getAllCategories pool h offset limit = do
       let categorySort = Prelude.map Category.toCategorySort value
           result = getCategoriesWithOffsetLimit offset limit (sortedAllCategories categorySort)
           toTextCategories = T.concat $ map ToText.toText result
-      liftIO $ Logger.logDebug (News.hLogHandle h) $ T.concat ["categories: OK! \n", toTextCategories]
+      liftIO $ Logger.logDebug (News.hLogHandle h) $ "categories: OK! \n" <> toTextCategories
       return result
 
 -- | sortedAllCategories - postgreSQL returns an alphabetically sorted result for Latin only, Cyrillic has to be sorted by Haskell
@@ -96,4 +96,4 @@ sortedAllCategories cats = Prelude.map Category.toCategoryFromCategorySort rez
         cats
 
 getCategoriesWithOffsetLimit :: DataTypes.Offset -> DataTypes.Limit -> [DataTypes.Category] -> [DataTypes.Category]
-getCategoriesWithOffsetLimit offset limit cat = take limit $ drop offset cat
+getCategoriesWithOffsetLimit DataTypes.Offset {..} DataTypes.Limit {..} cat = take limit $ drop offset cat
