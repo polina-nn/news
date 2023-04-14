@@ -95,13 +95,34 @@ data Filter = Filter
     filterTitle :: Maybe T.Text,
     filterContent :: Maybe T.Text
   }
-  deriving (Show, Generic, Eq)
+  deriving (Show, Generic)
 
-type DayAt = TIME.Day
+newtype DayAt = DayAt {dayAt :: TIME.Day}
+  deriving (Show, Read, Generic)
 
-type DayUntil = TIME.Day
+instance FromHttpApiData DayAt where
+  parseUrlPiece lim =
+    case readEither (T.unpack lim) :: Either String TIME.Day of
+      Left err -> Left (T.pack err)
+      Right val -> Right DayAt {dayAt = val}
 
-type DaySince = TIME.Day
+newtype DayUntil = DayUntil {dayUntil :: TIME.Day}
+  deriving (Show, Read, Generic)
+
+instance FromHttpApiData DayUntil where
+  parseUrlPiece lim =
+    case readEither (T.unpack lim) :: Either String TIME.Day of
+      Left err -> Left (T.pack err)
+      Right val -> Right DayUntil {dayUntil = val}
+
+newtype DaySince = DaySince {daySince :: TIME.Day}
+  deriving (Show, Read, Generic)
+
+instance FromHttpApiData DaySince where
+  parseUrlPiece lim =
+    case readEither (T.unpack lim) :: Either String TIME.Day of
+      Left err -> Left (T.pack err)
+      Right val -> Right DaySince {daySince = val}
 
 -- | type Limit -  maximum array length per get request
 newtype Limit = Limit {limit :: Int}
@@ -123,8 +144,13 @@ instance FromHttpApiData Offset where
       Left err -> Left (T.pack err)
       Right val -> Right Offset {offset = val}
 
+-- | type ParentId - id for category parent
+newtype ParentId = ParentId {parentId :: Int}
+  deriving (Show, Generic, Eq, A.ToJSON, A.FromJSON)
+
 -- | type Id - id for user, category, image
-type Id = Int
+newtype Id = Id {id :: Int}
+  deriving (Show, Generic, Eq, A.ToJSON, A.FromJSON)
 
 -- | type Name - name for user, category, image, news
 type Name = T.Text
@@ -175,28 +201,19 @@ instance Show URI' where
   show (URI' uriPath' uriId') = "/" ++ uriPath' ++ "/" ++ show uriId'
 
 -------- CATEGORY ----------------
-{--
-data Category =
-   Category
-     { categoryPath :: Path
-     , categoryId :: Id
-     , categoryName :: Name
-     }
-
-newtype Id a = Id {getId :: Int} --}
 
 -- | Category - one category.It has category_path, category_name, category_id (created automatically by Data Base)
 data Category = Category
   { categoryId :: Id,
     categoryName :: Name,
-    categoryParentId :: Id
+    categoryParentId :: ParentId
   }
-  deriving (Show, Generic, Ord, Eq, A.ToJSON, A.FromJSON)
+  deriving (Show, Generic, Eq, A.ToJSON, A.FromJSON)
 
 -- |  CreateCategoryRequest - for create category  in request.
 -- You must fill all fields in curl request
 data CreateCategoryRequest = CreateCategoryRequest
-  { parent :: Id,
+  { parent :: ParentId,
     category :: Name
   }
   deriving (Show, Generic, Eq, A.ToJSON, A.FromJSON)
@@ -204,7 +221,7 @@ data CreateCategoryRequest = CreateCategoryRequest
 -- | EditCategoryRequest - for edit category  in request.
 -- You must fill some fields in curl request
 data EditCategoryRequest = EditCategoryRequest
-  { newParent :: Maybe Id,
+  { newParent :: Maybe ParentId,
     newCategory :: Maybe Name
   }
   deriving (Show, Generic, Eq, A.ToJSON, A.FromJSON)

@@ -60,7 +60,7 @@ editNewsExcept ::
 editNewsExcept pool (h, token, newsId, r) = do
   _ <- checkId pool h newsId
   user <- EX.withExceptT ErrorTypes.AddEditNewsSQLRequestError (LibIO.searchUser h pool token)
-  liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Edit One News \n", ToText.toText r, "with news id ", T.pack $ show newsId, "\nby user: ", ToText.toText user]
+  liftIO $ Logger.logInfo (News.hLogHandle h) $ "\n\nRequest: Edit One News \n" <> ToText.toText r <> "with news id " .< newsId <> "\nby user: " <> ToText.toText user
   _ <- checkUserThisNewsAuthor pool h user newsId
   _ <- checkImageFilesExist h r
   _ <- checkPngImages h r
@@ -119,7 +119,7 @@ newCatId pool h newsId r@DataTypes.EditNewsRequest {newCategoryId = Just catId} 
               SQL.execute
                 conn
                 [sql| UPDATE news SET news_category_id = ? WHERE news_id = ? |]
-                (catId, newsId)
+                (DataTypes.id catId, newsId)
           ) ::
           IO (Either EXS.SomeException I.Int64)
       )
@@ -292,7 +292,7 @@ getNews pool h user idNews categories imagesIds = do
     Left err -> Throw.throwSqlRequestError h ("getNews", show err)
     Right [value] -> do
       let news = toNews value user categories imagesIds idNews
-      liftIO $ Logger.logDebug (News.hLogHandle h) $ T.concat ["getNews: OK!", ToText.toText news]
+      liftIO $ Logger.logDebug (News.hLogHandle h) $ "getNews: OK!" <> ToText.toText news
       return news
     Right _ -> Throw.throwSqlRequestError h ("getNews", "Developer error")
   where
@@ -404,7 +404,7 @@ checkCategoryId ::
 checkCategoryId _ _ r@DataTypes.EditNewsRequest {newCategoryId = Nothing} =
   return r
 checkCategoryId pool h r@DataTypes.EditNewsRequest {newCategoryId = Just categoryId} = do
-  res <- liftIO (EX.runExceptT (CategoryIO.checkCategoryExistsById pool h categoryId :: EX.ExceptT ErrorTypes.AddEditNewsError IO Int))
+  res <- liftIO (EX.runExceptT (CategoryIO.checkCategoryExistsById pool h (DataTypes.id categoryId) :: EX.ExceptT ErrorTypes.AddEditNewsError IO Int))
   case res of
     Left err -> EX.throwE err
     Right _ -> return r

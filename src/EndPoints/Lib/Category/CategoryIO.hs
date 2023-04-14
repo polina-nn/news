@@ -9,7 +9,6 @@ import qualified Control.Exception.Safe as EXS
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Control.Monad.Trans.Except as EX
 import qualified Data.Pool as POOL
-import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.Category.Category as Category
@@ -24,7 +23,7 @@ getCategoriesById ::
   Throw.ThrowSqlRequestError a [DataTypes.Category] =>
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
-  DataTypes.Id ->
+  Int ->
   EX.ExceptT a IO [DataTypes.Category]
 getCategoriesById pool h' id' = do
   res <-
@@ -42,7 +41,7 @@ getCategoriesById pool h' id' = do
                       SELECT category_id,  category_name, category_parent_id from temp1 |]
                 (SQL.Only id')
           ) ::
-          IO (Either EXS.SomeException [(DataTypes.Id, DataTypes.Name, DataTypes.Id)])
+          IO (Either EXS.SomeException [(Int, DataTypes.Name, Int)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h' ("getCategoriesById", show err)
@@ -68,13 +67,13 @@ getCategoryById pool h id' = do
                 [sql| SELECT category_id, category_name, category_parent_id FROM category WHERE category_id = ? |]
                 (SQL.Only id')
           ) ::
-          IO (Either EXS.SomeException [(DataTypes.Id, DataTypes.Name, DataTypes.Id)])
+          IO (Either EXS.SomeException [(Int, DataTypes.Name, Int)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("getCategory", show err)
     Right [val] -> do
       let editedCategory = Category.toCategory val
-      liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["getCategory: ", ToText.toText editedCategory]
+      liftIO $ Logger.logInfo (News.hLogHandle h) $ "getCategory: " <> ToText.toText editedCategory
       return editedCategory
     Right _ -> Throw.throwSqlRequestError h ("getCategory", "Developer error")
 

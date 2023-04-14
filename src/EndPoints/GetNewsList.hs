@@ -119,9 +119,9 @@ newsListCategory pool h DataTypes.Offset {..} DataTypes.Limit {..} NewsHelpTypes
             AND news_category_id = ?
             ORDER BY news_created DESC
             LIMIT ?  OFFSET ?|]
-                ( dbFilterDayAt,
-                  dbFilterDayUntil,
-                  dbFilterDaySince,
+                ( DataTypes.dayAt dbFilterDayAt,
+                  DataTypes.dayUntil dbFilterDayUntil,
+                  DataTypes.daySince dbFilterDaySince,
                   dbFilterAuthor,
                   dbFilterTitle,
                   dbFilterContent,
@@ -164,9 +164,9 @@ newsListNotCategory pool h DataTypes.Offset {..} DataTypes.Limit {..} NewsHelpTy
             AND news_text LIKE ?
             ORDER BY news_created DESC
             LIMIT ?  OFFSET ?|]
-                ( dbFilterDayAt,
-                  dbFilterDayUntil,
-                  dbFilterDaySince,
+                ( DataTypes.dayAt dbFilterDayAt,
+                  DataTypes.dayUntil dbFilterDayUntil,
+                  DataTypes.daySince dbFilterDaySince,
                   dbFilterAuthor,
                   dbFilterTitle,
                   dbFilterContent,

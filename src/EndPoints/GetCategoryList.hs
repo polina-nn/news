@@ -71,7 +71,7 @@ getAllCategories pool h offset limit = do
                       JOIN category s1 ON s1.category_parent_id = tree.category_id )
                       SELECT   category_id, category_name, category_parent_id, sort_string FROM tree ORDER BY sort_string ASC; |]
           ) ::
-          IO (Either EXS.SomeException [(DataTypes.Id, DataTypes.Name, DataTypes.Id, DataTypes.Name)])
+          IO (Either EXS.SomeException [(Int, DataTypes.Name, Int, DataTypes.Name)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("getAllCategories", show err)

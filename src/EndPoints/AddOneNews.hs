@@ -54,13 +54,13 @@ addNewsExcept ::
   EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.News
 addNewsExcept pool (h, token, r@DataTypes.CreateNewsRequest {..}) = do
   user <- EX.withExceptT ErrorTypes.AddEditNewsSQLRequestError (LibIO.searchUser h pool token)
-  liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add One News: \n", ToText.toText r, "by user: ", ToText.toText user]
+  liftIO $ Logger.logInfo (News.hLogHandle h) $ "\n\nRequest: Add One News: \n" <> ToText.toText r <> "by user: " <> ToText.toText user
   _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditNews (Lib.checkUserAuthor h user)
   _ <- checkImageFilesExist h r
   _ <- checkPngImages h r
   _ <- checkBase64Images h r
-  _ <- CategoryIO.checkCategoryExistsById pool h newsCategoryId
-  categories' <- CategoryIO.getCategoriesById pool h newsCategoryId
+  _ <- CategoryIO.checkCategoryExistsById pool h (DataTypes.id newsCategoryId)
+  categories' <- CategoryIO.getCategoriesById pool h (DataTypes.id newsCategoryId)
   images' <- addAllImages pool h r
   addNewsToDB pool h user categories' r images'
 
@@ -171,7 +171,7 @@ addNewsToDB pool h DataTypes.User {..} categories DataTypes.CreateNewsRequest {.
                   title,
                   show created,
                   userLogin,
-                  newsCategoryId,
+                  DataTypes.id newsCategoryId,
                   text,
                   published
                 )
@@ -192,6 +192,6 @@ addNewsToDB pool h DataTypes.User {..} categories DataTypes.CreateNewsRequest {.
                 newsPublished = published,
                 newsId = idNews
               }
-      liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["addNewsToDB: OK!", ToText.toText news]
+      liftIO $ Logger.logInfo (News.hLogHandle h) $ "addNewsToDB: OK!" <> ToText.toText news
       return news
     Right _ -> Throw.throwSqlRequestError h ("addNewsToDB", "Developer error")

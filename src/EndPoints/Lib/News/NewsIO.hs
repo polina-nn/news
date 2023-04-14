@@ -56,7 +56,8 @@ toNews ::
   NewsHelpTypes.DbNews ->
   EX.ExceptT ErrorTypes.GetNewsError IO DataTypes.News
 toNews con h NewsHelpTypes.DbNews {..} = do
-  categories <- CategoryIO.getCategoriesById con h dbNewsCategoryId
+  let newsCategoryId = DataTypes.id dbNewsCategoryId
+  categories <- CategoryIO.getCategoriesById con h newsCategoryId
   let news =
         DataTypes.News
           { newsTitle = dbNewsTitle,

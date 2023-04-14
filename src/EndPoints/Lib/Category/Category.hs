@@ -8,13 +8,23 @@ where
 import qualified EndPoints.Lib.Category.CategoryHelpTypes as CategoryHelpTypes
 import qualified Types.DataTypes as DataTypes
 
-toCategory ::
-  (DataTypes.Id, DataTypes.Name, DataTypes.Id) -> DataTypes.Category
-toCategory (categoryId, categoryName, categoryParentId) = DataTypes.Category {..}
+toCategory :: (Int, DataTypes.Name, Int) -> DataTypes.Category
+toCategory (catId, categoryName, parentCatId) =
+  DataTypes.Category
+    { categoryId = DataTypes.Id {id = catId},
+      categoryName = categoryName,
+      categoryParentId = DataTypes.ParentId {parentId = parentCatId}
+    }
 
 toCategorySort ::
-  (DataTypes.Id, DataTypes.Name, DataTypes.Id, DataTypes.Name) -> CategoryHelpTypes.CategorySort
-toCategorySort (categorySortId, categorySortName, categorySortParentId, categorySortPath) = CategoryHelpTypes.CategorySort {..}
+  (Int, DataTypes.Name, Int, DataTypes.Name) -> CategoryHelpTypes.CategorySort
+toCategorySort (catSortId, catSortName, catSortParentId, catSortPath) =
+  CategoryHelpTypes.CategorySort
+    { categorySortId = DataTypes.Id {id = catSortId},
+      categorySortName = catSortName,
+      categorySortParentId = DataTypes.ParentId {parentId = catSortParentId},
+      categorySortPath = catSortPath
+    }
 
 toCategoryFromCategorySort :: CategoryHelpTypes.CategorySort -> DataTypes.Category
 toCategoryFromCategorySort CategoryHelpTypes.CategorySort {..} =

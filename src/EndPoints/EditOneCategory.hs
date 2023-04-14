@@ -49,7 +49,7 @@ editCategoryExcept ::
 editCategoryExcept pool (h, token, catId, r) = do
   _ <- checkId pool h catId
   user <- EX.withExceptT ErrorTypes.AddEditCategorySQLRequestError (LibIO.searchUser h pool token)
-  liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["\n\nRequest: Edit Category: \n", ToText.toText r, "with category id ", T.pack $ show catId, "\nby user: ", ToText.toText user]
+  liftIO $ Logger.logInfo (News.hLogHandle h) $ "\n\nRequest: Edit Category: \n" <> ToText.toText r <> "with category id " .< catId <> "\nby user: " <> ToText.toText user
   _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditCategory (Lib.checkUserAdmin h user)
   _ <- checkParentId pool h r
   _ <- checkParentNotHisChild pool h catId r
@@ -93,9 +93,9 @@ checkParentId ::
   DataTypes.EditCategoryRequest ->
   EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.EditCategoryRequest
 checkParentId _ _ r@DataTypes.EditCategoryRequest {newParent = Nothing} = return r
-checkParentId _ _ r@DataTypes.EditCategoryRequest {newParent = Just 0} = return r
+checkParentId _ _ r@DataTypes.EditCategoryRequest {newParent = Just (DataTypes.ParentId {parentId = 0})} = return r
 checkParentId pool h' r@DataTypes.EditCategoryRequest {newParent = Just parent} = do
-  res <- liftIO (EX.runExceptT (CategoryIO.checkCategoryExistsById pool h' parent :: EX.ExceptT ErrorTypes.AddEditCategoryError IO Int))
+  res <- liftIO (EX.runExceptT (CategoryIO.checkCategoryExistsById pool h' (DataTypes.parentId parent) :: EX.ExceptT ErrorTypes.AddEditCategoryError IO Int))
   case res of
     Left err -> EX.throwE err
     Right _ -> return r
@@ -107,12 +107,12 @@ checkParentNotHisChild ::
   DataTypes.EditCategoryRequest ->
   EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.EditCategoryRequest
 checkParentNotHisChild _ _ _ r@DataTypes.EditCategoryRequest {newParent = Nothing} = return r
-checkParentNotHisChild _ _ _ r@DataTypes.EditCategoryRequest {newParent = Just 0} = return r
+checkParentNotHisChild _ _ _ r@DataTypes.EditCategoryRequest {newParent = Just (DataTypes.ParentId {parentId = 0})} = return r
 checkParentNotHisChild pool h id' r@DataTypes.EditCategoryRequest {newParent = Just parent}
-  | parent == id' = Throw.throwInvalidContentCategoryId h ("checkParentNotHisChild", "New parent " <> show parent <> " is his child")
+  | DataTypes.parentId parent == id' = Throw.throwInvalidContentCategoryId h ("checkParentNotHisChild", "New parent " <> show parent <> " is his child")
   | otherwise = do
     currentCategory <- CategoryIO.getCategoryById pool h id'
-    categoriesFutureParent <- CategoryIO.getCategoriesById pool h parent
+    categoriesFutureParent <- CategoryIO.getCategoriesById pool h (DataTypes.parentId parent)
     if any (\x -> DataTypes.categoryName x == DataTypes.categoryName currentCategory) categoriesFutureParent
       then Throw.throwInvalidContentCategoryId h ("checkParentNotHisChild", "New parent " <> show parent <> " is his child")
       else do
@@ -166,7 +166,7 @@ editCategoryParent pool h id' r@DataTypes.EditCategoryRequest {newParent = Just 
               SQL.execute
                 conn
                 [sql| UPDATE category SET category_parent_id = ? WHERE category_id = ? |]
-                (newParent, id')
+                (DataTypes.parentId newParent, id')
           ) ::
           IO (Either EXS.SomeException I.Int64)
       )

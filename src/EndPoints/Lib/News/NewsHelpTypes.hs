@@ -22,12 +22,12 @@ data DbNews = DbNews
 
 -- | DbFilter - filtering data to database request
 data DbFilter = DbFilter
-  { dbFilterDayAt :: TIME.Day,
-    dbFilterDayUntil :: TIME.Day,
-    dbFilterDaySince :: TIME.Day,
+  { dbFilterDayAt :: DataTypes.DayAt,
+    dbFilterDayUntil :: DataTypes.DayUntil,
+    dbFilterDaySince :: DataTypes.DaySince,
     dbFilterAuthor :: T.Text,
     dbFilterCategoryId :: Maybe Int,
     dbFilterTitle :: T.Text,
     dbFilterContent :: T.Text
   }
-  deriving (Show, Eq)
+  deriving (Show)

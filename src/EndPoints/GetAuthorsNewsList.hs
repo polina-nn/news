@@ -129,9 +129,9 @@ authorsNewsListCategory pool h DataTypes.User {..} DataTypes.Offset {..} DataTyp
             ORDER BY news_created DESC
             LIMIT ?  OFFSET ?|]
                 ( userLogin,
-                  dbFilterDayAt,
-                  dbFilterDayUntil,
-                  dbFilterDaySince,
+                  DataTypes.dayAt dbFilterDayAt,
+                  DataTypes.dayUntil dbFilterDayUntil,
+                  DataTypes.daySince dbFilterDaySince,
                   dbFilterAuthor,
                   dbFilterTitle,
                   dbFilterContent,
@@ -176,9 +176,9 @@ authorsNewsListNotCategory pool h DataTypes.User {..} DataTypes.Offset {..} Data
             ORDER BY news_created DESC
             LIMIT ?  OFFSET ?|]
                 ( userLogin,
-                  dbFilterDayAt,
-                  dbFilterDayUntil,
-                  dbFilterDaySince,
+                  DataTypes.dayAt dbFilterDayAt,
+                  DataTypes.dayUntil dbFilterDayUntil,
+                  DataTypes.daySince dbFilterDaySince,
                   dbFilterAuthor,
                   dbFilterTitle,
                   dbFilterContent,

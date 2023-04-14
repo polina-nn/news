@@ -6,7 +6,7 @@ import qualified Types.DataTypes as DataTypes
 data CategorySort = CategorySort
   { categorySortId :: DataTypes.Id,
     categorySortName :: DataTypes.Name,
-    categorySortParentId :: DataTypes.Id,
+    categorySortParentId :: DataTypes.ParentId,
     categorySortPath :: DataTypes.Name
   }
-  deriving (Show, Ord, Eq)
+  deriving (Show, Eq)
