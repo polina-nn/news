@@ -98,7 +98,7 @@ data Filter = Filter
   deriving (Show, Generic)
 
 newtype DayAt = DayAt {dayAt :: TIME.Day}
-  deriving (Show, Read, Generic)
+  deriving (Show, Generic)
 
 instance FromHttpApiData DayAt where
   parseUrlPiece lim =
@@ -107,7 +107,7 @@ instance FromHttpApiData DayAt where
       Right val -> Right DayAt {dayAt = val}
 
 newtype DayUntil = DayUntil {dayUntil :: TIME.Day}
-  deriving (Show, Read, Generic)
+  deriving (Show, Generic)
 
 instance FromHttpApiData DayUntil where
   parseUrlPiece lim =
@@ -116,7 +116,7 @@ instance FromHttpApiData DayUntil where
       Right val -> Right DayUntil {dayUntil = val}
 
 newtype DaySince = DaySince {daySince :: TIME.Day}
-  deriving (Show, Read, Generic)
+  deriving (Show, Generic)
 
 instance FromHttpApiData DaySince where
   parseUrlPiece lim =
@@ -126,7 +126,7 @@ instance FromHttpApiData DaySince where
 
 -- | type Limit -  maximum array length per get request
 newtype Limit = Limit {limit :: Int}
-  deriving (Show, Read, Generic)
+  deriving (Show, Eq, Generic)
 
 instance FromHttpApiData Limit where
   parseUrlPiece lim =
@@ -136,7 +136,7 @@ instance FromHttpApiData Limit where
 
 -- | type Offset - offset from the beginning of  get response array
 newtype Offset = Offset {offset :: Int}
-  deriving (Show, Read, Generic)
+  deriving (Show, Eq, Generic)
 
 instance FromHttpApiData Offset where
   parseUrlPiece off =
