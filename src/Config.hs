@@ -4,10 +4,12 @@ module Config
     getDbConfig,
     getLoggerConfig,
     getURIConfig,
+    tryLoadConfig,
   )
 where
 
 import Control.Exception.Safe (throwString)
+import qualified Control.Exception.Safe as EXS
 import qualified Data.Configurator as C
 import qualified Data.Configurator.Types as C
 import qualified Data.Text as T
@@ -17,6 +19,7 @@ import qualified News
 import qualified System.Directory as SD
 import qualified System.IO
 import Text.Read (readMaybe)
+import qualified Types.ExceptionTypes as ExceptionTypes
 
 -- | StdError  - use for choice in config. (I expect to see in the config.conf the words Terminal or File in stdError field)
 data StdError = Terminal | File
@@ -52,6 +55,14 @@ data MaybeURIConfig = MaybeURIConfig
     maybeUriPort :: Maybe Int
   }
   deriving (Show, Eq)
+
+tryLoadConfig :: FilePath -> IO C.Config
+tryLoadConfig path = do
+  loadedConf <-
+    EXS.try $ C.load [C.Required path] :: IO (Either EXS.SomeException C.Config)
+  case loadedConf of
+    Left exception -> EXS.throw (ExceptionTypes.NotConfig exception)
+    Right conf -> return conf
 
 getURIConfig :: C.Config -> IO News.URIConfig
 getURIConfig conf = do

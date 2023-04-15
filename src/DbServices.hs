@@ -7,6 +7,7 @@ module DbServices
 where
 
 import qualified Control.Exception.Safe as EXS
+import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Data.Pool as POOL
 import qualified Database.PostgreSQL.Simple as SQL
 import qualified Database.PostgreSQL.Simple.Migration as Migration
@@ -23,7 +24,7 @@ import qualified EndPoints.GetNewsList as GetNewsList
 import qualified EndPoints.GetNewsSearchList as GetNewsSearchList
 import qualified EndPoints.GetOneImage as GetOneImage
 import qualified EndPoints.GetUserList as GetUserList
-import Logger (logDebug, (.<))
+import Logger (logDebug)
 import qualified News
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ExceptionTypes as ExceptionTypes
@@ -66,15 +67,18 @@ createDb pool =
     }
 
 migrateDb :: POOL.Pool SQL.Connection -> (News.Handle IO, String) -> IO ()
-migrateDb pool (h, xs) =
-  POOL.withResource pool $ \conn -> do
-    initResult <-
-      SQL.withTransaction conn . Migration.runMigration $ Migration.MigrationContext Migration.MigrationInitialization True conn
-    Logger.logDebug (News.hLogHandle h) ("migrateDb: MigrationInitialization " .< initResult)
-    migrateResult <-
-      SQL.withTransaction conn . Migration.runMigration $ Migration.MigrationContext (Migration.MigrationDirectory xs) True conn
-    Logger.logDebug (News.hLogHandle h) ("migrateDb: Migration result " .< migrateResult)
-    case migrateResult of
-      Migration.MigrationError err ->
-        EXS.throw (ExceptionTypes.MigrationError err)
-      _ -> return ()
+migrateDb pool (h, xs) = do
+  migrateResult <-
+    liftIO $
+      EXS.try
+        ( POOL.withResource pool $ \conn -> do
+            _ <- SQL.withTransaction conn . Migration.runMigration $ Migration.MigrationContext Migration.MigrationInitialization True conn
+            SQL.withTransaction conn . Migration.runMigration $ Migration.MigrationContext (Migration.MigrationDirectory xs) True conn
+        ) ::
+      IO (Either EXS.SomeException (Migration.MigrationResult String))
+  case migrateResult of
+    Left migrateErr -> EXS.throw (ExceptionTypes.DbNotConnect migrateErr)
+    Right (Migration.MigrationError err) -> EXS.throw (ExceptionTypes.MigrationError err)
+    Right Migration.MigrationSuccess -> do
+      Logger.logDebug (News.hLogHandle h) "migrateDb: Migration result  -  MigrationSuccess"
+      return ()
