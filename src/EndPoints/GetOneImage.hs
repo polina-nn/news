@@ -16,6 +16,7 @@ import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import Logger (logDebug, logError, logInfo, (.<))
 import qualified News
 import Servant (Handler)
+import qualified Text.Read as R
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
 
@@ -51,7 +52,10 @@ oneImageExcept pool (h, id') = do
     Left err -> Throw.throwSqlRequestError h ("oneImageExcept", show err)
     Right [SQL.Only content] -> do
       liftIO $ Logger.logInfo (News.hLogHandle h) "oneImageExcept: OK!"
-      return $ read content
+      let rez = R.readMaybe content
+      case rez of
+        Nothing -> Throw.throwSqlRequestError h ("oneImageExcept", "Did not read image_content from table as ByteString")
+        Just content -> return content
     Right _ -> Throw.throwSqlRequestError h ("oneImageExcept", "Developer error!")
 
 checkId ::

@@ -53,8 +53,8 @@ addImageExcept pool (h, token, createImage) = do
   user <- EX.withExceptT ErrorTypes.AddImageSQLRequestError (LibIO.searchUser h pool token)
   liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add One Image ", ToText.toText createImage, "\nby user: ", ToText.toText user]
   _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddImage (Lib.checkUserAuthor h user)
-  _ <- checkPngImage h createImage
-  _ <- checkImageFileExist h createImage
+  -- _ <- checkPngImage h createImage
+  -- _ <- checkImageFileExist h createImage
   allCheckAndDecodeBase64ByteString <- checkAndDecodeBase64Image h createImage
   addImageToDB pool h createImage allCheckAndDecodeBase64ByteString
 
@@ -106,7 +106,7 @@ checkAndDecodeBase64Image ::
   DataTypes.CreateImageRequest ->
   EX.ExceptT ErrorTypes.AddImageError IO ImageDecodeBase64ByteString
 checkAndDecodeBase64Image h DataTypes.CreateImageRequest {..} = do
-  imageFile <- liftIO $ B.readFile image
+  imageFile <- liftIO $ EXS.catch (B.readFile image) handleError
   case Base64.decodeBase64 imageFile of
     Right val -> do
       liftIO $ Logger.logDebug (News.hLogHandle h) "checkAndDecodeBase64Image: OK!"
@@ -114,6 +114,8 @@ checkAndDecodeBase64Image h DataTypes.CreateImageRequest {..} = do
     Left err -> do
       liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.NotBase64Image (ErrorTypes.InvalidContent ("checkAndDecodeBase64Image: BAD!" ++ show err)))
       EX.throwE $ ErrorTypes.NotBase64Image $ ErrorTypes.InvalidContent []
+  where
+    handleError (EXS.SomeException e) = Throw.throwSqlRequestError h ("checkAndDecodeBase64Image", show e)
 
 addImageToDB ::
   POOL.Pool SQL.Connection ->
