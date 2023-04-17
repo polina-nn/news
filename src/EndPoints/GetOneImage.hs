@@ -55,7 +55,7 @@ oneImageExcept pool (h, id') = do
       let rez = R.readMaybe content
       case rez of
         Nothing -> Throw.throwSqlRequestError h ("oneImageExcept", "Did not read image_content from table as ByteString")
-        Just content -> return content
+        Just contents -> return contents
     Right _ -> Throw.throwSqlRequestError h ("oneImageExcept", "Developer error!")
 
 checkId ::

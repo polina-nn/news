@@ -8,7 +8,6 @@ import qualified Control.Exception.Safe as EXS
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import qualified Control.Monad.Trans.Except as EX
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.Int as I
 import qualified Data.Pool as POOL
@@ -60,7 +59,7 @@ editNewsExcept ::
 editNewsExcept pool (h, token, newsId, r) = do
   _ <- checkId pool h newsId
   user <- EX.withExceptT ErrorTypes.AddEditNewsSQLRequestError (LibIO.searchUser h pool token)
-  liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Edit One News \n", ToText.toText r, "with news id ", T.pack $ show newsId, "\nby user: ", ToText.toText user]
+  liftIO $ Logger.logInfo (News.hLogHandle h) $ "Request: Edit One News \n" <> ToText.toText r <> "with news id " .< newsId <> "\nby user: " <> ToText.toText user
   _ <- checkUserThisNewsAuthor pool h user newsId
   _ <- checkImageFilesExist h r
   _ <- checkPngImages h r
@@ -433,7 +432,7 @@ checkBase64Images ::
 checkBase64Images _ r@DataTypes.EditNewsRequest {newImages = Nothing} =
   return r
 checkBase64Images h r@DataTypes.EditNewsRequest {newImages = Just req} = do
-  imageFiles <- liftIO $ mapM (B.readFile . DataTypes.image) req
+  imageFiles <- mapM (NewsIO.tryReadImageFile h . DataTypes.image) req
   if length (filter Base64.isBase64 imageFiles) == length req
     then do
       liftIO $ Logger.logDebug (News.hLogHandle h) "checkBase64Image: OK!"

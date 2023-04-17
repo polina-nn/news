@@ -1,6 +1,7 @@
 module EndPoints.Lib.News.NewsIO
   ( addImageNews,
     toNews,
+    tryReadImageFile,
   )
 where
 
@@ -30,7 +31,7 @@ addImageNews ::
   DataTypes.CreateImageRequest ->
   EX.ExceptT ErrorTypes.AddEditNewsError IO IdImage
 addImageNews pool h DataTypes.CreateImageRequest {..} = do
-  content <- liftIO $ B.readFile image
+  content <- tryReadImageFile h image
   let imageDecodeBase64ByteString = Base64.decodeBase64Lenient content
   res <-
     liftIO
@@ -69,3 +70,10 @@ toNews con h NewsHelpTypes.DbNews {..} = do
             newsId = dbNewsId
           }
   return news
+
+tryReadImageFile :: Throw.ThrowSqlRequestError a B.ByteString => News.Handle IO -> FilePath -> EX.ExceptT a IO B.ByteString
+tryReadImageFile h filePath = do
+  imageFile <- liftIO (EXS.try (B.readFile filePath) :: IO (Either EXS.SomeException B.ByteString))
+  case imageFile of
+    Right val -> return val
+    Left err -> Throw.throwSqlRequestError h ("tryReadImageFile", show err)
