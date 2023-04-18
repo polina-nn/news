@@ -31,7 +31,7 @@ data MaybeDbConfig = MaybeDbConfig
     maybeDbName :: Maybe String,
     maybeUser :: Maybe String,
     maybePassword :: Maybe String,
-    maybeDbPort :: Maybe String,
+    maybeDbPort :: Maybe Integer,
     maybeNoOfStripes :: Maybe Int,
     maybeIdleTime :: Maybe Int,
     maybeStripeSize :: Maybe Int
@@ -106,7 +106,7 @@ getDbConfig conf = do
   dbName <- C.lookup conf "config.dbName" :: IO (Maybe String)
   user <- C.lookup conf "config.user" :: IO (Maybe String)
   password <- C.lookup conf "config.password" :: IO (Maybe String)
-  dbPort <- C.lookup conf "config.dbPort" :: IO (Maybe String)
+  dbPort <- C.lookup conf "config.dbPort" :: IO (Maybe Integer)
   noOfStripes <- C.lookup conf "config.noOfStripes" :: IO (Maybe Int)
   idleTime <- C.lookup conf "config.idleTime" :: IO (Maybe Int)
   stripeSize <- C.lookup conf "config.stripeSize" :: IO (Maybe Int)

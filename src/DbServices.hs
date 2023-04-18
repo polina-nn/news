@@ -40,7 +40,7 @@ url :: News.Handle IO -> SQL.ConnectInfo
 url h =
   SQL.ConnectInfo
     { connectHost = News.dbHost (News.hDbConfig h),
-      connectPort = read $ News.dbPort (News.hDbConfig h),
+      connectPort = fromIntegral $ News.dbPort (News.hDbConfig h),
       connectUser = News.user (News.hDbConfig h),
       connectPassword = News.password (News.hDbConfig h),
       connectDatabase = News.dbName (News.hDbConfig h)

@@ -41,7 +41,7 @@ You can see the example in **config.conf**  and use the same values.
     dbName = "tiny"            #  "news"      - dbName in postgress
     user = "postgres"          #  "postgres" - user in postgress
     password = "postgres123"   #  "postgres123" - password in n postgress
-    dbPort = "5432"            # "5432"  - dbPort in postgress
+    dbPort =  5432             #  5432  - dbPort in postgress
     noOfStripes = 2             # 2 - stripes https://docs.servant.dev/en/stable/cookbook/db-postgres-pool/PostgresPool.html
     idleTime = 60               # 60 - unused connections are kept open for a minute
     stripeSize = 10             # 10 - max. 10 connections open per stripe
