@@ -28,7 +28,7 @@ editOneCategory ::
   News.Handle IO ->
   DataTypes.Db ->
   DataTypes.Token ->
-  Int ->
+  DataTypes.Id DataTypes.CategoryId ->
   DataTypes.EditCategoryRequest ->
   Handler DataTypes.Category
 editOneCategory h DataTypes.Db {..} user catId r =
@@ -38,13 +38,13 @@ editOneCategory h DataTypes.Db {..} user catId r =
 
 editCategory ::
   POOL.Pool SQL.Connection ->
-  (News.Handle IO, DataTypes.Token, Int, DataTypes.EditCategoryRequest) ->
+  (News.Handle IO, DataTypes.Token, DataTypes.Id DataTypes.CategoryId, DataTypes.EditCategoryRequest) ->
   IO (Either ErrorTypes.AddEditCategoryError DataTypes.Category)
 editCategory pool (h, token, catId, r) = EX.runExceptT $ editCategoryExcept pool (h, token, catId, r)
 
 editCategoryExcept ::
   POOL.Pool SQL.Connection ->
-  (News.Handle IO, DataTypes.Token, Int, DataTypes.EditCategoryRequest) ->
+  (News.Handle IO, DataTypes.Token, DataTypes.Id DataTypes.CategoryId, DataTypes.EditCategoryRequest) ->
   EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.Category
 editCategoryExcept pool (h, token, catId, r) = do
   _ <- checkId pool h catId
@@ -61,8 +61,8 @@ editCategoryExcept pool (h, token, catId, r) = do
 checkId ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
-  Int ->
-  EX.ExceptT ErrorTypes.AddEditCategoryError IO Int
+  DataTypes.Id DataTypes.CategoryId ->
+  EX.ExceptT ErrorTypes.AddEditCategoryError IO (DataTypes.Id DataTypes.CategoryId)
 checkId pool h' id' =
   do
     res <-
@@ -72,7 +72,7 @@ checkId pool h' id' =
                 SQL.query
                   conn
                   [sql| SELECT EXISTS (SELECT category_id  FROM category WHERE category_id = ?) |]
-                  (SQL.Only id')
+                  (SQL.Only $ DataTypes.getId id')
             ) ::
             IO (Either EXS.SomeException [SQL.Only Bool])
         )
@@ -93,9 +93,9 @@ checkParentId ::
   DataTypes.EditCategoryRequest ->
   EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.EditCategoryRequest
 checkParentId _ _ r@DataTypes.EditCategoryRequest {newParent = Nothing} = return r
-checkParentId _ _ r@DataTypes.EditCategoryRequest {newParent = Just (DataTypes.ParentId {parentId = 0})} = return r
+checkParentId _ _ r@DataTypes.EditCategoryRequest {newParent = Just (DataTypes.Id {getId = 0})} = return r
 checkParentId pool h' r@DataTypes.EditCategoryRequest {newParent = Just parent} = do
-  res <- liftIO (EX.runExceptT (CategoryIO.checkCategoryExistsById pool h' (DataTypes.parentId parent) :: EX.ExceptT ErrorTypes.AddEditCategoryError IO Int))
+  res <- liftIO (EX.runExceptT (CategoryIO.checkCategoryExistsById pool h' parent :: EX.ExceptT ErrorTypes.AddEditCategoryError IO (DataTypes.Id DataTypes.CategoryId)))
   case res of
     Left err -> EX.throwE err
     Right _ -> return r
@@ -103,16 +103,16 @@ checkParentId pool h' r@DataTypes.EditCategoryRequest {newParent = Just parent} 
 checkParentNotHisChild ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
-  Int ->
+  DataTypes.Id DataTypes.CategoryId ->
   DataTypes.EditCategoryRequest ->
   EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.EditCategoryRequest
 checkParentNotHisChild _ _ _ r@DataTypes.EditCategoryRequest {newParent = Nothing} = return r
-checkParentNotHisChild _ _ _ r@DataTypes.EditCategoryRequest {newParent = Just (DataTypes.ParentId {parentId = 0})} = return r
+checkParentNotHisChild _ _ _ r@DataTypes.EditCategoryRequest {newParent = Just (DataTypes.Id {getId = 0})} = return r
 checkParentNotHisChild pool h id' r@DataTypes.EditCategoryRequest {newParent = Just parent}
-  | DataTypes.parentId parent == id' = Throw.throwInvalidContentCategoryId h ("checkParentNotHisChild", "New parent " <> show parent <> " is his child")
+  | parent == id' = Throw.throwInvalidContentCategoryId h ("checkParentNotHisChild", "New parent " <> show parent <> " is his child")
   | otherwise = do
     currentCategory <- CategoryIO.getCategoryById pool h id'
-    categoriesFutureParent <- CategoryIO.getCategoriesById pool h (DataTypes.parentId parent)
+    categoriesFutureParent <- CategoryIO.getCategoriesById pool h parent
     if any (\x -> DataTypes.categoryName x == DataTypes.categoryName currentCategory) categoriesFutureParent
       then Throw.throwInvalidContentCategoryId h ("checkParentNotHisChild", "New parent " <> show parent <> " is his child")
       else do
@@ -122,7 +122,7 @@ checkParentNotHisChild pool h id' r@DataTypes.EditCategoryRequest {newParent = J
 editCategoryName ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
-  Int ->
+  DataTypes.Id DataTypes.CategoryId ->
   DataTypes.EditCategoryRequest ->
   EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.EditCategoryRequest
 editCategoryName _ _ _ r@DataTypes.EditCategoryRequest {newCategory = Nothing} = return r
@@ -134,7 +134,7 @@ editCategoryName pool h id' r@DataTypes.EditCategoryRequest {newCategory = Just 
               SQL.execute
                 conn
                 [sql| UPDATE category SET category_name = ? WHERE category_id = ? |]
-                (newName, id')
+                (newName, DataTypes.getId id')
           ) ::
           IO (Either EXS.SomeException I.Int64)
       )
@@ -154,7 +154,7 @@ editCategoryName pool h id' r@DataTypes.EditCategoryRequest {newCategory = Just 
 editCategoryParent ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
-  Int ->
+  DataTypes.Id DataTypes.CategoryId ->
   DataTypes.EditCategoryRequest ->
   EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.EditCategoryRequest
 editCategoryParent _ _ _ r@DataTypes.EditCategoryRequest {newParent = Nothing} = return r
@@ -166,7 +166,7 @@ editCategoryParent pool h id' r@DataTypes.EditCategoryRequest {newParent = Just 
               SQL.execute
                 conn
                 [sql| UPDATE category SET category_parent_id = ? WHERE category_id = ? |]
-                (DataTypes.parentId newParent, id')
+                (DataTypes.getId newParent, DataTypes.getId id')
           ) ::
           IO (Either EXS.SomeException I.Int64)
       )

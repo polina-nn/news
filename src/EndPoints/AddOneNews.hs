@@ -28,8 +28,6 @@ import qualified System.Directory as SD
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
 
-type IdImage = Int
-
 addOneNews ::
   News.Handle IO ->
   DataTypes.Db ->
@@ -58,8 +56,8 @@ addNewsExcept pool (h, token, r@DataTypes.CreateNewsRequest {..}) = do
   _ <- checkImageFilesExist h r
   _ <- checkPngImages h r
   _ <- checkBase64Images h r
-  _ <- CategoryIO.checkCategoryExistsById pool h (DataTypes.id newsCategoryId)
-  categories' <- CategoryIO.getCategoriesById pool h (DataTypes.id newsCategoryId)
+  _ <- CategoryIO.checkCategoryExistsById pool h newsCategoryId
+  categories' <- CategoryIO.getCategoriesById pool h newsCategoryId
   images' <- addAllImages pool h r
   addNewsToDB pool h user categories' r images'
 
@@ -141,7 +139,7 @@ addAllImages ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
   DataTypes.CreateNewsRequest ->
-  EX.ExceptT ErrorTypes.AddEditNewsError IO [IdImage]
+  EX.ExceptT ErrorTypes.AddEditNewsError IO [DataTypes.Id DataTypes.ImageId]
 addAllImages _ _ (DataTypes.CreateNewsRequest _ _ _ Nothing _) = return []
 addAllImages pool h (DataTypes.CreateNewsRequest _ _ _ (Just req) _) = do
   rez <- mapM (NewsIO.addImageNews pool h) req
@@ -154,10 +152,10 @@ addNewsToDB ::
   DataTypes.User ->
   [DataTypes.Category] ->
   DataTypes.CreateNewsRequest ->
-  [IdImage] ->
+  [DataTypes.Id DataTypes.ImageId] ->
   EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.News
 addNewsToDB pool h DataTypes.User {..} categories DataTypes.CreateNewsRequest {..} idImages = do
-  let imageUris = map (Lib.imageIdToURI h) idImages
+  let imageUris = Lib.imagesURIs h idImages
   created <- liftIO Lib.currentDay
   res <-
     liftIO
@@ -170,7 +168,7 @@ addNewsToDB pool h DataTypes.User {..} categories DataTypes.CreateNewsRequest {.
                   title,
                   show created,
                   userLogin,
-                  DataTypes.id newsCategoryId,
+                  DataTypes.getId newsCategoryId,
                   text,
                   published
                 )
@@ -189,7 +187,7 @@ addNewsToDB pool h DataTypes.User {..} categories DataTypes.CreateNewsRequest {.
                 newsText = text,
                 newsImages = imageUris,
                 newsPublished = published,
-                newsId = idNews
+                newsId = DataTypes.Id {getId = idNews}
               }
       liftIO $ Logger.logInfo (News.hLogHandle h) $ "addNewsToDB: OK!" <> ToText.toText news
       return news

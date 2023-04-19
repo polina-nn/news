@@ -11,7 +11,6 @@ import qualified Control.Monad.Trans.Except as EX
 import qualified Data.Pool as POOL
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
-import qualified EndPoints.Lib.Category.Category as Category
 import qualified EndPoints.Lib.ThrowRequestError as Throw
 import qualified EndPoints.Lib.ToText as ToText
 import Logger (logDebug, logInfo)
@@ -23,7 +22,7 @@ getCategoriesById ::
   Throw.ThrowSqlRequestError a [DataTypes.Category] =>
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
-  Int ->
+  DataTypes.Id DataTypes.CategoryId ->
   EX.ExceptT a IO [DataTypes.Category]
 getCategoriesById pool h' id' = do
   res <-
@@ -39,15 +38,15 @@ getCategoriesById pool h' id' = do
                       SELECT t2.category_id, t2.category_parent_id, t2.category_name, CAST (temp1.path || '->'|| t2.category_name AS varchar(300))
                       FROM category t2 INNER JOIN temp1 ON (temp1.category_parent_id = t2.category_id))
                       SELECT category_id,  category_name, category_parent_id from temp1 |]
-                (SQL.Only id')
+                (SQL.Only $ DataTypes.getId id')
           ) ::
-          IO (Either EXS.SomeException [(Int, DataTypes.Name, Int)])
+          IO (Either EXS.SomeException [(DataTypes.Id DataTypes.CategoryId, DataTypes.Name, DataTypes.Id DataTypes.CategoryId)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h' ("getCategoriesById", show err)
     Right [] -> Throw.throwSqlRequestError h' ("getCategoriesById", "Developer error")
-    Right val -> do
-      let categories = Prelude.map Category.toCategory val
+    Right value -> do
+      let categories = Prelude.map (\(a, b, c) -> DataTypes.Category a b c) value
       return categories
 
 -- | getCategoriesById  - return category by categoryId
@@ -55,7 +54,7 @@ getCategoryById ::
   Throw.ThrowSqlRequestError a DataTypes.Category =>
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
-  Int ->
+  DataTypes.Id DataTypes.CategoryId ->
   EX.ExceptT a IO DataTypes.Category
 getCategoryById pool h id' = do
   res <-
@@ -65,26 +64,26 @@ getCategoryById pool h id' = do
               SQL.query
                 conn
                 [sql| SELECT category_id, category_name, category_parent_id FROM category WHERE category_id = ? |]
-                (SQL.Only id')
+                (SQL.Only $ DataTypes.getId id')
           ) ::
-          IO (Either EXS.SomeException [(Int, DataTypes.Name, Int)])
+          IO (Either EXS.SomeException [(DataTypes.Id DataTypes.CategoryId, DataTypes.Name, DataTypes.Id DataTypes.CategoryId)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("getCategory", show err)
-    Right [val] -> do
-      let editedCategory = Category.toCategory val
-      liftIO $ Logger.logInfo (News.hLogHandle h) $ "getCategory: " <> ToText.toText editedCategory
-      return editedCategory
+    Right [(idCat, name, parent)] -> do
+      let category = DataTypes.Category idCat name parent
+      liftIO $ Logger.logInfo (News.hLogHandle h) $ "getCategory: " <> ToText.toText category
+      return category
     Right _ -> Throw.throwSqlRequestError h ("getCategory", "Developer error")
 
 -- | checkCategoryExistsById  - return categories id if category exists
 checkCategoryExistsById ::
-  Throw.ThrowSqlRequestError a Int =>
-  Throw.ThrowInvalidContentCategoryId a Int =>
+  Throw.ThrowSqlRequestError a (DataTypes.Id DataTypes.CategoryId) =>
+  Throw.ThrowInvalidContentCategoryId a (DataTypes.Id DataTypes.CategoryId) =>
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
-  Int ->
-  EX.ExceptT a IO Int
+  DataTypes.Id DataTypes.CategoryId ->
+  EX.ExceptT a IO (DataTypes.Id DataTypes.CategoryId)
 checkCategoryExistsById pool h categoryId = do
   res <-
     liftIO
@@ -93,7 +92,7 @@ checkCategoryExistsById pool h categoryId = do
               SQL.query
                 conn
                 [sql| SELECT EXISTS (SELECT category_id  FROM category WHERE category_id = ?) |]
-                (SQL.Only categoryId)
+                (SQL.Only $ DataTypes.getId categoryId)
           ) ::
           IO (Either EXS.SomeException [SQL.Only Bool])
       )

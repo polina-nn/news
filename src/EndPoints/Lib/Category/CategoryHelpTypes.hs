@@ -4,9 +4,9 @@ module EndPoints.Lib.Category.CategoryHelpTypes where
 import qualified Types.DataTypes as DataTypes
 
 data CategorySort = CategorySort
-  { categorySortId :: DataTypes.Id,
+  { categorySortId :: DataTypes.Id DataTypes.CategoryId,
     categorySortName :: DataTypes.Name,
-    categorySortParentId :: DataTypes.ParentId,
+    categorySortParentId :: DataTypes.Id DataTypes.CategoryId,
     categorySortPath :: DataTypes.Name
   }
   deriving (Show, Eq)

@@ -49,16 +49,16 @@ addCategoryExcept pool (h, token, r@DataTypes.CreateCategoryRequest {..}) =
     user <- EX.withExceptT ErrorTypes.AddEditCategorySQLRequestError (LibIO.searchUser h pool token)
     liftIO $ Logger.logInfo (News.hLogHandle h) $ "\n\nRequest: Add Category: \n" <> ToText.toText r <> "by user: " <> ToText.toText user
     _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditCategory (Lib.checkUserAdmin h user)
-    _ <- checkParentId pool h (DataTypes.parentId parent)
+    _ <- checkParentId pool h parent
     addCategoryToDb pool h r
 
 -- | checkParentId  - check the existence of the parent category
 checkParentId ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
-  Int ->
-  EX.ExceptT ErrorTypes.AddEditCategoryError IO Int
-checkParentId _ _ 0 = return 0
+  DataTypes.Id DataTypes.CategoryId ->
+  EX.ExceptT ErrorTypes.AddEditCategoryError IO (DataTypes.Id DataTypes.CategoryId)
+checkParentId _ _ DataTypes.Id {getId = 0} = return DataTypes.Id {getId = 0}
 checkParentId pool h parent = CategoryIO.checkCategoryExistsById pool h parent
 
 addCategoryToDb ::
@@ -74,7 +74,7 @@ addCategoryToDb pool h DataTypes.CreateCategoryRequest {..} = do
               SQL.query
                 conn
                 [sql| INSERT INTO  category (category_parent_id, category_name)  VALUES (?,?) RETURNING category_id  |]
-                (DataTypes.parentId parent, category)
+                (DataTypes.getId parent, category)
           ) ::
           IO (Either EXS.SomeException [SQL.Only Int])
       )
@@ -84,7 +84,7 @@ addCategoryToDb pool h DataTypes.CreateCategoryRequest {..} = do
       let newCategory =
             ( DataTypes.Category
                 { categoryParentId = parent,
-                  categoryId = DataTypes.Id {id = val},
+                  categoryId = DataTypes.Id {getId = val},
                   categoryName = category
                 }
             )

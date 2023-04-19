@@ -34,7 +34,7 @@ getNewsList ::
   Maybe DataTypes.DayUntil ->
   Maybe DataTypes.DaySince ->
   Maybe T.Text ->
-  Maybe Int ->
+  Maybe (DataTypes.Id DataTypes.CategoryId) ->
   Maybe T.Text ->
   Maybe T.Text ->
   Maybe DataTypes.SortBy ->
@@ -125,12 +125,12 @@ newsListCategory pool h DataTypes.Offset {..} DataTypes.Limit {..} NewsHelpTypes
                   dbFilterAuthor,
                   dbFilterTitle,
                   dbFilterContent,
-                  newsCat,
+                  DataTypes.getId newsCat,
                   limit,
                   offset
                 )
           ) ::
-          IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, Int, T.Text, T.Text, SQLTypes.PGArray Int, Int, Bool, Int)])
+          IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, DataTypes.Id DataTypes.CategoryId, T.Text, T.Text, SQLTypes.PGArray (DataTypes.Id DataTypes.ImageId), Int, Bool, DataTypes.Id DataTypes.NewsId)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("newsListCategory", show err)
@@ -138,7 +138,7 @@ newsListCategory pool h DataTypes.Offset {..} DataTypes.Limit {..} NewsHelpTypes
       let dbNews = Prelude.map News.toDbNews news
       return dbNews
   where
-    newsCat = fromMaybe 0 dbFilterCategoryId
+    newsCat = fromMaybe (DataTypes.Id {getId = 0}) dbFilterCategoryId
 
 newsListNotCategory ::
   POOL.Pool SQL.Connection ->
@@ -174,7 +174,7 @@ newsListNotCategory pool h DataTypes.Offset {..} DataTypes.Limit {..} NewsHelpTy
                   offset
                 )
           ) ::
-          IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, Int, T.Text, T.Text, SQLTypes.PGArray Int, Int, Bool, Int)])
+          IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, DataTypes.Id DataTypes.CategoryId, T.Text, T.Text, SQLTypes.PGArray (DataTypes.Id DataTypes.ImageId), Int, Bool, DataTypes.Id DataTypes.NewsId)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("newsListNotCategory", show err)

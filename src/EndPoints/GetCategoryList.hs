@@ -12,7 +12,6 @@ import qualified Data.Pool as POOL
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
-import qualified EndPoints.Lib.Category.Category as Category
 import qualified EndPoints.Lib.Category.CategoryHelpTypes as CategoryHelpTypes
 import qualified EndPoints.Lib.OffsetLimit as OffsetLimit
 import qualified EndPoints.Lib.ThrowRequestError as Throw
@@ -71,12 +70,12 @@ getAllCategories pool h offset limit = do
                       JOIN category s1 ON s1.category_parent_id = tree.category_id )
                       SELECT   category_id, category_name, category_parent_id, sort_string FROM tree ORDER BY sort_string ASC; |]
           ) ::
-          IO (Either EXS.SomeException [(Int, DataTypes.Name, Int, DataTypes.Name)])
+          IO (Either EXS.SomeException [(DataTypes.Id DataTypes.CategoryId, DataTypes.Name, DataTypes.Id DataTypes.CategoryId, DataTypes.Name)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("getAllCategories", show err)
     Right value -> do
-      let categorySort = Prelude.map Category.toCategorySort value
+      let categorySort = Prelude.map (\(a, b, c, d) -> CategoryHelpTypes.CategorySort a b c d) value
           result = getCategoriesWithOffsetLimit offset limit (sortedAllCategories categorySort)
           toTextCategories = T.concat $ map ToText.toText result
       liftIO $ Logger.logDebug (News.hLogHandle h) $ "categories: OK! \n" <> toTextCategories
@@ -84,7 +83,7 @@ getAllCategories pool h offset limit = do
 
 -- | sortedAllCategories - postgreSQL returns an alphabetically sorted result for Latin only, Cyrillic has to be sorted by Haskell
 sortedAllCategories :: [CategoryHelpTypes.CategorySort] -> [DataTypes.Category]
-sortedAllCategories cats = Prelude.map Category.toCategoryFromCategorySort rez
+sortedAllCategories cats = Prelude.map toCategoryFromCategorySort rez
   where
     rez =
       sortBy
@@ -97,3 +96,11 @@ sortedAllCategories cats = Prelude.map Category.toCategoryFromCategorySort rez
 
 getCategoriesWithOffsetLimit :: DataTypes.Offset -> DataTypes.Limit -> [DataTypes.Category] -> [DataTypes.Category]
 getCategoriesWithOffsetLimit DataTypes.Offset {..} DataTypes.Limit {..} cat = take limit $ drop offset cat
+
+toCategoryFromCategorySort :: CategoryHelpTypes.CategorySort -> DataTypes.Category
+toCategoryFromCategorySort CategoryHelpTypes.CategorySort {..} =
+  DataTypes.Category
+    { categoryId = categorySortId,
+      categoryName = categorySortName,
+      categoryParentId = categorySortParentId
+    }

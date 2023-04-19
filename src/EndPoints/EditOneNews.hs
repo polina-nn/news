@@ -31,17 +31,11 @@ import qualified System.Directory as SD
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
 
-type IdNews = Int
-
-type IdCategory = Int
-
-type IdImage = Int
-
 editOneNews ::
   News.Handle IO ->
   DataTypes.Db ->
   DataTypes.Token ->
-  IdNews ->
+  DataTypes.Id DataTypes.NewsId ->
   DataTypes.EditNewsRequest ->
   Handler DataTypes.News
 editOneNews h DataTypes.Db {..} user catId r =
@@ -49,13 +43,13 @@ editOneNews h DataTypes.Db {..} user catId r =
 
 editNews ::
   POOL.Pool SQL.Connection ->
-  (News.Handle IO, DataTypes.Token, IdNews, DataTypes.EditNewsRequest) ->
+  (News.Handle IO, DataTypes.Token, DataTypes.Id DataTypes.NewsId, DataTypes.EditNewsRequest) ->
   IO (Either ErrorTypes.AddEditNewsError DataTypes.News)
 editNews pool (h, token, newsId, r) = do EX.runExceptT $ editNewsExcept pool (h, token, newsId, r)
 
 editNewsExcept ::
   POOL.Pool SQL.Connection ->
-  (News.Handle IO, DataTypes.Token, IdNews, DataTypes.EditNewsRequest) ->
+  (News.Handle IO, DataTypes.Token, DataTypes.Id DataTypes.NewsId, DataTypes.EditNewsRequest) ->
   EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.News
 editNewsExcept pool (h, token, newsId, r) = do
   _ <- checkId pool h newsId
@@ -79,7 +73,7 @@ editNewsExcept pool (h, token, newsId, r) = do
 newTitle ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
-  IdNews ->
+  DataTypes.Id DataTypes.NewsId ->
   DataTypes.EditNewsRequest ->
   EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.EditNewsRequest
 newTitle _ _ _ r@DataTypes.EditNewsRequest {newTitle = Nothing} =
@@ -92,7 +86,7 @@ newTitle pool h newsId r@DataTypes.EditNewsRequest {newTitle = Just title} = do
               SQL.execute
                 conn
                 [sql| UPDATE news SET news_title = ? WHERE news_id = ? |]
-                (title, newsId)
+                (title, DataTypes.getId newsId)
           ) ::
           IO (Either EXS.SomeException I.Int64)
       )
@@ -106,7 +100,7 @@ newTitle pool h newsId r@DataTypes.EditNewsRequest {newTitle = Just title} = do
 newCatId ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
-  IdNews ->
+  DataTypes.Id DataTypes.NewsId ->
   DataTypes.EditNewsRequest ->
   EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.EditNewsRequest
 newCatId _ _ _ r@DataTypes.EditNewsRequest {newCategoryId = Nothing} =
@@ -119,7 +113,7 @@ newCatId pool h newsId r@DataTypes.EditNewsRequest {newCategoryId = Just catId} 
               SQL.execute
                 conn
                 [sql| UPDATE news SET news_category_id = ? WHERE news_id = ? |]
-                (DataTypes.id catId, newsId)
+                (DataTypes.getId catId, DataTypes.getId newsId)
           ) ::
           IO (Either EXS.SomeException I.Int64)
       )
@@ -133,7 +127,7 @@ newCatId pool h newsId r@DataTypes.EditNewsRequest {newCategoryId = Just catId} 
 newText ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
-  IdNews ->
+  DataTypes.Id DataTypes.NewsId ->
   DataTypes.EditNewsRequest ->
   EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.EditNewsRequest
 newText _ _ _ r@DataTypes.EditNewsRequest {newText = Nothing} =
@@ -146,7 +140,7 @@ newText pool h newsId r@DataTypes.EditNewsRequest {newText = Just text} = do
               SQL.execute
                 conn
                 [sql| UPDATE news SET news_text = ? WHERE news_id = ? |]
-                (text, newsId)
+                (text, DataTypes.getId newsId)
           ) ::
           IO (Either EXS.SomeException I.Int64)
       )
@@ -171,7 +165,7 @@ newImages pool h r@DataTypes.EditNewsRequest {newImages = Just req} = do
 newPublish ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
-  IdNews ->
+  DataTypes.Id DataTypes.NewsId ->
   DataTypes.EditNewsRequest ->
   EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.EditNewsRequest
 newPublish _ _ _ r@DataTypes.EditNewsRequest {newPublished = Nothing} =
@@ -184,7 +178,7 @@ newPublish pool h newsId r@DataTypes.EditNewsRequest {newPublished = Just pub} =
               SQL.execute
                 conn
                 [sql| UPDATE news SET news_published = ? WHERE news_id = ? |]
-                (pub, newsId)
+                (pub, DataTypes.getId newsId)
           ) ::
           IO (Either EXS.SomeException I.Int64)
       )
@@ -198,8 +192,8 @@ newPublish pool h newsId r@DataTypes.EditNewsRequest {newPublished = Just pub} =
 getNewsCategoryId ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
-  IdNews ->
-  EX.ExceptT ErrorTypes.AddEditNewsError IO IdCategory
+  DataTypes.Id DataTypes.NewsId ->
+  EX.ExceptT ErrorTypes.AddEditNewsError IO (DataTypes.Id DataTypes.CategoryId)
 getNewsCategoryId pool h idNews = do
   res <-
     liftIO
@@ -208,7 +202,7 @@ getNewsCategoryId pool h idNews = do
               SQL.query
                 conn
                 [sql| SELECT news_category_id   FROM news WHERE  news_id = ? |]
-                (SQL.Only idNews)
+                (SQL.Only (DataTypes.getId idNews))
           ) ::
           IO (Either EXS.SomeException [SQL.Only Int])
       )
@@ -216,14 +210,14 @@ getNewsCategoryId pool h idNews = do
     Left err -> Throw.throwSqlRequestError h ("getNewsCategoryId", show err)
     Right [SQL.Only categoryId] -> do
       liftIO $ Logger.logDebug (News.hLogHandle h) ("getNewsCategoryId: OK! " .< categoryId)
-      return categoryId
+      return $ DataTypes.Id categoryId
     Right _ -> Throw.throwSqlRequestError h ("getNewsCategoryId", "Developer error")
 
 getNewsImages ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
-  IdNews ->
-  EX.ExceptT ErrorTypes.AddEditNewsError IO [IdImage]
+  DataTypes.Id DataTypes.NewsId ->
+  EX.ExceptT ErrorTypes.AddEditNewsError IO [DataTypes.Id DataTypes.ImageId]
 getNewsImages pool h idNews = do
   res <-
     liftIO
@@ -232,7 +226,7 @@ getNewsImages pool h idNews = do
               SQL.query
                 conn
                 [sql| SELECT EXISTS (SELECT news_images_id FROM news WHERE  news_id = ? AND news_images_id IS NOT NULL) |]
-                (SQL.Only idNews)
+                (SQL.Only (DataTypes.getId idNews))
           ) ::
           IO (Either EXS.SomeException [SQL.Only Bool])
       )
@@ -245,8 +239,8 @@ getNewsImages pool h idNews = do
 getExistedNewsImages ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
-  IdNews ->
-  EX.ExceptT ErrorTypes.AddEditNewsError IO [IdImage]
+  DataTypes.Id DataTypes.NewsId ->
+  EX.ExceptT ErrorTypes.AddEditNewsError IO [DataTypes.Id DataTypes.ImageId]
 getExistedNewsImages pool h idNews = do
   res <-
     liftIO
@@ -255,24 +249,24 @@ getExistedNewsImages pool h idNews = do
               SQL.query
                 conn
                 [sql| SELECT news_images_id  FROM news WHERE  news_id = ? |]
-                (SQL.Only idNews)
+                (SQL.Only (DataTypes.getId idNews))
           ) ::
-          IO (Either EXS.SomeException [SQLTypes.Only (SQLTypes.PGArray IdImage)])
+          IO (Either EXS.SomeException [SQLTypes.Only (SQLTypes.PGArray (DataTypes.Id DataTypes.ImageId))])
       )
   case res of
-    Left err -> Throw.throwSqlRequestError h ("userListExcept", show err)
+    Left err -> Throw.throwSqlRequestError h ("getExistedNewsImages", show err)
     Right [ids] -> do
       let idImages = SQLTypes.fromPGArray $ SQL.fromOnly ids
       return idImages
-    Right _ -> Throw.throwSqlRequestError h ("getNewsImages", "Developer error!")
+    Right _ -> Throw.throwSqlRequestError h ("getExistedNewsImages", "Developer error!")
 
 getNews ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
   DataTypes.User ->
-  IdNews ->
+  DataTypes.Id DataTypes.NewsId ->
   [DataTypes.Category] ->
-  [IdImage] ->
+  [DataTypes.Id DataTypes.ImageId] ->
   EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.News
 getNews pool h user idNews categories imagesIds = do
   res <-
@@ -284,7 +278,7 @@ getNews pool h user idNews categories imagesIds = do
                 [sql| SELECT news_title , news_created, news_text,  news_published
                 FROM news
                 WHERE  news_id = ? |]
-                (SQL.Only idNews)
+                (SQL.Only (DataTypes.getId idNews))
           ) ::
           IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, Bool)])
       )
@@ -300,8 +294,8 @@ getNews pool h user idNews categories imagesIds = do
       (T.Text, TIME.Day, T.Text, Bool) ->
       DataTypes.User ->
       [DataTypes.Category] ->
-      [IdImage] ->
-      IdNews ->
+      [DataTypes.Id DataTypes.ImageId] ->
+      DataTypes.Id DataTypes.NewsId ->
       DataTypes.News
     toNews (news_title, news_created, news_text, news_published) DataTypes.User {..} cats imagesId idNews' =
       DataTypes.News
@@ -321,8 +315,8 @@ getNews pool h user idNews categories imagesIds = do
 checkId ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
-  IdNews ->
-  EX.ExceptT ErrorTypes.AddEditNewsError IO IdNews
+  DataTypes.Id DataTypes.NewsId ->
+  EX.ExceptT ErrorTypes.AddEditNewsError IO (DataTypes.Id DataTypes.NewsId)
 checkId pool h newsId = do
   res <-
     liftIO
@@ -331,7 +325,7 @@ checkId pool h newsId = do
               SQL.query
                 conn
                 [sql| SELECT EXISTS (SELECT news_id  FROM news WHERE news_id = ?) |]
-                (SQL.Only newsId)
+                (SQL.Only (DataTypes.getId newsId))
           ) ::
           IO (Either EXS.SomeException [SQL.Only Bool])
       )
@@ -350,8 +344,8 @@ checkUserThisNewsAuthor ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
   DataTypes.User ->
-  IdNews ->
-  EX.ExceptT ErrorTypes.AddEditNewsError IO IdNews
+  DataTypes.Id DataTypes.NewsId ->
+  EX.ExceptT ErrorTypes.AddEditNewsError IO (DataTypes.Id DataTypes.NewsId)
 checkUserThisNewsAuthor pool h DataTypes.User {..} newsId = do
   res <-
     liftIO
@@ -360,7 +354,7 @@ checkUserThisNewsAuthor pool h DataTypes.User {..} newsId = do
               SQL.query
                 conn
                 [sql| SELECT news_author_login  FROM news WHERE news_id = ? |]
-                (SQL.Only newsId)
+                (SQL.Only (DataTypes.getId newsId))
           ) ::
           IO (Either EXS.SomeException [SQL.Only String])
       )
@@ -404,7 +398,7 @@ checkCategoryId ::
 checkCategoryId _ _ r@DataTypes.EditNewsRequest {newCategoryId = Nothing} =
   return r
 checkCategoryId pool h r@DataTypes.EditNewsRequest {newCategoryId = Just categoryId} = do
-  res <- liftIO (EX.runExceptT (CategoryIO.checkCategoryExistsById pool h (DataTypes.id categoryId) :: EX.ExceptT ErrorTypes.AddEditNewsError IO Int))
+  res <- liftIO (EX.runExceptT (CategoryIO.checkCategoryExistsById pool h categoryId :: EX.ExceptT ErrorTypes.AddEditNewsError IO (DataTypes.Id DataTypes.CategoryId)))
   case res of
     Left err -> EX.throwE err
     Right _ -> return r
