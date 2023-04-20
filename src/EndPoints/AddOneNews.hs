@@ -173,7 +173,7 @@ addNewsToDB pool h DataTypes.User {..} categories DataTypes.CreateNewsRequest {.
                   published
                 )
           ) ::
-          IO (Either EXS.SomeException [SQL.Only Int])
+          IO (Either EXS.SomeException [SQL.Only (DataTypes.Id DataTypes.News)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("addNewsToDB", show err)
@@ -187,7 +187,7 @@ addNewsToDB pool h DataTypes.User {..} categories DataTypes.CreateNewsRequest {.
                 newsText = text,
                 newsImages = imageUris,
                 newsPublished = published,
-                newsId = DataTypes.Id {getId = idNews}
+                newsId = idNews
               }
       liftIO $ Logger.logInfo (News.hLogHandle h) $ "addNewsToDB: OK!" <> ToText.toText news
       return news

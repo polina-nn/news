@@ -58,7 +58,7 @@ checkParentId ::
   News.Handle IO ->
   DataTypes.Id DataTypes.Category ->
   EX.ExceptT ErrorTypes.AddEditCategoryError IO (DataTypes.Id DataTypes.Category)
-checkParentId _ _ DataTypes.Id {getId = 0} = return DataTypes.Id {getId = 0}
+checkParentId _ _ catId@DataTypes.Id {getId = 0} = return catId
 checkParentId pool h parent = CategoryIO.checkCategoryExistsById pool h parent
 
 addCategoryToDb ::
@@ -76,7 +76,7 @@ addCategoryToDb pool h DataTypes.CreateCategoryRequest {..} = do
                 [sql| INSERT INTO  category (category_parent_id, category_name)  VALUES (?,?) RETURNING category_id  |]
                 (parent, category)
           ) ::
-          IO (Either EXS.SomeException [SQL.Only Int])
+          IO (Either EXS.SomeException [SQL.Only (DataTypes.Id DataTypes.Category)])
       )
   case res of
     Left err -> handleError err
@@ -84,7 +84,7 @@ addCategoryToDb pool h DataTypes.CreateCategoryRequest {..} = do
       let newCategory =
             ( DataTypes.Category
                 { categoryParentId = parent,
-                  categoryId = DataTypes.Id {getId = val},
+                  categoryId = val,
                   categoryName = category
                 }
             )

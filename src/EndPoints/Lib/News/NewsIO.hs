@@ -39,13 +39,13 @@ addImageNews pool h DataTypes.CreateImageRequest {..} = do
                 [sql| INSERT INTO image ( image_name, image_type, image_content) VALUES (?,?,?) RETURNING  image_id  |]
                 (file, format, show imageDecodeBase64ByteString)
           ) ::
-          IO (Either EXS.SomeException [SQL.Only Int])
+          IO (Either EXS.SomeException [SQL.Only (DataTypes.Id DataTypes.Image)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("addImageNews", show err)
     Right [SQL.Only idIm] -> do
       liftIO $ Logger.logDebug (News.hLogHandle h) ("addImageNews: OK! Image_id  " .< show idIm)
-      return $ DataTypes.Id {getId = idIm}
+      return idIm
     Right _ -> Throw.throwSqlRequestError h ("addImageNews", "Developer error!")
 
 toNews ::
