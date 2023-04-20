@@ -1,7 +1,10 @@
 -- | Handle for Config and Logger
 module News where
 
+import qualified Data.Configurator.Types as C
+import qualified Data.Text as T
 import qualified Logger
+import Text.Read (readMaybe)
 
 data Handle m = Handle
   { hLogHandle :: Logger.Handle m,
@@ -36,7 +39,11 @@ data Scheme
     Http
   | -- | https://
     Https
-  deriving (Eq)
+  deriving (Eq, Ord, Read)
+
+instance C.Configured Scheme where
+  convert (C.String str) = readMaybe (T.unpack str)
+  convert _ = Nothing
 
 instance Show Scheme where
   show Http = "http:/"
@@ -56,6 +63,6 @@ data URIConfig = URIConfig
 
 instance Show URIConfig where
   show (URIConfig uriScheme' "localhost" uriPort') =
-    show uriScheme' ++ "/localhost:" ++ show uriPort'
+    show uriScheme' <> "/localhost:" <> show uriPort'
   show (URIConfig uriScheme' uriHost' uriPort') =
-    show uriScheme' ++ "/" ++ uriHost' ++ "/" ++ show uriPort'
+    show uriScheme' <> "/" <> uriHost' <> "/" <> show uriPort'
