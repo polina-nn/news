@@ -11,7 +11,6 @@ import qualified Control.Monad.Trans.Except as EX
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.Pool as POOL
-import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified Database.PostgreSQL.Simple.Types as SQLTypes
@@ -28,8 +27,6 @@ import Servant (Handler)
 import qualified System.Directory as SD
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
-
-type IdImage = Int
 
 addOneNews ::
   News.Handle IO ->
@@ -54,7 +51,7 @@ addNewsExcept ::
   EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.News
 addNewsExcept pool (h, token, r@DataTypes.CreateNewsRequest {..}) = do
   user <- EX.withExceptT ErrorTypes.AddEditNewsSQLRequestError (LibIO.searchUser h pool token)
-  liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add One News: \n", ToText.toText r, "by user: ", ToText.toText user]
+  liftIO $ Logger.logInfo (News.hLogHandle h) $ "\n\nRequest: Add One News: \n" <> ToText.toText r <> "by user: " <> ToText.toText user
   _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditNews (Lib.checkUserAuthor h user)
   _ <- checkImageFilesExist h r
   _ <- checkPngImages h r
@@ -142,7 +139,7 @@ addAllImages ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
   DataTypes.CreateNewsRequest ->
-  EX.ExceptT ErrorTypes.AddEditNewsError IO [IdImage]
+  EX.ExceptT ErrorTypes.AddEditNewsError IO [DataTypes.Id DataTypes.Image]
 addAllImages _ _ (DataTypes.CreateNewsRequest _ _ _ Nothing _) = return []
 addAllImages pool h (DataTypes.CreateNewsRequest _ _ _ (Just req) _) = do
   rez <- mapM (NewsIO.addImageNews pool h) req
@@ -155,10 +152,10 @@ addNewsToDB ::
   DataTypes.User ->
   [DataTypes.Category] ->
   DataTypes.CreateNewsRequest ->
-  [IdImage] ->
+  [DataTypes.Id DataTypes.Image] ->
   EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.News
 addNewsToDB pool h DataTypes.User {..} categories DataTypes.CreateNewsRequest {..} idImages = do
-  let imageUris = map (Lib.imageIdToURI h) idImages
+  let imageUris = Lib.imagesURIs h idImages
   created <- liftIO Lib.currentDay
   res <-
     liftIO
@@ -176,7 +173,7 @@ addNewsToDB pool h DataTypes.User {..} categories DataTypes.CreateNewsRequest {.
                   published
                 )
           ) ::
-          IO (Either EXS.SomeException [SQL.Only Int])
+          IO (Either EXS.SomeException [SQL.Only (DataTypes.Id DataTypes.News)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("addNewsToDB", show err)
@@ -192,6 +189,6 @@ addNewsToDB pool h DataTypes.User {..} categories DataTypes.CreateNewsRequest {.
                 newsPublished = published,
                 newsId = idNews
               }
-      liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["addNewsToDB: OK!", ToText.toText news]
+      liftIO $ Logger.logInfo (News.hLogHandle h) $ "addNewsToDB: OK!" <> ToText.toText news
       return news
     Right _ -> Throw.throwSqlRequestError h ("addNewsToDB", "Developer error")

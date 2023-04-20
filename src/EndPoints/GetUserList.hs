@@ -17,7 +17,7 @@ import qualified EndPoints.Lib.OffsetLimit as OffsetLimit
 import qualified EndPoints.Lib.ThrowRequestError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
-import Logger (logDebug, logInfo)
+import Logger (logDebug, logInfo, (.<))
 import qualified News
 import Servant (Handler)
 import qualified Types.DataTypes as DataTypes
@@ -43,8 +43,8 @@ userListExcept ::
   (News.Handle IO, Maybe DataTypes.Offset, Maybe DataTypes.Limit) ->
   EX.ExceptT ErrorTypes.GetContentError IO [DataTypes.User]
 userListExcept pool (h, mo, ml) = do
-  liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Get User List with offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
-  (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetContent $ OffsetLimit.checkOffsetLimit h mo ml
+  liftIO $ Logger.logInfo (News.hLogHandle h) $ "\n\nRequest: Get User List with offset = " .< mo <> " limit = " .< ml
+  (offset', limit') <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetContent $ OffsetLimit.checkOffsetLimit h mo ml
   res <-
     liftIO
       ( EXS.try
@@ -53,7 +53,7 @@ userListExcept pool (h, mo, ml) = do
                 conn
                 [sql|SELECT usr_name, usr_login, usr_admin, usr_author, usr_created
                FROM usr ORDER BY usr_created LIMIT ?  OFFSET ? |]
-                (show limit, show offset)
+                (show $ DataTypes.limit limit', show $ DataTypes.offset offset')
           ) ::
           IO (Either EXS.SomeException [(T.Text, String, Bool, Bool, TIME.Day)])
       )
@@ -62,5 +62,5 @@ userListExcept pool (h, mo, ml) = do
     Right value -> do
       let users = Prelude.map Lib.toUser value
       let toTextUsers = T.concat $ map ToText.toText users
-      liftIO $ Logger.logDebug (News.hLogHandle h) $ T.concat ["userList: OK! \n", toTextUsers]
+      liftIO $ Logger.logDebug (News.hLogHandle h) $ "userList: OK! \n" <> toTextUsers
       return users

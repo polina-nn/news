@@ -67,13 +67,13 @@ authorsNewsSearchListExcept _ (h, _, Nothing, _, _) = do
   EX.throwE $ ErrorTypes.InvalidSearchGetNews $ ErrorTypes.InvalidRequest []
 authorsNewsSearchListExcept pool (h, token, Just search, mo, ml) = do
   user <- EX.withExceptT ErrorTypes.GetNewsSQLRequestError (LibIO.searchUser h pool token)
-  liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request with authentication: Get News Search List ", search, " offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
+  liftIO $ Logger.logInfo (News.hLogHandle h) $ "\n\nRequest with authentication: Get News Search List " <> search <> ", offset = " .< mo <> ", limit = " .< ml
   _ <- EX.withExceptT ErrorTypes.InvalidPermissionGetNews (Lib.checkUserAuthor h user)
   (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetNews $ OffsetLimit.checkOffsetLimit h mo ml
   dbNews <- authorsNewsSearchListFromDb pool h user search offset limit
   news <- Prelude.mapM (NewsIO.toNews pool h) dbNews
   let toTextNews = T.concat $ map ToText.toText news
-  liftIO $ Logger.logDebug (News.hLogHandle h) $ T.concat ["authorsNewsSearchListExcept: OK! \n", toTextNews]
+  liftIO $ Logger.logDebug (News.hLogHandle h) $ "authorsNewsSearchListExcept: OK! \n" <> toTextNews
   return news
 
 authorsNewsSearchListFromDb ::
@@ -84,7 +84,7 @@ authorsNewsSearchListFromDb ::
   DataTypes.Offset ->
   DataTypes.Limit ->
   EX.ExceptT ErrorTypes.GetNewsError IO [NewsHelpTypes.DbNews]
-authorsNewsSearchListFromDb pool h DataTypes.User {..} search off lim = do
+authorsNewsSearchListFromDb pool h DataTypes.User {..} search DataTypes.Offset {..} DataTypes.Limit {..} = do
   res <-
     liftIO
       ( EXS.try
@@ -97,9 +97,9 @@ authorsNewsSearchListFromDb pool h DataTypes.User {..} search off lim = do
             where ((news_published = true) or (news_author_login = ? )) and (to_tsvector(news_title) || to_tsvector(usr_name) || to_tsvector(category_name) || to_tsvector(news_text) @@ plainto_tsquery(?))
             ORDER BY news_created DESC
             LIMIT ?  OFFSET ? |]
-                (userLogin, search, show lim, show off)
+                (userLogin, search, show limit, show offset)
           ) ::
-          IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, Int, T.Text, T.Text, SQLTypes.PGArray Int, Int, Bool, Int)])
+          IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, DataTypes.Id DataTypes.Category, T.Text, T.Text, SQLTypes.PGArray (DataTypes.Id DataTypes.Image), Int, Bool, DataTypes.Id DataTypes.News)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("authorsNewsSearchListFromDb", show err)

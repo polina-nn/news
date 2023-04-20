@@ -64,15 +64,15 @@ checkUserAuthor h r@DataTypes.User {..} =
           )
       EX.throwE $ ErrorTypes.InvalidAuthorPermission []
 
--- | imageIdToURI - create URI of one image
-imageIdToURI :: News.Handle IO -> Int -> DataTypes.URI
-imageIdToURI h idIm = show uriBegin ++ show uriEnd
+-- | imageIdToURI - create URI of one image from ImageId
+imageIdToURI :: News.Handle IO -> DataTypes.Id DataTypes.Image -> DataTypes.URI
+imageIdToURI h DataTypes.Id {getId = idIm} = show uriBegin ++ show uriEnd
   where
     uriBegin = News.hURIConfig h
     uriEnd = DataTypes.URI' {uriPath = "image", uriId = idIm}
 
 -- | imagesURIs - create URI of images
-imagesURIs :: News.Handle IO -> [Int] -> [DataTypes.URI]
+imagesURIs :: News.Handle IO -> [DataTypes.Id DataTypes.Image] -> [DataTypes.URI]
 imagesURIs _ [] = []
 imagesURIs h xs = map (imageIdToURI h) xs
 

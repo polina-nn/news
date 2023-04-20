@@ -30,13 +30,13 @@ curl -v "http://localhost:8080/news?offset=2&limit=5"
 ----- Check filters -----
 
 1. Filter news by creation date: created_until
-curl -v "http://localhost:8080/news?created_until=2022-09-30&limit=5"
+curl -v "http://localhost:8080/news?created_until=2023-09-30&limit=5"
 
 2. Filter news by creation date: created_since
 curl -v "http://localhost:8080/news?created_since=2022-09-30&limit=5"
 
 3. Filter news by creation date: created_at
-curl -v "http://localhost:8080/news?created_at=2022-10-13&limit=5"
+curl -v "http://localhost:8080/news?created_at=2023-04-14&limit=5"
 
 4. Filter by: created_at & created_until. ERROR: BAD REQUEST!
 curl -v "http://localhost:8080/news?created_at=2022-10-13&created_until=2022-09-30&limit=5"

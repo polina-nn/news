@@ -47,7 +47,7 @@ addCategoryExcept ::
 addCategoryExcept pool (h, token, r@DataTypes.CreateCategoryRequest {..}) =
   do
     user <- EX.withExceptT ErrorTypes.AddEditCategorySQLRequestError (LibIO.searchUser h pool token)
-    liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["\n\nRequest: Add Category: \n", ToText.toText r, "by user: ", ToText.toText user]
+    liftIO $ Logger.logInfo (News.hLogHandle h) $ "\n\nRequest: Add Category: \n" <> ToText.toText r <> "by user: " <> ToText.toText user
     _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditCategory (Lib.checkUserAdmin h user)
     _ <- checkParentId pool h parent
     addCategoryToDb pool h r
@@ -56,9 +56,9 @@ addCategoryExcept pool (h, token, r@DataTypes.CreateCategoryRequest {..}) =
 checkParentId ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
-  Int ->
-  EX.ExceptT ErrorTypes.AddEditCategoryError IO Int
-checkParentId _ _ 0 = return 0
+  DataTypes.Id DataTypes.Category ->
+  EX.ExceptT ErrorTypes.AddEditCategoryError IO (DataTypes.Id DataTypes.Category)
+checkParentId _ _ catId@DataTypes.Id {getId = 0} = return catId
 checkParentId pool h parent = CategoryIO.checkCategoryExistsById pool h parent
 
 addCategoryToDb ::
@@ -76,7 +76,7 @@ addCategoryToDb pool h DataTypes.CreateCategoryRequest {..} = do
                 [sql| INSERT INTO  category (category_parent_id, category_name)  VALUES (?,?) RETURNING category_id  |]
                 (parent, category)
           ) ::
-          IO (Either EXS.SomeException [SQL.Only Int])
+          IO (Either EXS.SomeException [SQL.Only (DataTypes.Id DataTypes.Category)])
       )
   case res of
     Left err -> handleError err
@@ -88,7 +88,7 @@ addCategoryToDb pool h DataTypes.CreateCategoryRequest {..} = do
                   categoryName = category
                 }
             )
-      liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["addCategoryToDb: added new category: ", ToText.toText newCategory]
+      liftIO $ Logger.logInfo (News.hLogHandle h) $ "addCategoryToDb: added new category: " <> ToText.toText newCategory
       return newCategory
     Right _ -> Throw.throwSqlRequestError h ("addCategoryToDb", "Developer error")
   where

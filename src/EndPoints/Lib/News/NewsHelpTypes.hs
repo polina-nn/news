@@ -10,24 +10,24 @@ data DbNews = DbNews
   { dbNewsTitle :: DataTypes.Name,
     dbNewsCreated :: TIME.Day,
     dbNewsAuthor :: DataTypes.Name,
-    dbNewsCategoryId :: DataTypes.Id,
+    dbNewsCategoryId :: DataTypes.Id DataTypes.Category,
     dbNewsCategoryName :: DataTypes.Name,
     dbNewsText :: T.Text,
-    dbNewsImagesId :: [Int],
+    dbNewsImagesId :: [DataTypes.Id DataTypes.Image],
     dbNewsImagesQuantity :: Int,
     dbNewsPublished :: Bool,
-    dbNewsId :: Int
+    dbNewsId :: DataTypes.Id DataTypes.News
   }
   deriving (Show, Eq)
 
 -- | DbFilter - filtering data to database request
 data DbFilter = DbFilter
-  { dbFilterDayAt :: TIME.Day,
-    dbFilterDayUntil :: TIME.Day,
-    dbFilterDaySince :: TIME.Day,
+  { dbFilterDayAt :: DataTypes.DayAt,
+    dbFilterDayUntil :: DataTypes.DayUntil,
+    dbFilterDaySince :: DataTypes.DaySince,
     dbFilterAuthor :: T.Text,
-    dbFilterCategoryId :: Maybe Int,
+    dbFilterCategoryId :: Maybe (DataTypes.Id DataTypes.Category),
     dbFilterTitle :: T.Text,
     dbFilterContent :: T.Text
   }
-  deriving (Show, Eq)
+  deriving (Show)

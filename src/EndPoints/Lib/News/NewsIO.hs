@@ -21,14 +21,12 @@ import qualified News
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
 
-type IdImage = Int
-
 -- | addImageNews adding one pictures to the table of pictures when working with news
 addImageNews ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
   DataTypes.CreateImageRequest ->
-  EX.ExceptT ErrorTypes.AddEditNewsError IO IdImage
+  EX.ExceptT ErrorTypes.AddEditNewsError IO (DataTypes.Id DataTypes.Image)
 addImageNews pool h DataTypes.CreateImageRequest {..} = do
   content <- liftIO $ B.readFile image
   let imageDecodeBase64ByteString = Base64.decodeBase64Lenient content
@@ -41,7 +39,7 @@ addImageNews pool h DataTypes.CreateImageRequest {..} = do
                 [sql| INSERT INTO image ( image_name, image_type, image_content) VALUES (?,?,?) RETURNING  image_id  |]
                 (file, format, show imageDecodeBase64ByteString)
           ) ::
-          IO (Either EXS.SomeException [SQL.Only Int])
+          IO (Either EXS.SomeException [SQL.Only (DataTypes.Id DataTypes.Image)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("addImageNews", show err)
