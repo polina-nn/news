@@ -10,13 +10,13 @@ data DbNews = DbNews
   { dbNewsTitle :: DataTypes.Name,
     dbNewsCreated :: TIME.Day,
     dbNewsAuthor :: DataTypes.Name,
-    dbNewsCategoryId :: DataTypes.Id DataTypes.CategoryId,
+    dbNewsCategoryId :: DataTypes.Id DataTypes.Category,
     dbNewsCategoryName :: DataTypes.Name,
     dbNewsText :: T.Text,
-    dbNewsImagesId :: [DataTypes.Id DataTypes.ImageId],
+    dbNewsImagesId :: [DataTypes.Id DataTypes.Image],
     dbNewsImagesQuantity :: Int,
     dbNewsPublished :: Bool,
-    dbNewsId :: DataTypes.Id DataTypes.NewsId
+    dbNewsId :: DataTypes.Id DataTypes.News
   }
   deriving (Show, Eq)
 
@@ -26,7 +26,7 @@ data DbFilter = DbFilter
     dbFilterDayUntil :: DataTypes.DayUntil,
     dbFilterDaySince :: DataTypes.DaySince,
     dbFilterAuthor :: T.Text,
-    dbFilterCategoryId :: Maybe (DataTypes.Id DataTypes.CategoryId),
+    dbFilterCategoryId :: Maybe (DataTypes.Id DataTypes.Category),
     dbFilterTitle :: T.Text,
     dbFilterContent :: T.Text
   }

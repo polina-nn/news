@@ -26,7 +26,7 @@ addImageNews ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
   DataTypes.CreateImageRequest ->
-  EX.ExceptT ErrorTypes.AddEditNewsError IO (DataTypes.Id DataTypes.ImageId)
+  EX.ExceptT ErrorTypes.AddEditNewsError IO (DataTypes.Id DataTypes.Image)
 addImageNews pool h DataTypes.CreateImageRequest {..} = do
   content <- liftIO $ B.readFile image
   let imageDecodeBase64ByteString = Base64.decodeBase64Lenient content

@@ -56,8 +56,8 @@ addCategoryExcept pool (h, token, r@DataTypes.CreateCategoryRequest {..}) =
 checkParentId ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
-  DataTypes.Id DataTypes.CategoryId ->
-  EX.ExceptT ErrorTypes.AddEditCategoryError IO (DataTypes.Id DataTypes.CategoryId)
+  DataTypes.Id DataTypes.Category ->
+  EX.ExceptT ErrorTypes.AddEditCategoryError IO (DataTypes.Id DataTypes.Category)
 checkParentId _ _ DataTypes.Id {getId = 0} = return DataTypes.Id {getId = 0}
 checkParentId pool h parent = CategoryIO.checkCategoryExistsById pool h parent
 
@@ -74,7 +74,7 @@ addCategoryToDb pool h DataTypes.CreateCategoryRequest {..} = do
               SQL.query
                 conn
                 [sql| INSERT INTO  category (category_parent_id, category_name)  VALUES (?,?) RETURNING category_id  |]
-                (DataTypes.getId parent, category)
+                (parent, category)
           ) ::
           IO (Either EXS.SomeException [SQL.Only Int])
       )

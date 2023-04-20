@@ -1,5 +1,4 @@
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE UndecidableInstances #-}
 
 -- | DataTypes for End Points --
 module Types.DataTypes where
@@ -36,8 +35,8 @@ data Db = Db
     dbAddCategory :: (News.Handle IO, Token, CreateCategoryRequest) -> IO (Either ErrorTypes.AddEditCategoryError Category),
     dbAddNews :: (News.Handle IO, Token, CreateNewsRequest) -> IO (Either ErrorTypes.AddEditNewsError News),
     dbAddImage :: (News.Handle IO, Token, CreateImageRequest) -> IO (Either ErrorTypes.AddImageError URI),
-    dbEditCategory :: (News.Handle IO, Token, Id CategoryId, EditCategoryRequest) -> IO (Either ErrorTypes.AddEditCategoryError Category),
-    dbEditNews :: (News.Handle IO, Token, Id NewsId, EditNewsRequest) -> IO (Either ErrorTypes.AddEditNewsError News),
+    dbEditCategory :: (News.Handle IO, Token, Id Category, EditCategoryRequest) -> IO (Either ErrorTypes.AddEditCategoryError Category),
+    dbEditNews :: (News.Handle IO, Token, Id News, EditNewsRequest) -> IO (Either ErrorTypes.AddEditNewsError News),
     dbAuthorsNewsList ::
       ( News.Handle IO,
         Token,
@@ -56,7 +55,7 @@ data Db = Db
       ) ->
       IO (Either ErrorTypes.GetNewsError [News]),
     dbUserList :: (News.Handle IO, Maybe Offset, Maybe Limit) -> IO (Either ErrorTypes.GetContentError [User]),
-    dbOneImage :: (News.Handle IO, Id ImageId) -> IO (Either ErrorTypes.GetImageError B.ByteString),
+    dbOneImage :: (News.Handle IO, Id Image) -> IO (Either ErrorTypes.GetImageError B.ByteString),
     dbCategoryList :: (News.Handle IO, Maybe Offset, Maybe Limit) -> IO (Either ErrorTypes.GetContentError [Category]),
     dbNewsList ::
       ( News.Handle IO,
@@ -94,7 +93,7 @@ data Filter = Filter
     filterDayUntil :: Maybe DayUntil,
     filterDaySince :: Maybe DaySince,
     filterAuthor :: Maybe T.Text,
-    filterCategoryId :: Maybe (Id CategoryId),
+    filterCategoryId :: Maybe (Id Category),
     filterTitle :: Maybe T.Text,
     filterContent :: Maybe T.Text
   }
@@ -176,11 +175,6 @@ data User = User
   deriving (Show, Generic, Eq, A.ToJSON, A.FromJSON)
 
 -------- ID FOR CATEGORY, NEWS, IMAGE ------
-data CategoryId
-
-data NewsId
-
-data ImageId
 
 newtype Id a = Id {getId :: Int}
   deriving (Show, Generic, Eq, A.ToJSON, A.FromJSON, Read)
@@ -200,6 +194,8 @@ instance ToField (Id a) where
   toField (Id a) = toField a
 
 ---------IMAGE-------------
+
+data Image
 
 -- | CreateImage
 data CreateImageRequest = CreateImageRequest
@@ -223,16 +219,16 @@ instance Show URI' where
 
 -- | Category - one category.It has category_path, category_name, category_id (created automatically by Data Base)
 data Category = Category
-  { categoryId :: Id CategoryId,
+  { categoryId :: Id Category,
     categoryName :: Name,
-    categoryParentId :: Id CategoryId
+    categoryParentId :: Id Category
   }
   deriving (Show, Generic, Eq, A.ToJSON, A.FromJSON)
 
 -- |  CreateCategoryRequest - for create category  in request.
 -- You must fill all fields in curl request
 data CreateCategoryRequest = CreateCategoryRequest
-  { parent :: Id CategoryId,
+  { parent :: Id Category,
     category :: Name
   }
   deriving (Show, Generic, Eq, A.ToJSON, A.FromJSON)
@@ -240,7 +236,7 @@ data CreateCategoryRequest = CreateCategoryRequest
 -- | EditCategoryRequest - for edit category  in request.
 -- You must fill some fields in curl request
 data EditCategoryRequest = EditCategoryRequest
-  { newParent :: Maybe (Id CategoryId),
+  { newParent :: Maybe (Id Category),
     newCategory :: Maybe Name
   }
   deriving (Show, Generic, Eq, A.ToJSON, A.FromJSON)
@@ -248,7 +244,7 @@ data EditCategoryRequest = EditCategoryRequest
 ---------NEWS-------------
 data CreateNewsRequest = CreateNewsRequest
   { title :: Name,
-    newsCategoryId :: Id CategoryId,
+    newsCategoryId :: Id Category,
     text :: T.Text,
     images :: Maybe [CreateImageRequest],
     published :: Bool
@@ -257,7 +253,7 @@ data CreateNewsRequest = CreateNewsRequest
 
 data EditNewsRequest = EditNewsRequest
   { newTitle :: Maybe Name,
-    newCategoryId :: Maybe (Id CategoryId),
+    newCategoryId :: Maybe (Id Category),
     newText :: Maybe T.Text,
     newImages :: Maybe [CreateImageRequest],
     newPublished :: Maybe Bool
@@ -272,6 +268,6 @@ data News = News
     newsText :: T.Text,
     newsImages :: [URI],
     newsPublished :: Bool,
-    newsId :: Id NewsId
+    newsId :: Id News
   }
   deriving (Show, Generic, Eq, A.ToJSON, A.FromJSON)

@@ -99,7 +99,7 @@ authorsNewsSearchListFromDb pool h DataTypes.User {..} search DataTypes.Offset {
             LIMIT ?  OFFSET ? |]
                 (userLogin, search, show limit, show offset)
           ) ::
-          IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, DataTypes.Id DataTypes.CategoryId, T.Text, T.Text, SQLTypes.PGArray (DataTypes.Id DataTypes.ImageId), Int, Bool, DataTypes.Id DataTypes.NewsId)])
+          IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, DataTypes.Id DataTypes.Category, T.Text, T.Text, SQLTypes.PGArray (DataTypes.Id DataTypes.Image), Int, Bool, DataTypes.Id DataTypes.News)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("authorsNewsSearchListFromDb", show err)

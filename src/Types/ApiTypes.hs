@@ -33,16 +33,16 @@ type RestAPI =
     -- create image by author
     :<|> AuthProtect "cookie-auth" :> "login" :> "image" :> ReqBody '[JSON] DataTypes.CreateImageRequest :> Post '[JSON] DataTypes.URI
     -- edit category by admin
-    :<|> AuthProtect "cookie-auth" :> "login" :> "category" :> Capture "id" (DataTypes.Id DataTypes.CategoryId) :> ReqBody '[JSON] DataTypes.EditCategoryRequest :> Put '[JSON] DataTypes.Category
+    :<|> AuthProtect "cookie-auth" :> "login" :> "category" :> Capture "id" (DataTypes.Id DataTypes.Category) :> ReqBody '[JSON] DataTypes.EditCategoryRequest :> Put '[JSON] DataTypes.Category
     -- edit news by new's author"
-    :<|> AuthProtect "cookie-auth" :> "login" :> "news" :> Capture "id" (DataTypes.Id DataTypes.NewsId) :> ReqBody '[JSON] DataTypes.EditNewsRequest :> Put '[JSON] DataTypes.News
+    :<|> AuthProtect "cookie-auth" :> "login" :> "news" :> Capture "id" (DataTypes.Id DataTypes.News) :> ReqBody '[JSON] DataTypes.EditNewsRequest :> Put '[JSON] DataTypes.News
     --  get list of news with authentication, the author sees his unpublished news and all published
     :<|> AuthProtect "cookie-auth" :> "login" :> "news"
       :> QueryParam "created_at" DataTypes.DayAt
       :> QueryParam "created_until" DataTypes.DayUntil
       :> QueryParam "created_since" DataTypes.DaySince
       :> QueryParam "author" T.Text
-      :> QueryParam "category_id" (DataTypes.Id DataTypes.CategoryId)
+      :> QueryParam "category_id" (DataTypes.Id DataTypes.Category)
       :> QueryParam "title" T.Text
       :> QueryParam "content" T.Text
       :> QueryParam "sort_by" DataTypes.SortBy
@@ -54,7 +54,7 @@ type RestAPI =
     --  get list of users
     :<|> "users" :> QueryParam "offset" DataTypes.Offset :> QueryParam "limit" DataTypes.Limit :> Get '[JSON] [DataTypes.User]
     -- get one image
-    :<|> "image" :> Capture "id" (DataTypes.Id DataTypes.ImageId) :> Get '[IMAGE] B.ByteString
+    :<|> "image" :> Capture "id" (DataTypes.Id DataTypes.Image) :> Get '[IMAGE] B.ByteString
     --  get list of categories
     :<|> "category" :> QueryParam "offset" DataTypes.Offset :> QueryParam "limit" DataTypes.Limit :> Get '[JSON] [DataTypes.Category]
     --  get list of news without authentication
@@ -63,7 +63,7 @@ type RestAPI =
       :> QueryParam "created_until" DataTypes.DayUntil
       :> QueryParam "created_since" DataTypes.DaySince
       :> QueryParam "author" T.Text
-      :> QueryParam "category_id" (DataTypes.Id DataTypes.CategoryId)
+      :> QueryParam "category_id" (DataTypes.Id DataTypes.Category)
       :> QueryParam "title" T.Text
       :> QueryParam "content" T.Text
       :> QueryParam "sort_by" DataTypes.SortBy

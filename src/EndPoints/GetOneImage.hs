@@ -19,19 +19,19 @@ import Servant (Handler)
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
 
-getOneImage :: News.Handle IO -> DataTypes.Db -> DataTypes.Id DataTypes.ImageId -> Handler B.ByteString
+getOneImage :: News.Handle IO -> DataTypes.Db -> DataTypes.Id DataTypes.Image -> Handler B.ByteString
 getOneImage h DataTypes.Db {..} idImage =
   (>>=) (liftIO $ dbOneImage (h, idImage)) ToHttpResponse.toHttpResponse
 
 oneImage ::
   POOL.Pool SQL.Connection ->
-  (News.Handle IO, DataTypes.Id DataTypes.ImageId) ->
+  (News.Handle IO, DataTypes.Id DataTypes.Image) ->
   IO (Either ErrorTypes.GetImageError B.ByteString)
 oneImage pool (h, id') = EX.runExceptT $ oneImageExcept pool (h, id')
 
 oneImageExcept ::
   POOL.Pool SQL.Connection ->
-  (News.Handle IO, DataTypes.Id DataTypes.ImageId) ->
+  (News.Handle IO, DataTypes.Id DataTypes.Image) ->
   EX.ExceptT ErrorTypes.GetImageError IO B.ByteString
 oneImageExcept pool (h, id') = do
   liftIO $ Logger.logInfo (News.hLogHandle h) $ "Request: Get One Image with id " .< id'
@@ -43,7 +43,7 @@ oneImageExcept pool (h, id') = do
               SQL.query
                 conn
                 [sql|SELECT image_content FROM image WHERE image_id = ?|]
-                (SQL.Only $ DataTypes.getId id')
+                (SQL.Only id')
           ) ::
           IO (Either EXS.SomeException [SQL.Only String])
       )
@@ -57,8 +57,8 @@ oneImageExcept pool (h, id') = do
 checkId ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
-  DataTypes.Id DataTypes.ImageId ->
-  EX.ExceptT ErrorTypes.GetImageError IO (DataTypes.Id DataTypes.ImageId)
+  DataTypes.Id DataTypes.Image ->
+  EX.ExceptT ErrorTypes.GetImageError IO (DataTypes.Id DataTypes.Image)
 checkId pool h' id' = do
   res <-
     liftIO
@@ -67,7 +67,7 @@ checkId pool h' id' = do
               SQL.query
                 conn
                 [sql|SELECT EXISTS (SELECT image_id  FROM image WHERE image_id = ?)|]
-                (SQL.Only $ DataTypes.getId id')
+                (SQL.Only id')
           ) ::
           IO (Either EXS.SomeException [SQL.Only Bool])
       )

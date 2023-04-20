@@ -32,7 +32,7 @@ toFilter ::
   Maybe DataTypes.DayUntil ->
   Maybe DataTypes.DaySince ->
   Maybe T.Text ->
-  Maybe (DataTypes.Id DataTypes.CategoryId) ->
+  Maybe (DataTypes.Id DataTypes.Category) ->
   Maybe T.Text ->
   Maybe T.Text ->
   DataTypes.Filter
@@ -146,13 +146,13 @@ toDbNews ::
   ( T.Text,
     TIME.Day,
     T.Text,
-    DataTypes.Id DataTypes.CategoryId,
+    DataTypes.Id DataTypes.Category,
     T.Text,
     T.Text,
-    SQLTypes.PGArray (DataTypes.Id DataTypes.ImageId),
+    SQLTypes.PGArray (DataTypes.Id DataTypes.Image),
     Int,
     Bool,
-    DataTypes.Id DataTypes.NewsId
+    DataTypes.Id DataTypes.News
   ) ->
   NewsHelpTypes.DbNews
 toDbNews (dbNewsTitle, dbNewsCreated, dbNewsAuthor, dbNewsCategoryId, dbNewsCategoryName, dbNewsText, dbNewsImagesId', dbNewsImagesQuantity, dbNewsPublished, dbNewsId) =

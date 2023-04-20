@@ -34,7 +34,7 @@ getNewsList ::
   Maybe DataTypes.DayUntil ->
   Maybe DataTypes.DaySince ->
   Maybe T.Text ->
-  Maybe (DataTypes.Id DataTypes.CategoryId) ->
+  Maybe (DataTypes.Id DataTypes.Category) ->
   Maybe T.Text ->
   Maybe T.Text ->
   Maybe DataTypes.SortBy ->
@@ -125,12 +125,12 @@ newsListCategory pool h DataTypes.Offset {..} DataTypes.Limit {..} NewsHelpTypes
                   dbFilterAuthor,
                   dbFilterTitle,
                   dbFilterContent,
-                  DataTypes.getId newsCat,
+                  newsCat,
                   limit,
                   offset
                 )
           ) ::
-          IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, DataTypes.Id DataTypes.CategoryId, T.Text, T.Text, SQLTypes.PGArray (DataTypes.Id DataTypes.ImageId), Int, Bool, DataTypes.Id DataTypes.NewsId)])
+          IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, DataTypes.Id DataTypes.Category, T.Text, T.Text, SQLTypes.PGArray (DataTypes.Id DataTypes.Image), Int, Bool, DataTypes.Id DataTypes.News)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("newsListCategory", show err)
@@ -174,7 +174,7 @@ newsListNotCategory pool h DataTypes.Offset {..} DataTypes.Limit {..} NewsHelpTy
                   offset
                 )
           ) ::
-          IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, DataTypes.Id DataTypes.CategoryId, T.Text, T.Text, SQLTypes.PGArray (DataTypes.Id DataTypes.ImageId), Int, Bool, DataTypes.Id DataTypes.NewsId)])
+          IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, DataTypes.Id DataTypes.Category, T.Text, T.Text, SQLTypes.PGArray (DataTypes.Id DataTypes.Image), Int, Bool, DataTypes.Id DataTypes.News)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("newsListNotCategory", show err)

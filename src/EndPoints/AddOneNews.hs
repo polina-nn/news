@@ -139,7 +139,7 @@ addAllImages ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
   DataTypes.CreateNewsRequest ->
-  EX.ExceptT ErrorTypes.AddEditNewsError IO [DataTypes.Id DataTypes.ImageId]
+  EX.ExceptT ErrorTypes.AddEditNewsError IO [DataTypes.Id DataTypes.Image]
 addAllImages _ _ (DataTypes.CreateNewsRequest _ _ _ Nothing _) = return []
 addAllImages pool h (DataTypes.CreateNewsRequest _ _ _ (Just req) _) = do
   rez <- mapM (NewsIO.addImageNews pool h) req
@@ -152,7 +152,7 @@ addNewsToDB ::
   DataTypes.User ->
   [DataTypes.Category] ->
   DataTypes.CreateNewsRequest ->
-  [DataTypes.Id DataTypes.ImageId] ->
+  [DataTypes.Id DataTypes.Image] ->
   EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.News
 addNewsToDB pool h DataTypes.User {..} categories DataTypes.CreateNewsRequest {..} idImages = do
   let imageUris = Lib.imagesURIs h idImages
@@ -168,7 +168,7 @@ addNewsToDB pool h DataTypes.User {..} categories DataTypes.CreateNewsRequest {.
                   title,
                   show created,
                   userLogin,
-                  DataTypes.getId newsCategoryId,
+                  newsCategoryId,
                   text,
                   published
                 )
