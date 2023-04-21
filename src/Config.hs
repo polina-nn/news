@@ -28,9 +28,6 @@ instance C.Configured StdError where
   convert (C.String str) = readMaybe (T.unpack str)
   convert _ = Nothing
 
--- | FieldName -  the name of a Config Field
-type FieldName = T.Text
-
 tryLoadConfig :: FilePath -> IO C.Config
 tryLoadConfig path = do
   loadedConf <-
@@ -97,7 +94,7 @@ getDbConfig conf = do
   dbName' <- EXS.catch (tryLookUpConfigStringValueField conf "config.dbName") ExceptionTypes.handleExceptionToTerminal
   user' <- EXS.catch (tryLookUpConfigStringValueField conf "config.user") ExceptionTypes.handleExceptionToTerminal
   password' <- EXS.catch (tryLookUpConfigStringValueField conf "config.password") ExceptionTypes.handleExceptionToTerminal
-  dbPort' <- EXS.catch (tryLookUpConfigStringValueField conf "config.dbPort") ExceptionTypes.handleExceptionToTerminal
+  dbPort' <- EXS.catch (tryLookUpConfigIntValueField conf "config.dbPort") ExceptionTypes.handleExceptionToTerminal
   noOfStripes' <- EXS.catch (tryLookUpConfigIntValueField conf "config.noOfStripes") ExceptionTypes.handleExceptionToTerminal
   idleTime' <- EXS.catch (tryLookUpConfigIntValueField conf "config.idleTime") ExceptionTypes.handleExceptionToTerminal
   stripeSize' <- EXS.catch (tryLookUpConfigIntValueField conf "config.stripeSize") ExceptionTypes.handleExceptionToTerminal

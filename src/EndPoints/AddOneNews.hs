@@ -8,7 +8,6 @@ import qualified Control.Exception.Safe as EXS
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Control.Monad.Trans.Class (MonadTrans (lift))
 import qualified Control.Monad.Trans.Except as EX
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.Pool as POOL
 import qualified Database.PostgreSQL.Simple as SQL
@@ -117,22 +116,14 @@ checkBase64Images ::
 checkBase64Images _ r@(DataTypes.CreateNewsRequest _ _ _ Nothing _) =
   return r
 checkBase64Images h r@(DataTypes.CreateNewsRequest _ _ _ (Just req) _) = do
-  imageFiles <- liftIO $ mapM (B.readFile . DataTypes.image) req
+  imageFiles <- mapM (NewsIO.tryReadImageFile h . DataTypes.image) req
   if length (filter Base64.isBase64 imageFiles) == length req
     then do
       liftIO $ Logger.logDebug (News.hLogHandle h) "checkBase64Image: OK!"
       return r
     else do
-      liftIO $
-        Logger.logError
-          (News.hLogHandle h)
-          ( "ERROR "
-              .< ErrorTypes.NotBase64ImageAddEditNews
-                ( ErrorTypes.InvalidContent "checkBase64Image: BAD!"
-                )
-          )
-      EX.throwE $
-        ErrorTypes.NotBase64ImageAddEditNews $ ErrorTypes.InvalidContent []
+      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.NotBase64ImageAddEditNews (ErrorTypes.InvalidContent "checkBase64Image: BAD!"))
+      EX.throwE $ ErrorTypes.NotBase64ImageAddEditNews $ ErrorTypes.InvalidContent []
 
 -- | addAllImagesIO Add all the pictures for the news.
 addAllImages ::

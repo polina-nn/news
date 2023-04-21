@@ -15,6 +15,7 @@ import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.LibIO as LibIO
+import qualified EndPoints.Lib.News.NewsIO as NewsIO
 import qualified EndPoints.Lib.ThrowRequestError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
@@ -105,7 +106,7 @@ checkAndDecodeBase64Image ::
   DataTypes.CreateImageRequest ->
   EX.ExceptT ErrorTypes.AddImageError IO ImageDecodeBase64ByteString
 checkAndDecodeBase64Image h DataTypes.CreateImageRequest {..} = do
-  imageFile <- liftIO $ B.readFile image
+  imageFile <- NewsIO.tryReadImageFile h image
   case Base64.decodeBase64 imageFile of
     Right val -> do
       liftIO $ Logger.logDebug (News.hLogHandle h) "checkAndDecodeBase64Image: OK!"
