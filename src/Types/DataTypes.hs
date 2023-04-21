@@ -7,11 +7,14 @@ import qualified Data.Aeson as A
 import qualified Data.ByteString as B
 import qualified Data.Text as T
 import qualified Data.Time as TIME
+import Database.PostgreSQL.Simple.FromField (FromField (..))
+import Database.PostgreSQL.Simple.ToField (ToField (toField))
 import GHC.Generics (Generic)
 import qualified News
-import Servant.API (FromHttpApiData (parseQueryParam))
+import Servant (FromHttpApiData (..))
 import Servant.API.Experimental.Auth (AuthProtect)
 import Servant.Server.Experimental.Auth (AuthServerData)
+import Text.Read (readEither)
 import qualified Types.ErrorTypes as ErrorTypes
 
 newtype Handle = Handle
@@ -32,8 +35,8 @@ data Db = Db
     dbAddCategory :: (News.Handle IO, Token, CreateCategoryRequest) -> IO (Either ErrorTypes.AddEditCategoryError Category),
     dbAddNews :: (News.Handle IO, Token, CreateNewsRequest) -> IO (Either ErrorTypes.AddEditNewsError News),
     dbAddImage :: (News.Handle IO, Token, CreateImageRequest) -> IO (Either ErrorTypes.AddImageError URI),
-    dbEditCategory :: (News.Handle IO, Token, Int, EditCategoryRequest) -> IO (Either ErrorTypes.AddEditCategoryError Category),
-    dbEditNews :: (News.Handle IO, Token, Int, EditNewsRequest) -> IO (Either ErrorTypes.AddEditNewsError News),
+    dbEditCategory :: (News.Handle IO, Token, Id Category, EditCategoryRequest) -> IO (Either ErrorTypes.AddEditCategoryError Category),
+    dbEditNews :: (News.Handle IO, Token, Id News, EditNewsRequest) -> IO (Either ErrorTypes.AddEditNewsError News),
     dbAuthorsNewsList ::
       ( News.Handle IO,
         Token,
@@ -52,7 +55,7 @@ data Db = Db
       ) ->
       IO (Either ErrorTypes.GetNewsError [News]),
     dbUserList :: (News.Handle IO, Maybe Offset, Maybe Limit) -> IO (Either ErrorTypes.GetContentError [User]),
-    dbOneImage :: (News.Handle IO, Integer) -> IO (Either ErrorTypes.GetImageError B.ByteString),
+    dbOneImage :: (News.Handle IO, Id Image) -> IO (Either ErrorTypes.GetImageError B.ByteString),
     dbCategoryList :: (News.Handle IO, Maybe Offset, Maybe Limit) -> IO (Either ErrorTypes.GetContentError [Category]),
     dbNewsList ::
       ( News.Handle IO,
@@ -90,26 +93,58 @@ data Filter = Filter
     filterDayUntil :: Maybe DayUntil,
     filterDaySince :: Maybe DaySince,
     filterAuthor :: Maybe T.Text,
-    filterCategoryId :: Maybe Int,
+    filterCategoryId :: Maybe (Id Category),
     filterTitle :: Maybe T.Text,
     filterContent :: Maybe T.Text
   }
-  deriving (Show, Generic, Eq)
+  deriving (Show, Generic)
 
-type DayAt = TIME.Day
+newtype DayAt = DayAt {dayAt :: TIME.Day}
+  deriving (Show, Generic)
 
-type DayUntil = TIME.Day
+instance FromHttpApiData DayAt where
+  parseUrlPiece lim =
+    case readEither (T.unpack lim) :: Either String TIME.Day of
+      Left err -> Left (T.pack err)
+      Right val -> Right DayAt {dayAt = val}
 
-type DaySince = TIME.Day
+newtype DayUntil = DayUntil {dayUntil :: TIME.Day}
+  deriving (Show, Generic)
+
+instance FromHttpApiData DayUntil where
+  parseUrlPiece lim =
+    case readEither (T.unpack lim) :: Either String TIME.Day of
+      Left err -> Left (T.pack err)
+      Right val -> Right DayUntil {dayUntil = val}
+
+newtype DaySince = DaySince {daySince :: TIME.Day}
+  deriving (Show, Generic)
+
+instance FromHttpApiData DaySince where
+  parseUrlPiece lim =
+    case readEither (T.unpack lim) :: Either String TIME.Day of
+      Left err -> Left (T.pack err)
+      Right val -> Right DaySince {daySince = val}
 
 -- | type Limit -  maximum array length per get request
-type Limit = Int
+newtype Limit = Limit {limit :: Int}
+  deriving (Show, Eq, Generic)
+
+instance FromHttpApiData Limit where
+  parseUrlPiece lim =
+    case readEither (T.unpack lim) :: Either String Int of
+      Left err -> Left (T.pack err)
+      Right val -> Right Limit {limit = val}
 
 -- | type Offset - offset from the beginning of  get response array
-type Offset = Int
+newtype Offset = Offset {offset :: Int}
+  deriving (Show, Eq, Generic)
 
--- | type Id - id for user, category, image
-type Id = Int
+instance FromHttpApiData Offset where
+  parseUrlPiece off =
+    case readEither (T.unpack off) :: Either String Int of
+      Left err -> Left (T.pack err)
+      Right val -> Right Offset {offset = val}
 
 -- | type Name - name for user, category, image, news
 type Name = T.Text
@@ -139,7 +174,28 @@ data User = User
   }
   deriving (Show, Generic, Eq, A.ToJSON, A.FromJSON)
 
+-------- ID FOR CATEGORY, NEWS, IMAGE ------
+
+newtype Id a = Id {getId :: Int}
+  deriving (Show, Generic, Eq, A.ToJSON, A.FromJSON, Read)
+
+instance FromHttpApiData (Id a) where
+  parseUrlPiece someId =
+    case readEither (T.unpack someId) :: Either String Int of
+      Left err -> Left (T.pack err)
+      Right val -> Right Id {getId = val}
+
+instance FromField (Id a) where
+  fromField field' maybeData = do
+    x <- fromField field' maybeData
+    return Id {getId = x}
+
+instance ToField (Id a) where
+  toField (Id a) = toField a
+
 ---------IMAGE-------------
+
+data Image
 
 -- | CreateImage
 data CreateImageRequest = CreateImageRequest
@@ -163,16 +219,16 @@ instance Show URI' where
 
 -- | Category - one category.It has category_path, category_name, category_id (created automatically by Data Base)
 data Category = Category
-  { categoryId :: Id,
+  { categoryId :: Id Category,
     categoryName :: Name,
-    categoryParentId :: Id
+    categoryParentId :: Id Category
   }
-  deriving (Show, Generic, Ord, Eq, A.ToJSON, A.FromJSON)
+  deriving (Show, Generic, Eq, A.ToJSON, A.FromJSON)
 
 -- |  CreateCategoryRequest - for create category  in request.
 -- You must fill all fields in curl request
 data CreateCategoryRequest = CreateCategoryRequest
-  { parent :: Id,
+  { parent :: Id Category,
     category :: Name
   }
   deriving (Show, Generic, Eq, A.ToJSON, A.FromJSON)
@@ -180,7 +236,7 @@ data CreateCategoryRequest = CreateCategoryRequest
 -- | EditCategoryRequest - for edit category  in request.
 -- You must fill some fields in curl request
 data EditCategoryRequest = EditCategoryRequest
-  { newParent :: Maybe Id,
+  { newParent :: Maybe (Id Category),
     newCategory :: Maybe Name
   }
   deriving (Show, Generic, Eq, A.ToJSON, A.FromJSON)
@@ -188,7 +244,7 @@ data EditCategoryRequest = EditCategoryRequest
 ---------NEWS-------------
 data CreateNewsRequest = CreateNewsRequest
   { title :: Name,
-    newsCategoryId :: Id,
+    newsCategoryId :: Id Category,
     text :: T.Text,
     images :: Maybe [CreateImageRequest],
     published :: Bool
@@ -197,7 +253,7 @@ data CreateNewsRequest = CreateNewsRequest
 
 data EditNewsRequest = EditNewsRequest
   { newTitle :: Maybe Name,
-    newCategoryId :: Maybe Id,
+    newCategoryId :: Maybe (Id Category),
     newText :: Maybe T.Text,
     newImages :: Maybe [CreateImageRequest],
     newPublished :: Maybe Bool
@@ -212,6 +268,6 @@ data News = News
     newsText :: T.Text,
     newsImages :: [URI],
     newsPublished :: Bool,
-    newsId :: Int
+    newsId :: Id News
   }
   deriving (Show, Generic, Eq, A.ToJSON, A.FromJSON)

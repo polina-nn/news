@@ -46,7 +46,7 @@ addUserExcept ::
   EX.ExceptT ErrorTypes.AddUserError IO DataTypes.User
 addUserExcept pool (h, token, req) = do
   user <- EX.withExceptT ErrorTypes.AddUserSQLRequestError (LibIO.searchUser h pool token)
-  liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Add User: \n", ToText.toText req, "by user: ", ToText.toText user]
+  liftIO $ Logger.logInfo (News.hLogHandle h) $ "\n\nRequest: Add User: \n" <> ToText.toText req <> "by user: " <> ToText.toText user
   _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddUser (Lib.checkUserAdmin h user)
   newUser <- addUserToDB pool h req
   addTokenToDB pool h newUser
@@ -109,7 +109,7 @@ addUserToDB pool h DataTypes.CreateUserRequest {..} = do
                   userAuthor = author
                 }
             )
-      liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["addUserToDB: OK!", ToText.toText newUser]
+      liftIO $ Logger.logInfo (News.hLogHandle h) $ "addUserToDB: OK!" <> ToText.toText newUser
       return newUser
     Right _ -> Throw.throwSqlRequestError h ("addUserToDB", "Developer error")
   where

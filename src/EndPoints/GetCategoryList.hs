@@ -12,13 +12,12 @@ import qualified Data.Pool as POOL
 import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
-import qualified EndPoints.Lib.Category.Category as Category
 import qualified EndPoints.Lib.Category.CategoryHelpTypes as CategoryHelpTypes
 import qualified EndPoints.Lib.OffsetLimit as OffsetLimit
 import qualified EndPoints.Lib.ThrowRequestError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
-import Logger (logDebug, logInfo)
+import Logger (logDebug, logInfo, (.<))
 import qualified News
 import Servant (Handler)
 import qualified Types.DataTypes as DataTypes
@@ -44,7 +43,7 @@ categoryListExcept ::
   (News.Handle IO, Maybe DataTypes.Offset, Maybe DataTypes.Limit) ->
   EX.ExceptT ErrorTypes.GetContentError IO [DataTypes.Category]
 categoryListExcept pool (h, mo, ml) = do
-  liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request: Get Category List  with offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
+  liftIO $ Logger.logInfo (News.hLogHandle h) $ "\n\nRequest: Get Category List  with offset = " .< mo <> " limit = " .< ml
   (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetContent $ OffsetLimit.checkOffsetLimit h mo ml
   getAllCategories pool h offset limit
 
@@ -71,20 +70,20 @@ getAllCategories pool h offset limit = do
                       JOIN category s1 ON s1.category_parent_id = tree.category_id )
                       SELECT   category_id, category_name, category_parent_id, sort_string FROM tree ORDER BY sort_string ASC; |]
           ) ::
-          IO (Either EXS.SomeException [(DataTypes.Id, DataTypes.Name, DataTypes.Id, DataTypes.Name)])
+          IO (Either EXS.SomeException [(DataTypes.Id DataTypes.Category, DataTypes.Name, DataTypes.Id DataTypes.Category, DataTypes.Name)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("getAllCategories", show err)
     Right value -> do
-      let categorySort = Prelude.map Category.toCategorySort value
+      let categorySort = Prelude.map (\(a, b, c, d) -> CategoryHelpTypes.CategorySort a b c d) value
           result = getCategoriesWithOffsetLimit offset limit (sortedAllCategories categorySort)
           toTextCategories = T.concat $ map ToText.toText result
-      liftIO $ Logger.logDebug (News.hLogHandle h) $ T.concat ["categories: OK! \n", toTextCategories]
+      liftIO $ Logger.logDebug (News.hLogHandle h) $ "categories: OK! \n" <> toTextCategories
       return result
 
 -- | sortedAllCategories - postgreSQL returns an alphabetically sorted result for Latin only, Cyrillic has to be sorted by Haskell
 sortedAllCategories :: [CategoryHelpTypes.CategorySort] -> [DataTypes.Category]
-sortedAllCategories cats = Prelude.map Category.toCategoryFromCategorySort rez
+sortedAllCategories cats = Prelude.map toCategoryFromCategorySort rez
   where
     rez =
       sortBy
@@ -96,4 +95,12 @@ sortedAllCategories cats = Prelude.map Category.toCategoryFromCategorySort rez
         cats
 
 getCategoriesWithOffsetLimit :: DataTypes.Offset -> DataTypes.Limit -> [DataTypes.Category] -> [DataTypes.Category]
-getCategoriesWithOffsetLimit offset limit cat = take limit $ drop offset cat
+getCategoriesWithOffsetLimit DataTypes.Offset {..} DataTypes.Limit {..} cat = take limit $ drop offset cat
+
+toCategoryFromCategorySort :: CategoryHelpTypes.CategorySort -> DataTypes.Category
+toCategoryFromCategorySort CategoryHelpTypes.CategorySort {..} =
+  DataTypes.Category
+    { categoryId = categorySortId,
+      categoryName = categorySortName,
+      categoryParentId = categorySortParentId
+    }

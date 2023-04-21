@@ -31,14 +31,14 @@ spec =
     -- checkOffset tests
     do
       it "checkOffset: returns the (Right 0) if offset is not set in request" $
-        OffsetLimit.checkOffset handleSpec Nothing === EX.except (Right 0)
+        OffsetLimit.checkOffset handleSpec Nothing === EX.except (Right (DataTypes.Offset {offset = 0}))
       it "checkOffset: returns the (Right offset) if offset is >= 0 " $
         property $ \(NonNegative count) ->
-          OffsetLimit.checkOffset handleSpec (Just count)
-            === EX.except (Right count)
+          OffsetLimit.checkOffset handleSpec (Just (DataTypes.Offset {offset = count}))
+            === EX.except (Right (DataTypes.Offset {offset = count}))
       it "checkOffset: returns the (Left InvalidOffset) if offset < 0 " $
         property $ \(Negative count) ->
-          OffsetLimit.checkOffset handleSpec (Just count)
+          OffsetLimit.checkOffset handleSpec (Just (DataTypes.Offset {offset = count}))
             === EX.throwE (ErrorTypes.InvalidOffset [])
       -- realLimit tests
       it
@@ -47,15 +47,15 @@ spec =
           handleSpecForLimit
           Nothing
           (appShowLimit appConfigSpec)
-          === EX.except (Right (appShowLimit appConfigSpec :: DataTypes.Limit))
+          === EX.except (Right (DataTypes.Limit {limit = appShowLimit appConfigSpec}))
       it
         "checkLimit: returns the (Right appConfigLimit) if  Limit > appConfigLimit (property limitMoreThenConfig)"
         $ property limitMoreThenConfig
       it "checkLimit: returns the (Left InvalidLimit ) if  Limit <= 0 " $
-        property $ \(NonPositive limit) ->
+        property $ \(NonPositive limit') ->
           OffsetLimit.checkLimit
             handleSpecForLimit
-            (Just limit)
+            (Just (DataTypes.Limit {limit = limit'}))
             (appShowLimit appConfigSpec)
             === EX.throwE (ErrorTypes.InvalidLimit [])
       it
@@ -71,12 +71,12 @@ spec =
       it "checkOffsetLimit: returns the Right (offset, limit): case4" $
         property validOffsetAndLimit4
       it "checkOffsetLimit: returns the Right (offset, limit): case5" $
-        property $ \(NonNegative offset) ->
-          OffsetLimit.checkOffsetLimit handleSpec (Just offset) Nothing
-            === EX.except (Right (offset, appShowLimit appConfigSpec))
+        property $ \(NonNegative offset') ->
+          OffsetLimit.checkOffsetLimit handleSpec (Just (DataTypes.Offset {offset = offset'})) Nothing
+            === EX.except (Right (DataTypes.Offset {offset = offset'}, DataTypes.Limit {limit = appShowLimit appConfigSpec}))
       it "checkOffsetLimit: returns the Right (offset, limit): case6" $
         OffsetLimit.checkOffsetLimit handleSpec Nothing Nothing
-          === EX.except (Right (0, appShowLimit appConfigSpec))
+          === EX.except (Right (DataTypes.Offset {offset = 0}, DataTypes.Limit {limit = appShowLimit appConfigSpec}))
       it "checkOffsetLimit: returns the Left (offsetErr, limitErr) " $
         property invalidOffsetAndLimit
       it "checkOffsetLimit: returns the Left (offsetErr, Nothing) case1" $
@@ -89,74 +89,74 @@ spec =
         property invalidLimit2
 
 limitMoreThenConfig :: Int -> Property
-limitMoreThenConfig limit =
-  (limit > appShowLimit appConfigSpec)
+limitMoreThenConfig limit' =
+  (limit' > appShowLimit appConfigSpec)
     ==> OffsetLimit.checkLimit
       handleSpecForLimit
-      (Just limit)
+      (Just (DataTypes.Limit {limit = limit'}))
       (appShowLimit appConfigSpec)
-    === EX.except (Right (appShowLimit appConfigSpec :: DataTypes.Limit))
+    === EX.except (Right (DataTypes.Limit {limit = appShowLimit appConfigSpec}))
 
 limitRight :: Int -> Property
-limitRight limit =
-  ((limit <= appShowLimit appConfigSpecForLimit) && (limit > 0))
+limitRight limit' =
+  ((limit' <= appShowLimit appConfigSpecForLimit) && (limit' > 0))
     ==> OffsetLimit.checkLimit
       handleSpecForLimit
-      (Just limit)
+      (Just DataTypes.Limit {limit = limit'})
       (appShowLimit appConfigSpecForLimit)
-    === EX.except (Right limit)
+    === EX.except (Right DataTypes.Limit {limit = limit'})
 
 validOffsetAndLimit1 :: Int -> Int -> Property
-validOffsetAndLimit1 offset limit =
-  (offset >= 0 && limit > 0 && limit <= appShowLimit appConfigSpecForLimit)
-    ==> OffsetLimit.checkOffsetLimit handleSpecForLimit (Just offset) (Just limit)
-    === EX.except (Right (offset, limit))
+validOffsetAndLimit1 offset' limit' =
+  (offset' >= 0 && limit' > 0 && limit' <= appShowLimit appConfigSpecForLimit)
+    ==> OffsetLimit.checkOffsetLimit handleSpecForLimit (Just DataTypes.Offset {offset = offset'}) (Just DataTypes.Limit {limit = limit'})
+    === EX.except (Right (DataTypes.Offset {offset = offset'}, DataTypes.Limit {limit = limit'}))
 
 validOffsetAndLimit2 :: Int -> Int -> Property
-validOffsetAndLimit2 offset limit =
-  (offset >= 0 && limit > appShowLimit appConfigSpec)
-    ==> OffsetLimit.checkOffsetLimit handleSpec (Just offset) (Just limit)
-    === EX.except (Right (offset, appShowLimit appConfigSpec))
+validOffsetAndLimit2 offset' limit' =
+  (offset' >= 0 && limit' > appShowLimit appConfigSpec)
+    ==> OffsetLimit.checkOffsetLimit handleSpec (Just DataTypes.Offset {offset = offset'}) (Just DataTypes.Limit {limit = limit'})
+    === EX.except (Right (DataTypes.Offset {offset = offset'}, DataTypes.Limit {limit = appShowLimit appConfigSpec}))
 
 validOffsetAndLimit3 :: Int -> Property
-validOffsetAndLimit3 limit =
-  (limit > 0 && limit <= appShowLimit appConfigSpecForLimit)
-    ==> OffsetLimit.checkOffsetLimit handleSpecForLimit Nothing (Just limit)
-    === EX.except (Right (0, limit))
+validOffsetAndLimit3 limit' =
+  (limit' > 0 && limit' <= appShowLimit appConfigSpecForLimit)
+    ==> OffsetLimit.checkOffsetLimit handleSpecForLimit Nothing (Just DataTypes.Limit {limit = limit'})
+    === EX.except (Right (DataTypes.Offset {offset = 0}, DataTypes.Limit {limit = limit'}))
 
 validOffsetAndLimit4 :: Int -> Property
-validOffsetAndLimit4 limit =
-  (limit > appShowLimit appConfigSpec)
-    ==> OffsetLimit.checkOffsetLimit handleSpec Nothing (Just limit)
-    === EX.except (Right (0 :: DataTypes.Offset, appShowLimit appConfigSpec))
+validOffsetAndLimit4 limit' =
+  (limit' > appShowLimit appConfigSpec)
+    ==> OffsetLimit.checkOffsetLimit handleSpec Nothing (Just DataTypes.Limit {limit = limit'})
+    === EX.except (Right (DataTypes.Offset {offset = 0}, DataTypes.Limit {limit = appShowLimit appConfigSpec}))
 
 invalidOffsetAndLimit :: Int -> Int -> Property
-invalidOffsetAndLimit offset limit =
-  (offset < 0 && limit <= 0)
-    ==> OffsetLimit.checkOffsetLimit handleSpec (Just offset) (Just limit)
+invalidOffsetAndLimit offset' limit' =
+  (offset' < 0 && limit' <= 0)
+    ==> OffsetLimit.checkOffsetLimit handleSpec (Just DataTypes.Offset {offset = offset'}) (Just DataTypes.Limit {limit = limit'})
     === EX.throwE (ErrorTypes.InvalidOffset [])
 
 invalidOffset1 :: Int -> Int -> Property
-invalidOffset1 offset limit =
-  offset < 0
-    && limit
-    > 0 ==> OffsetLimit.checkOffsetLimit handleSpec (Just offset) (Just limit)
+invalidOffset1 offset' limit' =
+  offset' < 0
+    && limit'
+    > 0 ==> OffsetLimit.checkOffsetLimit handleSpec (Just DataTypes.Offset {offset = offset'}) (Just DataTypes.Limit {limit = limit'})
     === EX.throwE (ErrorTypes.InvalidOffset [])
 
 invalidOffset2 :: Int -> Property
-invalidOffset2 offset =
-  offset
-    < 0 ==> OffsetLimit.checkOffsetLimit handleSpec (Just offset) Nothing
+invalidOffset2 offset' =
+  offset'
+    < 0 ==> OffsetLimit.checkOffsetLimit handleSpec (Just DataTypes.Offset {offset = offset'}) Nothing
     === EX.throwE (ErrorTypes.InvalidOffset [])
 
 invalidLimit1 :: Int -> Int -> Property
-invalidLimit1 offset limit =
-  (offset >= 0 && limit < 0)
-    ==> OffsetLimit.checkOffsetLimit handleSpec (Just offset) (Just limit)
+invalidLimit1 offset' limit' =
+  (offset' >= 0 && limit' < 0)
+    ==> OffsetLimit.checkOffsetLimit handleSpec (Just DataTypes.Offset {offset = offset'}) (Just DataTypes.Limit {limit = limit'})
     === EX.throwE (ErrorTypes.InvalidLimit [])
 
 invalidLimit2 :: Int -> Property
-invalidLimit2 limit =
-  limit
-    < 0 ==> OffsetLimit.checkOffsetLimit handleSpec Nothing (Just limit)
+invalidLimit2 limit' =
+  limit' < 0
+    ==> OffsetLimit.checkOffsetLimit handleSpec Nothing (Just DataTypes.Limit {limit = limit'})
     === EX.throwE (ErrorTypes.InvalidLimit [])

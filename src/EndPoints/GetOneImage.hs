@@ -20,19 +20,19 @@ import qualified Text.Read as R
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
 
-getOneImage :: News.Handle IO -> DataTypes.Db -> Integer -> Handler B.ByteString
+getOneImage :: News.Handle IO -> DataTypes.Db -> DataTypes.Id DataTypes.Image -> Handler B.ByteString
 getOneImage h DataTypes.Db {..} idImage =
   (>>=) (liftIO $ dbOneImage (h, idImage)) ToHttpResponse.toHttpResponse
 
 oneImage ::
   POOL.Pool SQL.Connection ->
-  (News.Handle IO, Integer) ->
+  (News.Handle IO, DataTypes.Id DataTypes.Image) ->
   IO (Either ErrorTypes.GetImageError B.ByteString)
 oneImage pool (h, id') = EX.runExceptT $ oneImageExcept pool (h, id')
 
 oneImageExcept ::
   POOL.Pool SQL.Connection ->
-  (News.Handle IO, Integer) ->
+  (News.Handle IO, DataTypes.Id DataTypes.Image) ->
   EX.ExceptT ErrorTypes.GetImageError IO B.ByteString
 oneImageExcept pool (h, id') = do
   liftIO $ Logger.logInfo (News.hLogHandle h) $ "Request: Get One Image with id " .< id'
@@ -61,8 +61,8 @@ oneImageExcept pool (h, id') = do
 checkId ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
-  Integer ->
-  EX.ExceptT ErrorTypes.GetImageError IO Integer
+  DataTypes.Id DataTypes.Image ->
+  EX.ExceptT ErrorTypes.GetImageError IO (DataTypes.Id DataTypes.Image)
 checkId pool h' id' = do
   res <-
     liftIO

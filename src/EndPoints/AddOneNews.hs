@@ -27,8 +27,6 @@ import qualified System.Directory as SD
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
 
-type IdImage = Int
-
 addOneNews ::
   News.Handle IO ->
   DataTypes.Db ->
@@ -132,7 +130,7 @@ addAllImages ::
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
   DataTypes.CreateNewsRequest ->
-  EX.ExceptT ErrorTypes.AddEditNewsError IO [IdImage]
+  EX.ExceptT ErrorTypes.AddEditNewsError IO [DataTypes.Id DataTypes.Image]
 addAllImages _ _ (DataTypes.CreateNewsRequest _ _ _ Nothing _) = return []
 addAllImages pool h (DataTypes.CreateNewsRequest _ _ _ (Just req) _) = do
   rez <- mapM (NewsIO.addImageNews pool h) req
@@ -145,10 +143,10 @@ addNewsToDB ::
   DataTypes.User ->
   [DataTypes.Category] ->
   DataTypes.CreateNewsRequest ->
-  [IdImage] ->
+  [DataTypes.Id DataTypes.Image] ->
   EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.News
 addNewsToDB pool h DataTypes.User {..} categories DataTypes.CreateNewsRequest {..} idImages = do
-  let imageUris = map (Lib.imageIdToURI h) idImages
+  let imageUris = Lib.imagesURIs h idImages
   created <- liftIO Lib.currentDay
   res <-
     liftIO
@@ -166,7 +164,7 @@ addNewsToDB pool h DataTypes.User {..} categories DataTypes.CreateNewsRequest {.
                   published
                 )
           ) ::
-          IO (Either EXS.SomeException [SQL.Only Int])
+          IO (Either EXS.SomeException [SQL.Only (DataTypes.Id DataTypes.News)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("addNewsToDB", show err)

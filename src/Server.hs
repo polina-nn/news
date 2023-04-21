@@ -81,7 +81,7 @@ run h = do
   let appConfig = News.hAppConfig (DataTypes.hServerHandle h)
   let appPort = News.appPort appConfig
   pool <- DbServices.initConnPool h
-  EXS.catch (DbServices.migrateDb pool (DataTypes.hServerHandle h, "_migrations")) (ExceptionTypes.handleException (DataTypes.hServerHandle h))
+  EXS.catch (DbServices.migrateDb pool (DataTypes.hServerHandle h, "_migrations")) (ExceptionTypes.handleExceptionToLog (DataTypes.hServerHandle h))
   Network.Wai.Handler.Warp.run appPort $ app (DataTypes.hServerHandle h) pool
 
 app :: News.Handle IO -> POOL.Pool SQL.Connection -> Application

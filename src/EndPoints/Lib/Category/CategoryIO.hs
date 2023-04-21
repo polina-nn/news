@@ -9,10 +9,8 @@ import qualified Control.Exception.Safe as EXS
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Control.Monad.Trans.Except as EX
 import qualified Data.Pool as POOL
-import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
-import qualified EndPoints.Lib.Category.Category as Category
 import qualified EndPoints.Lib.ThrowRequestError as Throw
 import qualified EndPoints.Lib.ToText as ToText
 import Logger (logDebug, logInfo)
@@ -24,7 +22,7 @@ getCategoriesById ::
   Throw.ThrowSqlRequestError a [DataTypes.Category] =>
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
-  DataTypes.Id ->
+  DataTypes.Id DataTypes.Category ->
   EX.ExceptT a IO [DataTypes.Category]
 getCategoriesById pool h' id' = do
   res <-
@@ -42,13 +40,13 @@ getCategoriesById pool h' id' = do
                       SELECT category_id,  category_name, category_parent_id from temp1 |]
                 (SQL.Only id')
           ) ::
-          IO (Either EXS.SomeException [(DataTypes.Id, DataTypes.Name, DataTypes.Id)])
+          IO (Either EXS.SomeException [(DataTypes.Id DataTypes.Category, DataTypes.Name, DataTypes.Id DataTypes.Category)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h' ("getCategoriesById", show err)
     Right [] -> Throw.throwSqlRequestError h' ("getCategoriesById", "Developer error")
-    Right val -> do
-      let categories = Prelude.map Category.toCategory val
+    Right value -> do
+      let categories = Prelude.map (\(a, b, c) -> DataTypes.Category a b c) value
       return categories
 
 -- | getCategoriesById  - return category by categoryId
@@ -56,7 +54,7 @@ getCategoryById ::
   Throw.ThrowSqlRequestError a DataTypes.Category =>
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
-  Int ->
+  DataTypes.Id DataTypes.Category ->
   EX.ExceptT a IO DataTypes.Category
 getCategoryById pool h id' = do
   res <-
@@ -68,24 +66,24 @@ getCategoryById pool h id' = do
                 [sql| SELECT category_id, category_name, category_parent_id FROM category WHERE category_id = ? |]
                 (SQL.Only id')
           ) ::
-          IO (Either EXS.SomeException [(DataTypes.Id, DataTypes.Name, DataTypes.Id)])
+          IO (Either EXS.SomeException [(DataTypes.Id DataTypes.Category, DataTypes.Name, DataTypes.Id DataTypes.Category)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("getCategory", show err)
-    Right [val] -> do
-      let editedCategory = Category.toCategory val
-      liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["getCategory: ", ToText.toText editedCategory]
-      return editedCategory
+    Right [(idCat, name, parent)] -> do
+      let category = DataTypes.Category idCat name parent
+      liftIO $ Logger.logInfo (News.hLogHandle h) $ "getCategory: " <> ToText.toText category
+      return category
     Right _ -> Throw.throwSqlRequestError h ("getCategory", "Developer error")
 
 -- | checkCategoryExistsById  - return categories id if category exists
 checkCategoryExistsById ::
-  Throw.ThrowSqlRequestError a Int =>
-  Throw.ThrowInvalidContentCategoryId a Int =>
+  Throw.ThrowSqlRequestError a (DataTypes.Id DataTypes.Category) =>
+  Throw.ThrowInvalidContentCategoryId a (DataTypes.Id DataTypes.Category) =>
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
-  Int ->
-  EX.ExceptT a IO Int
+  DataTypes.Id DataTypes.Category ->
+  EX.ExceptT a IO (DataTypes.Id DataTypes.Category)
 checkCategoryExistsById pool h categoryId = do
   res <-
     liftIO

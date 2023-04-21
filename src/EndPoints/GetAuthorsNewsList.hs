@@ -23,7 +23,7 @@ import qualified EndPoints.Lib.OffsetLimit as OffsetLimit
 import qualified EndPoints.Lib.ThrowRequestError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
-import Logger (logDebug, logInfo)
+import Logger (logDebug, logInfo, (.<))
 import qualified News
 import Servant (Handler)
 import qualified Types.DataTypes as DataTypes
@@ -37,7 +37,7 @@ getAuthorsNewsList ::
   Maybe DataTypes.DayUntil ->
   Maybe DataTypes.DaySince ->
   Maybe T.Text ->
-  Maybe Int ->
+  Maybe (DataTypes.Id DataTypes.Category) ->
   Maybe T.Text ->
   Maybe T.Text ->
   Maybe DataTypes.SortBy ->
@@ -76,7 +76,7 @@ authorsNewsListExcept ::
   EX.ExceptT ErrorTypes.GetNewsError IO [DataTypes.News]
 authorsNewsListExcept pool (h, token, f, mSort, mo, ml) = do
   user <- EX.withExceptT ErrorTypes.GetNewsSQLRequestError (LibIO.searchUser h pool token)
-  liftIO $ Logger.logInfo (News.hLogHandle h) $ T.concat ["Request with authentication: Get News List with filter ", ToText.toText f, " offset = ", T.pack $ show mo, " limit = ", T.pack $ show ml]
+  liftIO $ Logger.logInfo (News.hLogHandle h) $ "Request with authentication: Get News List with filter " <> ToText.toText f <> " offset = " .< mo <> " limit = " .< ml
   _ <- EX.withExceptT ErrorTypes.InvalidPermissionGetNews (Lib.checkUserAuthor h user)
   (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetNews $ OffsetLimit.checkOffsetLimit h mo ml
   dbFilter <- News.checkFilter f
@@ -84,7 +84,7 @@ authorsNewsListExcept pool (h, token, f, mSort, mo, ml) = do
   sortedDbNews <- News.sortNews h mSort dbNews
   news <- Prelude.mapM (NewsIO.toNews pool h) sortedDbNews
   let toTextNews = T.concat $ map ToText.toText news
-  liftIO $ Logger.logDebug (News.hLogHandle h) $ T.concat ["authorsNewsSearchListExcept: OK! \n", toTextNews]
+  liftIO $ Logger.logDebug (News.hLogHandle h) $ "authorsNewsSearchListExcept: OK! \n" <> toTextNews
   return news
 
 -- | authorsNewsListFromDb  get the full list of news if the array is empty, there is no news
@@ -110,7 +110,7 @@ authorsNewsListCategory ::
   DataTypes.Limit ->
   NewsHelpTypes.DbFilter ->
   EX.ExceptT ErrorTypes.GetNewsError IO [NewsHelpTypes.DbNews]
-authorsNewsListCategory pool h DataTypes.User {..} off lim NewsHelpTypes.DbFilter {..} = do
+authorsNewsListCategory pool h DataTypes.User {..} DataTypes.Offset {..} DataTypes.Limit {..} NewsHelpTypes.DbFilter {..} = do
   res <-
     liftIO
       ( EXS.try
@@ -129,18 +129,18 @@ authorsNewsListCategory pool h DataTypes.User {..} off lim NewsHelpTypes.DbFilte
             ORDER BY news_created DESC
             LIMIT ?  OFFSET ?|]
                 ( userLogin,
-                  dbFilterDayAt,
-                  dbFilterDayUntil,
-                  dbFilterDaySince,
+                  DataTypes.dayAt dbFilterDayAt,
+                  DataTypes.dayUntil dbFilterDayUntil,
+                  DataTypes.daySince dbFilterDaySince,
                   dbFilterAuthor,
                   dbFilterTitle,
                   dbFilterContent,
                   newsCat,
-                  lim,
-                  off
+                  limit,
+                  offset
                 )
           ) ::
-          IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, Int, T.Text, T.Text, SQLTypes.PGArray Int, Int, Bool, Int)])
+          IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, DataTypes.Id DataTypes.Category, T.Text, T.Text, SQLTypes.PGArray (DataTypes.Id DataTypes.Image), Int, Bool, DataTypes.Id DataTypes.News)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("authorsNewsListCategory", show err)
@@ -148,7 +148,7 @@ authorsNewsListCategory pool h DataTypes.User {..} off lim NewsHelpTypes.DbFilte
       let dbNews = Prelude.map News.toDbNews news
       return dbNews
   where
-    newsCat = fromMaybe 0 dbFilterCategoryId
+    newsCat = fromMaybe (DataTypes.Id {getId = 0}) dbFilterCategoryId
 
 authorsNewsListNotCategory ::
   POOL.Pool SQL.Connection ->
@@ -158,7 +158,7 @@ authorsNewsListNotCategory ::
   DataTypes.Limit ->
   NewsHelpTypes.DbFilter ->
   EX.ExceptT ErrorTypes.GetNewsError IO [NewsHelpTypes.DbNews]
-authorsNewsListNotCategory pool h DataTypes.User {..} off lim NewsHelpTypes.DbFilter {..} = do
+authorsNewsListNotCategory pool h DataTypes.User {..} DataTypes.Offset {..} DataTypes.Limit {..} NewsHelpTypes.DbFilter {..} = do
   res <-
     liftIO
       ( EXS.try
@@ -176,17 +176,17 @@ authorsNewsListNotCategory pool h DataTypes.User {..} off lim NewsHelpTypes.DbFi
             ORDER BY news_created DESC
             LIMIT ?  OFFSET ?|]
                 ( userLogin,
-                  dbFilterDayAt,
-                  dbFilterDayUntil,
-                  dbFilterDaySince,
+                  DataTypes.dayAt dbFilterDayAt,
+                  DataTypes.dayUntil dbFilterDayUntil,
+                  DataTypes.daySince dbFilterDaySince,
                   dbFilterAuthor,
                   dbFilterTitle,
                   dbFilterContent,
-                  lim,
-                  off
+                  limit,
+                  offset
                 )
           ) ::
-          IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, Int, T.Text, T.Text, SQLTypes.PGArray Int, Int, Bool, Int)])
+          IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, DataTypes.Id DataTypes.Category, T.Text, T.Text, SQLTypes.PGArray (DataTypes.Id DataTypes.Image), Int, Bool, DataTypes.Id DataTypes.News)])
       )
   case res of
     Left err -> Throw.throwSqlRequestError h ("authorsNewsListNotCategory", show err)
