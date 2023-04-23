@@ -20,6 +20,8 @@ import qualified System.IO
 import Text.Read (readMaybe)
 import qualified Types.ExceptionTypes as ExceptionTypes
 
+type FieldName = T.Text
+
 -- | StdError  - use for choice in config. (I expect to see in the config.conf the words Terminal or File in stdError field)
 data StdError = Terminal | File
   deriving (Show, Eq, Ord, Read)

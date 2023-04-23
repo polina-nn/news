@@ -26,7 +26,7 @@ data DbConfig = DbConfig
     dbName :: String,
     user :: String,
     password :: String,
-    dbPort :: Integer,
+    dbPort :: Int,
     noOfStripes :: Int,
     idleTime :: Int,
     stripeSize :: Int
