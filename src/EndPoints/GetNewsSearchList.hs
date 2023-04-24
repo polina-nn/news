@@ -17,7 +17,6 @@ import qualified EndPoints.Lib.News.News as News
 import qualified EndPoints.Lib.News.NewsHelpTypes as NewsHelpTypes
 import qualified EndPoints.Lib.News.NewsIO as NewsIO
 import qualified EndPoints.Lib.OffsetLimit as OffsetLimit
-import qualified EndPoints.Lib.ThrowRequestError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
 import Logger (logError, logInfo, (.<))
@@ -46,7 +45,9 @@ newsSearchList ::
     Maybe DataTypes.Limit
   ) ->
   IO (Either ErrorTypes.GetNewsError [DataTypes.News])
-newsSearchList pool (h, search, mo, ml) = do EX.runExceptT $ newsSearchListExcept pool (h, search, mo, ml)
+newsSearchList pool (h, search, mo, ml) = do
+  let reqResult = EXS.catch (newsSearchListExcept pool (h, search, mo, ml)) (ErrorTypes.handleGetNewsError h)
+  EX.runExceptT reqResult
 
 newsSearchListExcept ::
   POOL.Pool SQL.Connection ->
@@ -61,8 +62,8 @@ newsSearchListExcept _ (h, Nothing, _, _) = do
   EX.throwE $ ErrorTypes.InvalidSearchGetNews $ ErrorTypes.InvalidRequest []
 newsSearchListExcept pool (h, Just search, mo, ml) = do
   liftIO $ Logger.logInfo (News.hLogHandle h) $ "\n\nRequest: Get News Search List " <> search <> ", offset = " .< mo <> ", limit = " .< ml
-  (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetNews $ OffsetLimit.checkOffsetLimit h mo ml
-  res <- newsSearchListAtDb pool h search offset limit
+  (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetNews (EX.catchE (OffsetLimit.checkOffsetLimit h mo ml) (ErrorTypes.handleInvalidOffsetOrLimit h))
+  res <- newsSearchListAtDb pool search offset limit
   news <- Prelude.mapM (NewsIO.toNews pool h) res
   let toTextNews = T.concat $ map ToText.toText news
   liftIO $ Logger.logInfo (News.hLogHandle h) $ "newsSearchListExcept: OK! \n" <> toTextNews
@@ -70,12 +71,11 @@ newsSearchListExcept pool (h, Just search, mo, ml) = do
 
 newsSearchListAtDb ::
   POOL.Pool SQL.Connection ->
-  News.Handle IO ->
   T.Text ->
   DataTypes.Offset ->
   DataTypes.Limit ->
   EX.ExceptT ErrorTypes.GetNewsError IO [NewsHelpTypes.DbNews]
-newsSearchListAtDb pool h search DataTypes.Offset {..} DataTypes.Limit {..} = do
+newsSearchListAtDb pool search DataTypes.Offset {..} DataTypes.Limit {..} = do
   res <-
     liftIO
       ( EXS.try
@@ -93,7 +93,7 @@ newsSearchListAtDb pool h search DataTypes.Offset {..} DataTypes.Limit {..} = do
           IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, DataTypes.Id DataTypes.Category, T.Text, T.Text, SQLTypes.PGArray (DataTypes.Id DataTypes.Image), Int, Bool, DataTypes.Id DataTypes.News)])
       )
   case res of
-    Left err -> Throw.throwSqlRequestError h ("newsSearchListAtDb", show err)
+    Left err -> EXS.throwM $ ErrorTypes.GetNewsSomeException err
     Right newsList -> do
       let dbNews = Prelude.map News.toDbNews newsList
       return dbNews

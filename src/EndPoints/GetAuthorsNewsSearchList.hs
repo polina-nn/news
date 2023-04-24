@@ -19,10 +19,9 @@ import qualified EndPoints.Lib.News.News as News
 import qualified EndPoints.Lib.News.NewsHelpTypes as NewsHelpTypes
 import qualified EndPoints.Lib.News.NewsIO as NewsIO
 import qualified EndPoints.Lib.OffsetLimit as OffsetLimit
-import qualified EndPoints.Lib.ThrowRequestError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
-import Logger (logError, (.<))
+import Logger ((.<))
 import qualified Logger
 import qualified News
 import Servant (Handler)
@@ -51,7 +50,9 @@ authorsNewsSearchList ::
     Maybe DataTypes.Limit
   ) ->
   IO (Either ErrorTypes.GetNewsError [DataTypes.News])
-authorsNewsSearchList pool (h, token, search, mo, ml) = do EX.runExceptT $ authorsNewsSearchListExcept pool (h, token, search, mo, ml)
+authorsNewsSearchList pool (h, token, search, mo, ml) = do
+  let reqResult = EXS.catch (authorsNewsSearchListExcept pool (h, token, search, mo, ml)) (ErrorTypes.handleGetNewsError h)
+  EX.runExceptT reqResult
 
 authorsNewsSearchListExcept ::
   POOL.Pool SQL.Connection ->
@@ -62,15 +63,14 @@ authorsNewsSearchListExcept ::
     Maybe DataTypes.Limit
   ) ->
   EX.ExceptT ErrorTypes.GetNewsError IO [DataTypes.News]
-authorsNewsSearchListExcept _ (h, _, Nothing, _, _) = do
-  liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidSearchGetNews (ErrorTypes.InvalidRequest "authorsNewsSearchListExcept: BAD! Not text for searching \n"))
-  EX.throwE $ ErrorTypes.InvalidSearchGetNews $ ErrorTypes.InvalidRequest []
+authorsNewsSearchListExcept _ (_, _, Nothing, _, _) = do
+  EXS.throwM $ ErrorTypes.InvalidSearchGetNews $ ErrorTypes.InvalidRequest " Not text for searching"
 authorsNewsSearchListExcept pool (h, token, Just search, mo, ml) = do
-  user <- EX.withExceptT ErrorTypes.GetNewsSQLRequestError (LibIO.searchUser h pool token)
+  user <- EX.withExceptT ErrorTypes.GetNewsSearchUserError (EXS.catch (LibIO.searchUser pool token) (ErrorTypes.handleSearchUserError h))
   liftIO $ Logger.logInfo (News.hLogHandle h) $ "\n\nRequest with authentication: Get News Search List " <> search <> ", offset = " .< mo <> ", limit = " .< ml
-  _ <- EX.withExceptT ErrorTypes.InvalidPermissionGetNews (Lib.checkUserAuthor h user)
-  (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetNews $ OffsetLimit.checkOffsetLimit h mo ml
-  dbNews <- authorsNewsSearchListFromDb pool h user search offset limit
+  _ <- EX.withExceptT ErrorTypes.InvalidPermissionGetNews (EX.catchE (Lib.checkUserAuthor h user) (ErrorTypes.handleInvalidAuthorPermission h))
+  (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetNews (EX.catchE (OffsetLimit.checkOffsetLimit h mo ml) (ErrorTypes.handleInvalidOffsetOrLimit h))
+  dbNews <- authorsNewsSearchListFromDb pool user search offset limit
   news <- Prelude.mapM (NewsIO.toNews pool h) dbNews
   let toTextNews = T.concat $ map ToText.toText news
   liftIO $ Logger.logDebug (News.hLogHandle h) $ "authorsNewsSearchListExcept: OK! \n" <> toTextNews
@@ -78,13 +78,12 @@ authorsNewsSearchListExcept pool (h, token, Just search, mo, ml) = do
 
 authorsNewsSearchListFromDb ::
   POOL.Pool SQL.Connection ->
-  News.Handle IO ->
   DataTypes.User ->
   T.Text ->
   DataTypes.Offset ->
   DataTypes.Limit ->
   EX.ExceptT ErrorTypes.GetNewsError IO [NewsHelpTypes.DbNews]
-authorsNewsSearchListFromDb pool h DataTypes.User {..} search DataTypes.Offset {..} DataTypes.Limit {..} = do
+authorsNewsSearchListFromDb pool DataTypes.User {..} search DataTypes.Offset {..} DataTypes.Limit {..} = do
   res <-
     liftIO
       ( EXS.try
@@ -102,7 +101,7 @@ authorsNewsSearchListFromDb pool h DataTypes.User {..} search DataTypes.Offset {
           IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, DataTypes.Id DataTypes.Category, T.Text, T.Text, SQLTypes.PGArray (DataTypes.Id DataTypes.Image), Int, Bool, DataTypes.Id DataTypes.News)])
       )
   case res of
-    Left err -> Throw.throwSqlRequestError h ("authorsNewsSearchListFromDb", show err)
+    Left err -> EXS.throwM $ ErrorTypes.GetNewsSomeException err
     Right newsList -> do
       let dbNews = Prelude.map News.toDbNews newsList
       return dbNews

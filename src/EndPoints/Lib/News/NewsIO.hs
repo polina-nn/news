@@ -16,7 +16,6 @@ import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.Category.CategoryIO as CategoryIO
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.News.NewsHelpTypes as NewsHelpTypes
-import qualified EndPoints.Lib.ThrowRequestError as Throw
 import Logger (logDebug, (.<))
 import qualified News
 import qualified Types.DataTypes as DataTypes
@@ -29,7 +28,7 @@ addImageNews ::
   DataTypes.CreateImageRequest ->
   EX.ExceptT ErrorTypes.AddEditNewsError IO (DataTypes.Id DataTypes.Image)
 addImageNews pool h DataTypes.CreateImageRequest {..} = do
-  content <- tryReadImageFile h image
+  content <- EX.withExceptT ErrorTypes.NotBase64ImageAddEditNews (tryReadImageFile image)
   let imageDecodeBase64ByteString = Base64.decodeBase64Lenient content
   res <-
     liftIO
@@ -43,11 +42,11 @@ addImageNews pool h DataTypes.CreateImageRequest {..} = do
           IO (Either EXS.SomeException [SQL.Only (DataTypes.Id DataTypes.Image)])
       )
   case res of
-    Left err -> Throw.throwSqlRequestError h ("addImageNews", show err)
+    Left err -> EXS.throwM $ ErrorTypes.AddEditNewsSomeException err
     Right [SQL.Only idIm] -> do
       liftIO $ Logger.logDebug (News.hLogHandle h) ("addImageNews: OK! Image_id  " .< show idIm)
       return idIm
-    Right _ -> Throw.throwSqlRequestError h ("addImageNews", "Developer error!")
+    Right _ -> EXS.throwM $ ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError " Developer error"
 
 toNews ::
   POOL.Pool SQL.Connection ->
@@ -55,7 +54,7 @@ toNews ::
   NewsHelpTypes.DbNews ->
   EX.ExceptT ErrorTypes.GetNewsError IO DataTypes.News
 toNews con h NewsHelpTypes.DbNews {..} = do
-  categories <- CategoryIO.getCategoriesById con h dbNewsCategoryId
+  categories <- EX.withExceptT ErrorTypes.InvalidCategoryIdGetNews (EXS.catch (CategoryIO.getCategoriesById con h dbNewsCategoryId) (ErrorTypes.handleInvalidContentCategoryId h))
   let news =
         DataTypes.News
           { newsTitle = dbNewsTitle,
@@ -69,9 +68,9 @@ toNews con h NewsHelpTypes.DbNews {..} = do
           }
   return news
 
-tryReadImageFile :: Throw.ThrowSqlRequestError a B.ByteString => News.Handle IO -> FilePath -> EX.ExceptT a IO B.ByteString
-tryReadImageFile h filePath = do
+tryReadImageFile :: FilePath -> EX.ExceptT ErrorTypes.InvalidContent IO B.ByteString
+tryReadImageFile filePath = do
   imageFile <- liftIO (EXS.try (B.readFile filePath) :: IO (Either EXS.SomeException B.ByteString))
   case imageFile of
     Right val -> return val
-    Left err -> Throw.throwSqlRequestError h ("tryReadImageFile", show err)
+    Left err -> EX.throwE $ ErrorTypes.InvalidContent (show err)

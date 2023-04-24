@@ -9,21 +9,21 @@ import qualified Control.Exception.Safe as EXS
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Control.Monad.Trans.Except as EX
 import qualified Data.Pool as POOL
+import qualified Data.Text as T
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
-import qualified EndPoints.Lib.ThrowRequestError as Throw
 import qualified EndPoints.Lib.ToText as ToText
 import Logger (logDebug, logInfo)
 import qualified News
 import qualified Types.DataTypes as DataTypes
+import qualified Types.ErrorTypes as ErrorTypes
 
 -- | getCategoriesById  - return categories from node to root, by categoryId
 getCategoriesById ::
-  Throw.ThrowSqlRequestError a [DataTypes.Category] =>
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
   DataTypes.Id DataTypes.Category ->
-  EX.ExceptT a IO [DataTypes.Category]
+  EX.ExceptT ErrorTypes.InvalidContentCategoryId IO [DataTypes.Category]
 getCategoriesById pool h' id' = do
   res <-
     liftIO
@@ -43,19 +43,20 @@ getCategoriesById pool h' id' = do
           IO (Either EXS.SomeException [(DataTypes.Id DataTypes.Category, DataTypes.Name, DataTypes.Id DataTypes.Category)])
       )
   case res of
-    Left err -> Throw.throwSqlRequestError h' ("getCategoriesById", show err)
-    Right [] -> Throw.throwSqlRequestError h' ("getCategoriesById", "Developer error")
+    Left err -> EXS.throwM $ ErrorTypes.InvalidContentCategoryIdSomeException err
+    Right [] -> EXS.throwM $ ErrorTypes.InvalidContentCategoryIdError $ ErrorTypes.InvalidContent "Category not exists"
     Right value -> do
       let categories = Prelude.map (\(a, b, c) -> DataTypes.Category a b c) value
+          toTextCategories = T.concat $ map ToText.toText categories
+      liftIO $ Logger.logInfo (News.hLogHandle h') $ "getCategory: " <> toTextCategories
       return categories
 
--- | getCategoriesById  - return category by categoryId
+-- | getCategoryById  - return category by categoryId
 getCategoryById ::
-  Throw.ThrowSqlRequestError a DataTypes.Category =>
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
   DataTypes.Id DataTypes.Category ->
-  EX.ExceptT a IO DataTypes.Category
+  EX.ExceptT ErrorTypes.InvalidContentCategoryId IO DataTypes.Category
 getCategoryById pool h id' = do
   res <-
     liftIO
@@ -69,21 +70,20 @@ getCategoryById pool h id' = do
           IO (Either EXS.SomeException [(DataTypes.Id DataTypes.Category, DataTypes.Name, DataTypes.Id DataTypes.Category)])
       )
   case res of
-    Left err -> Throw.throwSqlRequestError h ("getCategory", show err)
+    Left err -> EXS.throwM $ ErrorTypes.InvalidContentCategoryIdSomeException err
     Right [(idCat, name, parent)] -> do
       let category = DataTypes.Category idCat name parent
       liftIO $ Logger.logInfo (News.hLogHandle h) $ "getCategory: " <> ToText.toText category
       return category
-    Right _ -> Throw.throwSqlRequestError h ("getCategory", "Developer error")
+    Right [] -> EXS.throwM $ ErrorTypes.InvalidContentCategoryIdError $ ErrorTypes.InvalidContent "Category not exists"
+    Right _ -> EXS.throwM $ ErrorTypes.InvalidContentCategoryIdSQLRequestError $ ErrorTypes.SQLRequestError "Developer error"
 
 -- | checkCategoryExistsById  - return categories id if category exists
 checkCategoryExistsById ::
-  Throw.ThrowSqlRequestError a (DataTypes.Id DataTypes.Category) =>
-  Throw.ThrowInvalidContentCategoryId a (DataTypes.Id DataTypes.Category) =>
   POOL.Pool SQL.Connection ->
   News.Handle IO ->
   DataTypes.Id DataTypes.Category ->
-  EX.ExceptT a IO (DataTypes.Id DataTypes.Category)
+  EX.ExceptT ErrorTypes.InvalidContentCategoryId IO (DataTypes.Id DataTypes.Category)
 checkCategoryExistsById pool h categoryId = do
   res <-
     liftIO
@@ -97,9 +97,9 @@ checkCategoryExistsById pool h categoryId = do
           IO (Either EXS.SomeException [SQL.Only Bool])
       )
   case res of
-    Left err -> Throw.throwSqlRequestError h ("checkCategoryExistsById", show err)
+    Left err -> EXS.throwM $ ErrorTypes.InvalidContentCategoryIdSomeException err
     Right [SQL.Only True] -> do
       liftIO $ Logger.logDebug (News.hLogHandle h) "checkCategoryExistsById: OK!  Category exists "
       return categoryId
-    Right [SQL.Only False] -> Throw.throwInvalidContentCategoryId h ("checkCategoryExistsById", "Category with categoryId " <> show categoryId <> " not exists")
-    Right _ -> Throw.throwSqlRequestError h ("checkCategoryId", "Developer error")
+    Right [SQL.Only False] -> EXS.throwM $ ErrorTypes.InvalidContentCategoryIdError $ ErrorTypes.InvalidContent " Category not exists"
+    Right _ -> EXS.throwM $ ErrorTypes.InvalidContentCategoryIdSQLRequestError $ ErrorTypes.SQLRequestError " Developer error"

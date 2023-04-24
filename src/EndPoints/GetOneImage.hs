@@ -11,9 +11,8 @@ import qualified Data.ByteString as B
 import qualified Data.Pool as POOL
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
-import qualified EndPoints.Lib.ThrowRequestError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
-import Logger (logDebug, logError, logInfo, (.<))
+import Logger (logDebug, logInfo, (.<))
 import qualified News
 import Servant (Handler)
 import qualified Text.Read as R
@@ -28,7 +27,9 @@ oneImage ::
   POOL.Pool SQL.Connection ->
   (News.Handle IO, DataTypes.Id DataTypes.Image) ->
   IO (Either ErrorTypes.GetImageError B.ByteString)
-oneImage pool (h, id') = EX.runExceptT $ oneImageExcept pool (h, id')
+oneImage pool (h, id') = do
+  let reqResult = EXS.catch (oneImageExcept pool (h, id')) (ErrorTypes.handleGetImageError h)
+  EX.runExceptT reqResult
 
 oneImageExcept ::
   POOL.Pool SQL.Connection ->
@@ -49,14 +50,14 @@ oneImageExcept pool (h, id') = do
           IO (Either EXS.SomeException [SQL.Only String])
       )
   case res of
-    Left err -> Throw.throwSqlRequestError h ("oneImageExcept", show err)
+    Left err -> EXS.throwM $ ErrorTypes.GetImageSomeException err
     Right [SQL.Only content] -> do
       liftIO $ Logger.logInfo (News.hLogHandle h) "oneImageExcept: OK!"
       let rez = R.readMaybe content
       case rez of
-        Nothing -> Throw.throwSqlRequestError h ("oneImageExcept", "Did not read image_content from table as ByteString")
+        Nothing -> EXS.throwM $ ErrorTypes.GetImageSQLRequestError $ ErrorTypes.SQLRequestError " Did not read image_content from table as ByteString"
         Just contents -> return contents
-    Right _ -> Throw.throwSqlRequestError h ("oneImageExcept", "Developer error!")
+    Right _ -> EXS.throwM $ ErrorTypes.GetImageSQLRequestError $ ErrorTypes.SQLRequestError " Developer error! "
 
 checkId ::
   POOL.Pool SQL.Connection ->
@@ -76,11 +77,9 @@ checkId pool h' id' = do
           IO (Either EXS.SomeException [SQL.Only Bool])
       )
   case res of
-    Left err -> Throw.throwSqlRequestError h' ("checkId", show err)
+    Left err -> EXS.throwM $ ErrorTypes.GetImageSomeException err
     Right [SQL.Only True] -> do
       liftIO $ Logger.logDebug (News.hLogHandle h') "checkId: OK!  Image exist "
       return id'
-    Right [SQL.Only False] -> do
-      liftIO $ Logger.logError (News.hLogHandle h') ("ERROR " .< ErrorTypes.InvalidImagedId (ErrorTypes.InvalidId "checkId: BAD! Image not exist"))
-      EX.throwE $ ErrorTypes.InvalidImagedId $ ErrorTypes.InvalidId []
-    Right _ -> Throw.throwSqlRequestError h' ("checkId", "Developer error!")
+    Right [SQL.Only False] -> EXS.throwM $ ErrorTypes.InvalidImagedId $ ErrorTypes.InvalidId " Image not exists "
+    Right _ -> EXS.throwM $ ErrorTypes.GetImageSQLRequestError $ ErrorTypes.SQLRequestError " Developer error! "

@@ -14,7 +14,6 @@ import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.OffsetLimit as OffsetLimit
-import qualified EndPoints.Lib.ThrowRequestError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
 import Logger (logDebug, logInfo, (.<))
@@ -36,7 +35,9 @@ userList ::
   POOL.Pool SQL.Connection ->
   (News.Handle IO, Maybe DataTypes.Offset, Maybe DataTypes.Limit) ->
   IO (Either ErrorTypes.GetContentError [DataTypes.User])
-userList pool (h, mo, ml) = do EX.runExceptT $ userListExcept pool (h, mo, ml)
+userList pool (h, mo, ml) = do
+  let reqResult = EXS.catch (userListExcept pool (h, mo, ml)) (ErrorTypes.handleGetContentError h)
+  EX.runExceptT reqResult
 
 userListExcept ::
   POOL.Pool SQL.Connection ->
@@ -44,7 +45,7 @@ userListExcept ::
   EX.ExceptT ErrorTypes.GetContentError IO [DataTypes.User]
 userListExcept pool (h, mo, ml) = do
   liftIO $ Logger.logInfo (News.hLogHandle h) $ "\n\nRequest: Get User List with offset = " .< mo <> " limit = " .< ml
-  (offset', limit') <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetContent $ OffsetLimit.checkOffsetLimit h mo ml
+  (offset', limit') <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetContent (EX.catchE (OffsetLimit.checkOffsetLimit h mo ml) (ErrorTypes.handleInvalidOffsetOrLimit h))
   res <-
     liftIO
       ( EXS.try
@@ -58,7 +59,7 @@ userListExcept pool (h, mo, ml) = do
           IO (Either EXS.SomeException [(T.Text, String, Bool, Bool, TIME.Day)])
       )
   case res of
-    Left err -> Throw.throwSqlRequestError h ("userListExcept", show err)
+    Left err -> EXS.throwM $ ErrorTypes.GetContentSomeException err
     Right value -> do
       let users = Prelude.map Lib.toUser value
       let toTextUsers = T.concat $ map ToText.toText users

@@ -23,11 +23,8 @@ checkOffset _ Nothing = return DataTypes.Offset {offset = 0}
 checkOffset h (Just r@DataTypes.Offset {..})
   | offset >= 0 = return r
   | otherwise = do
-    lift $
-      Logger.logError
-        (News.hLogHandle h)
-        ("ERROR " .< ErrorTypes.InvalidOffset "checkOffset: Offset in request is a negative number.")
-    EX.throwE $ ErrorTypes.InvalidOffset []
+    lift $ Logger.logError (News.hLogHandle h) "checkOffset: Offset in request is a negative number."
+    EX.throwE $ ErrorTypes.InvalidOffset " Offset in request is a negative number."
 
 -- | checkLimit -- return limit of request result
 checkLimit ::
@@ -45,11 +42,8 @@ checkLimit h (Just r@DataTypes.Limit {..}) appConfigLimit
   | limit > appConfigLimit = return DataTypes.Limit {limit = appConfigLimit}
   | limit <= appConfigLimit && (limit > 0) = return r
   | otherwise = do
-    lift $
-      Logger.logError
-        (News.hLogHandle h)
-        ("ERROR " .< ErrorTypes.InvalidLimit "checkLimit: Limit in request is a negative number or zero.")
-    EX.throwE $ ErrorTypes.InvalidLimit []
+    lift $ Logger.logError (News.hLogHandle h) "checkLimit: Limit in request is a negative number or zero."
+    EX.throwE $ ErrorTypes.InvalidLimit " Limit in request is a negative number or zero. "
 
 checkOffsetLimit ::
   Monad m =>

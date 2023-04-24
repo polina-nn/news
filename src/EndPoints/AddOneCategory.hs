@@ -14,10 +14,9 @@ import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.Category.CategoryIO as CategoryIO
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.LibIO as LibIO
-import qualified EndPoints.Lib.ThrowRequestError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
-import Logger (logError, logInfo, (.<))
+import Logger (logInfo)
 import qualified News
 import Servant (Handler)
 import qualified Types.DataTypes as DataTypes
@@ -38,7 +37,9 @@ addCategory ::
   POOL.Pool SQL.Connection ->
   (News.Handle IO, DataTypes.Token, DataTypes.CreateCategoryRequest) ->
   IO (Either ErrorTypes.AddEditCategoryError DataTypes.Category)
-addCategory pool (h, token, r) = EX.runExceptT $ addCategoryExcept pool (h, token, r)
+addCategory pool (h, token, r) = do
+  let reqResult = EXS.catch (addCategoryExcept pool (h, token, r)) (ErrorTypes.handleAddEditCategoryError h)
+  EX.runExceptT reqResult
 
 addCategoryExcept ::
   POOL.Pool SQL.Connection ->
@@ -46,9 +47,9 @@ addCategoryExcept ::
   EX.ExceptT ErrorTypes.AddEditCategoryError IO DataTypes.Category
 addCategoryExcept pool (h, token, r@DataTypes.CreateCategoryRequest {..}) =
   do
-    user <- EX.withExceptT ErrorTypes.AddEditCategorySQLRequestError (LibIO.searchUser h pool token)
+    user <- EX.withExceptT ErrorTypes.AddEditCategorySearchUserError (EXS.catch (LibIO.searchUser pool token) (ErrorTypes.handleSearchUserError h))
     liftIO $ Logger.logInfo (News.hLogHandle h) $ "\n\nRequest: Add Category: \n" <> ToText.toText r <> "by user: " <> ToText.toText user
-    _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditCategory (Lib.checkUserAdmin h user)
+    _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditCategory (EX.catchE (Lib.checkUserAdmin h user) (ErrorTypes.handleInvalidAdminPermission h))
     _ <- checkParentId pool h parent
     addCategoryToDb pool h r
 
@@ -59,7 +60,7 @@ checkParentId ::
   DataTypes.Id DataTypes.Category ->
   EX.ExceptT ErrorTypes.AddEditCategoryError IO (DataTypes.Id DataTypes.Category)
 checkParentId _ _ catId@DataTypes.Id {getId = 0} = return catId
-checkParentId pool h parent = CategoryIO.checkCategoryExistsById pool h parent
+checkParentId pool h parent = EX.withExceptT ErrorTypes.InvalidParentIdAddEditCategory (EXS.catch (CategoryIO.checkCategoryExistsById pool h parent) (ErrorTypes.handleInvalidContentCategoryId h))
 
 addCategoryToDb ::
   POOL.Pool SQL.Connection ->
@@ -90,12 +91,10 @@ addCategoryToDb pool h DataTypes.CreateCategoryRequest {..} = do
             )
       liftIO $ Logger.logInfo (News.hLogHandle h) $ "addCategoryToDb: added new category: " <> ToText.toText newCategory
       return newCategory
-    Right _ -> Throw.throwSqlRequestError h ("addCategoryToDb", "Developer error")
+    Right _ -> EXS.throwM $ ErrorTypes.AddEditCategorySQLRequestError $ ErrorTypes.SQLRequestError " Developer error"
   where
     handleError (EXS.SomeException e) =
       let errMsg = EXS.displayException e
        in if "duplicate key value" `T.isInfixOf` T.pack errMsg
-            then do
-              liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.CategoryAlreadyExisted (ErrorTypes.InvalidContent "checkCategoryName: BAD! Category with this name already exists "))
-              EX.throwE $ ErrorTypes.CategoryAlreadyExisted $ ErrorTypes.InvalidContent []
-            else Throw.throwSqlRequestError h ("addCategoryToDb", show e)
+            then EXS.throwM $ ErrorTypes.CategoryAlreadyExisted $ ErrorTypes.InvalidContent " Category with this name already exists"
+            else EXS.throwM $ ErrorTypes.AddEditCategorySomeException (EXS.SomeException e)

@@ -29,8 +29,7 @@ import qualified EndPoints.GetNewsSearchList as GetNewsSearchList
 import qualified EndPoints.GetOneImage as GetOneImage
 import qualified EndPoints.GetUserList as GetUserList
 import qualified EndPoints.Lib.Lib as Lib
-import qualified EndPoints.Lib.ThrowRequestError as Throw
-import Logger (logDebug, logError, (.<))
+import Logger (logDebug)
 import Network.Wai (Request, requestHeaders)
 import qualified Network.Wai.Handler.Warp
 import qualified News
@@ -107,10 +106,12 @@ authHandlerConn h conn = mkAuthHandler handler
 
 lookupToken :: News.Handle IO -> POOL.Pool SQL.Connection -> ByteString -> Handler DataTypes.Token
 lookupToken h pool key = do
-  token <- liftIO $ EX.runExceptT $ lookupTokenDB pool (h, key)
+  let reqResult = EXS.catch (lookupTokenDB pool (h, key)) (ErrorTypes.handleServerAuthError h)
+  token <- liftIO $ EX.runExceptT reqResult
   case token of
-    Left (ErrorTypes.ServerAuthErrorSQLRequestError a) -> throwError err500 {errReasonPhrase = show a}
-    Left (ErrorTypes.ServerAuthErrorInvalidToken a) -> throwError err403 {errReasonPhrase = show a}
+    Left (ErrorTypes.ServerAuthErrorSQLRequestError _) -> throwError err500 {errReasonPhrase = ErrorTypes.error500}
+    Left (ErrorTypes.ServerAuthErrorSomeException _) -> throwError err500 {errReasonPhrase = ErrorTypes.error500}
+    Left (ErrorTypes.ServerAuthErrorInvalidToken _) -> throwError err403 {errReasonPhrase = ErrorTypes.error403}
     Right value -> return value
 
 lookupTokenDB :: POOL.Pool SQL.Connection -> (News.Handle IO, ByteString) -> EX.ExceptT ErrorTypes.ServerAuthError IO DataTypes.Token
@@ -128,11 +129,10 @@ lookupTokenDB pool (h, t) = do
           IO (Either EXS.SomeException [SQL.Only Bool])
       )
   case res of
-    Left err -> Throw.throwSqlRequestError h ("lookupTokenDB", show err)
+    Left err -> EXS.throwM $ ErrorTypes.ServerAuthErrorSomeException err
     Right [SQL.Only True] -> do
-      liftIO $ Logger.logDebug (News.hLogHandle h) "lookupTokenDB: OK! Token exist "
+      liftIO $ Logger.logDebug (News.hLogHandle h) " lookupTokenDB: OK! Token exist "
       return DataTypes.Token {..}
     Right [SQL.Only False] -> do
-      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidToken "lookupTokenDB: BAD! Token not exist")
-      EX.throwE $ ErrorTypes.ServerAuthErrorInvalidToken $ ErrorTypes.InvalidToken []
-    Right _ -> Throw.throwSqlRequestError h ("lookupTokenDB", "Developer error!")
+      EXS.throwM $ ErrorTypes.ServerAuthErrorInvalidToken $ ErrorTypes.InvalidToken " lookupTokenDB: BAD! Token not exist"
+    Right _ -> EXS.throwM $ ErrorTypes.AddEditCategorySQLRequestError $ ErrorTypes.SQLRequestError " lookupTokenDB: Developer error"

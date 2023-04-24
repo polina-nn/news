@@ -67,7 +67,7 @@ checkDayFilter fi@DataTypes.Filter {..}
   | M.isNothing filterDayUntil && M.isNothing filterDaySince = return fi
   | M.isNothing filterDayAt && M.isNothing filterDaySince = return fi
   | M.isNothing filterDayAt && M.isNothing filterDayUntil = return fi
-  | otherwise = EX.throwE $ ErrorTypes.InvalidFilterGetNews $ ErrorTypes.InvalidRequest []
+  | otherwise = EX.throwE $ ErrorTypes.InvalidFilterGetNews $ ErrorTypes.InvalidRequest " Filter in request not valid"
 
 -- | dayAt -- return value for part "AND (news_created = dbFilterDayAt OR news_created < dbFilterDayUntil OR news_created > dbFilterDaySince)"  at select request
 -- if filter dbFilterDayAt is not specified, use day before data base created (remotePast)

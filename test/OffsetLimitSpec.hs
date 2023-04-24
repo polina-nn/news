@@ -25,6 +25,12 @@ import Test.QuickCheck
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
 
+offsetError :: String
+offsetError = " Offset in request is a negative number."
+
+limitError :: String
+limitError = " Limit in request is a negative number or zero. "
+
 spec :: Spec
 spec =
   describe "OffsetLimit - logic for getting results of request " $
@@ -36,10 +42,10 @@ spec =
         property $ \(NonNegative count) ->
           OffsetLimit.checkOffset handleSpec (Just (DataTypes.Offset {offset = count}))
             === EX.except (Right (DataTypes.Offset {offset = count}))
-      it "checkOffset: returns the (Left InvalidOffset) if offset < 0 " $
+      it "checkOffset: returns the (Left InvalidOffset offsetError) if offset < 0 " $
         property $ \(Negative count) ->
           OffsetLimit.checkOffset handleSpec (Just (DataTypes.Offset {offset = count}))
-            === EX.throwE (ErrorTypes.InvalidOffset [])
+            === EX.throwE (ErrorTypes.InvalidOffset offsetError)
       -- realLimit tests
       it
         "checkLimit: returns the (Right appConfigLimit) if limit is not set in request"
@@ -51,13 +57,13 @@ spec =
       it
         "checkLimit: returns the (Right appConfigLimit) if  Limit > appConfigLimit (property limitMoreThenConfig)"
         $ property limitMoreThenConfig
-      it "checkLimit: returns the (Left InvalidLimit ) if  Limit <= 0 " $
+      it "checkLimit: returns the (Left InvalidLimit limitError ) if  Limit <= 0 " $
         property $ \(NonPositive limit') ->
           OffsetLimit.checkLimit
             handleSpecForLimit
             (Just (DataTypes.Limit {limit = limit'}))
             (appShowLimit appConfigSpec)
-            === EX.throwE (ErrorTypes.InvalidLimit [])
+            === EX.throwE (ErrorTypes.InvalidLimit limitError)
       it
         "checkLimit: returns the (Right limit) if  0 < Limit <= appConfigLimit (property limitRight)"
         $ property limitRight
@@ -134,29 +140,29 @@ invalidOffsetAndLimit :: Int -> Int -> Property
 invalidOffsetAndLimit offset' limit' =
   (offset' < 0 && limit' <= 0)
     ==> OffsetLimit.checkOffsetLimit handleSpec (Just DataTypes.Offset {offset = offset'}) (Just DataTypes.Limit {limit = limit'})
-    === EX.throwE (ErrorTypes.InvalidOffset [])
+    === EX.throwE (ErrorTypes.InvalidOffset offsetError)
 
 invalidOffset1 :: Int -> Int -> Property
 invalidOffset1 offset' limit' =
   offset' < 0
     && limit'
     > 0 ==> OffsetLimit.checkOffsetLimit handleSpec (Just DataTypes.Offset {offset = offset'}) (Just DataTypes.Limit {limit = limit'})
-    === EX.throwE (ErrorTypes.InvalidOffset [])
+    === EX.throwE (ErrorTypes.InvalidOffset offsetError)
 
 invalidOffset2 :: Int -> Property
 invalidOffset2 offset' =
   offset'
     < 0 ==> OffsetLimit.checkOffsetLimit handleSpec (Just DataTypes.Offset {offset = offset'}) Nothing
-    === EX.throwE (ErrorTypes.InvalidOffset [])
+    === EX.throwE (ErrorTypes.InvalidOffset offsetError)
 
 invalidLimit1 :: Int -> Int -> Property
 invalidLimit1 offset' limit' =
   (offset' >= 0 && limit' < 0)
     ==> OffsetLimit.checkOffsetLimit handleSpec (Just DataTypes.Offset {offset = offset'}) (Just DataTypes.Limit {limit = limit'})
-    === EX.throwE (ErrorTypes.InvalidLimit [])
+    === EX.throwE (ErrorTypes.InvalidLimit limitError)
 
 invalidLimit2 :: Int -> Property
 invalidLimit2 limit' =
   limit' < 0
     ==> OffsetLimit.checkOffsetLimit handleSpec Nothing (Just DataTypes.Limit {limit = limit'})
-    === EX.throwE (ErrorTypes.InvalidLimit [])
+    === EX.throwE (ErrorTypes.InvalidLimit limitError)
