@@ -5,6 +5,7 @@ module Logger.Impl
   )
 where
 
+import qualified Control.Monad as CM
 import qualified Data.Text as T
 import qualified Data.Time as TM
 import qualified Logger
@@ -22,29 +23,19 @@ data Config = Config
   }
 
 withHandle :: Config -> (Logger.Handle IO -> IO ()) -> IO ()
-withHandle config f = f Logger.Handle {Logger.hLowLevelLog = logWith config}
+withHandle config' f = f Logger.Handle {Logger.hLowLevelLog = logWith config'}
 
 logWith :: Config -> Logger.Level -> T.Text -> IO ()
-logWith сonf logLevel text = do
-  let minLevel = confMinLevel сonf
-  if logLevel >= minLevel
-    then do
+logWith config logLevel text = do
+  let minLevel = confMinLevel config
+  CM.when
+    (logLevel >= minLevel)
+    $ do
       today <- currentDay
       time <- currentTime
-      let message =
-            show today
-              ++ " "
-              ++ time
-              ++ " ["
-              ++ show (confMinLevel сonf)
-              ++ "] "
-              ++ "["
-              ++ show logLevel
-              ++ "] "
-              ++ T.unpack text
-      System.IO.hPutStrLn (confFileHandle сonf) message
-      System.IO.hFlush (confFileHandle сonf)
-    else pure ()
+      let message = show today <> " " <> time <> " [" <> show (confMinLevel config) <> "] " <> "[" <> show logLevel <> "] " <> T.unpack text
+      System.IO.hPutStrLn (confFileHandle config) message
+      System.IO.hFlush (confFileHandle config)
 
 currentDay :: IO TM.Day
 currentDay = fmap TM.utctDay TM.getCurrentTime
@@ -55,10 +46,4 @@ currentTime = do
   timezone <- TM.getCurrentTimeZone
   let (TM.TimeOfDay hour minute sec) =
         TM.localTimeOfDay $ TM.utcToLocalTime timezone now
-  return
-    ( show hour
-        ++ ":"
-        ++ show minute
-        ++ ":"
-        ++ show (div (fromEnum sec) 1000000000000)
-    )
+  return $ show hour <> ":" <> show minute <> ":" <> show (div (fromEnum sec) 1000000000000)
