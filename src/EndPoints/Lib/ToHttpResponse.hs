@@ -19,7 +19,6 @@ import qualified Types.ErrorTypes as ErrorTypes
 class ToHttpResponse e r where
   toHttpResponse :: Either e r -> Handler r
 
--- | 1
 -- | AddEditCategoryError - Add and edit category errors
 instance ToHttpResponse ErrorTypes.AddEditCategoryError DataTypes.Category where
   toHttpResponse (Right category) = return category
@@ -34,7 +33,6 @@ instance ToHttpResponse ErrorTypes.AddEditCategoryError DataTypes.Category where
   toHttpResponse (Left (ErrorTypes.InvalidCategoryId a)) =
     throwError err404 {errReasonPhrase = show a}
 
--- | 2
 -- | AddImageError  - Add image error
 instance ToHttpResponse ErrorTypes.AddImageError DataTypes.URI where
   toHttpResponse (Right uri) = return uri
@@ -49,7 +47,6 @@ instance ToHttpResponse ErrorTypes.AddImageError DataTypes.URI where
   toHttpResponse (Left (ErrorTypes.NotExistImageFile a)) =
     throwError err400 {errReasonPhrase = show a}
 
--- | 3
 -- | AddEditNewsError  - Add or edit news error
 instance ToHttpResponse ErrorTypes.AddEditNewsError DataTypes.News where
   toHttpResponse (Right news) = return news
@@ -68,7 +65,6 @@ instance ToHttpResponse ErrorTypes.AddEditNewsError DataTypes.News where
   toHttpResponse (Left (ErrorTypes.InvalidNewsId a)) =
     throwError err404 {errReasonPhrase = show a}
 
--- | 4
 -- | AddUserError - creation user errors
 instance ToHttpResponse ErrorTypes.AddUserError DataTypes.User where
   toHttpResponse (Right user) = return user
@@ -79,7 +75,6 @@ instance ToHttpResponse ErrorTypes.AddUserError DataTypes.User where
   toHttpResponse (Left (ErrorTypes.AddUserSQLRequestError a)) =
     throwError err500 {errReasonPhrase = show a}
 
--- | 5
 -- | GetNewsError - get news list error
 instance ToHttpResponse ErrorTypes.GetNewsError [DataTypes.News] where
   toHttpResponse (Right news) = return news
@@ -94,7 +89,6 @@ instance ToHttpResponse ErrorTypes.GetNewsError [DataTypes.News] where
   toHttpResponse (Left (ErrorTypes.InvalidSearchGetNews a)) =
     throwError err400 {errReasonPhrase = show a}
 
--- | 6
 -- | GetContentError - get users or category list error
 instance ToHttpResponse ErrorTypes.GetContentError [DataTypes.Category] where
   toHttpResponse (Right cat) = return cat
@@ -110,7 +104,6 @@ instance ToHttpResponse ErrorTypes.GetContentError [DataTypes.User] where
   toHttpResponse (Left (ErrorTypes.InvalidOffsetOrLimitGetContent a)) =
     throwError err400 {errReasonPhrase = show a}
 
--- | 7
 -- | GetImageError - get one image
 instance ToHttpResponse ErrorTypes.GetImageError B.ByteString where
   toHttpResponse (Right str) = return str

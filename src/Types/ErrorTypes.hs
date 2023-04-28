@@ -15,7 +15,7 @@ error403 :: String
 error403 = "403 Forbidden Error"
 
 -- | COMMON ERROR LIST -- In these cases I return Error for user and LogMessage for admin
--- | 1
+
 -- | InvalidOffset - if offset is less then 0.
 -- | InvalidLimit - if limit is less or equal the  0
 data InvalidOffsetOrLimit = InvalidOffset String | InvalidLimit String
@@ -27,7 +27,6 @@ instance Show InvalidOffsetOrLimit where
   show (InvalidLimit []) = show error400
   show (InvalidLimit a) = show a
 
--- | 3
 -- | InvalidId  - Then resource with this Id in URI (ex.700) don't exists in the Data Base (http://localhost:8080/image/700)
 newtype InvalidId
   = InvalidId String
@@ -37,7 +36,6 @@ instance Show InvalidId where
   show (InvalidId []) = show error404
   show (InvalidId a) = show a
 
--- | 4
 -- | InvalidContent  - Then content in request (ex.700a) is invalid. (--data '{ "new_path": "700a", "new_category": "cat " }' \ )
 newtype InvalidContent
   = InvalidContent String
@@ -47,7 +45,6 @@ instance Show InvalidContent where
   show (InvalidContent []) = show error400
   show (InvalidContent a) = show a
 
--- | 5
 -- | InvalidAdminPermission  - Then the user does not have admin permission to execute  request.
 newtype InvalidAdminPermission
   = InvalidAdminPermission String
@@ -57,7 +54,6 @@ instance Show InvalidAdminPermission where
   show (InvalidAdminPermission []) = show error404
   show (InvalidAdminPermission a) = show a
 
--- | 6
 -- | InvalidAuthorPermission  - Then the user does not have author permission to execute  request.
 newtype InvalidAuthorPermission
   = InvalidAuthorPermission String
@@ -67,7 +63,6 @@ instance Show InvalidAuthorPermission where
   show (InvalidAuthorPermission []) = show error403
   show (InvalidAuthorPermission a) = show a
 
--- | 7
 -- | InvalidRequest   - Then error in uri ( no word "text" in request news/search?text = "Ann")
 newtype InvalidRequest
   = InvalidRequest String
@@ -77,7 +72,6 @@ instance Show InvalidRequest where
   show (InvalidRequest []) = show error400
   show (InvalidRequest a) = show a
 
--- | 8
 -- | SQLRequestError  - Error of executing SQL request.
 newtype SQLRequestError
   = SQLRequestError String
@@ -87,7 +81,6 @@ instance Show SQLRequestError where
   show (SQLRequestError []) = show error500
   show (SQLRequestError a) = show a
 
--- | 9
 -- | InvalidToken  - Invalid token
 newtype InvalidToken
   = InvalidToken String
@@ -109,7 +102,7 @@ data ServerAuthError
 
 -- | LIST OF ERRORS FOR EACH ENDPOINT
 -- This allows you to see the expected errors in each method.
--- | 1
+
 -- | AddEditCategoryError - Add and edit category errors
 data AddEditCategoryError
   = InvalidPermissionAddEditCategory InvalidAdminPermission
@@ -122,7 +115,6 @@ data AddEditCategoryError
     InvalidCategoryId InvalidId
   deriving (Show, Eq)
 
--- | 2
 -- | AddImageError  - Add image error
 data AddImageError
   = -- | InvalidPermissionAddImage - the image is not added by the author
@@ -136,7 +128,6 @@ data AddImageError
   | AddImageSQLRequestError SQLRequestError
   deriving (Show, Eq)
 
--- | 3
 -- | AddEditNewsError  - Add or edit news error
 data AddEditNewsError
   = -- | InvalidPermissionAddNews - the news is not added by the author
@@ -154,7 +145,6 @@ data AddEditNewsError
     InvalidNewsId InvalidId
   deriving (Show, Eq)
 
--- | 4
 -- | AddUserError - creation user errors
 data AddUserError
   = -- |  InvalidPermissionAddUser - the user is not  admin
@@ -164,7 +154,6 @@ data AddUserError
   | AddUserSQLRequestError SQLRequestError
   deriving (Show, Eq)
 
--- | 5
 -- | GetNewsError - get news list error
 data GetNewsError
   = InvalidOffsetOrLimitGetNews InvalidOffsetOrLimit
@@ -177,14 +166,12 @@ data GetNewsError
   | GetNewsSQLRequestError SQLRequestError
   deriving (Show, Eq)
 
--- | 6
 -- | GetContentError - get users or category list error
 data GetContentError
   = InvalidOffsetOrLimitGetContent InvalidOffsetOrLimit
   | GetContentSQLRequestError SQLRequestError
   deriving (Show, Eq)
 
--- | 7
 -- | GetImageError - get one image
 data GetImageError
   = InvalidImagedId InvalidId
