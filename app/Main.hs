@@ -10,6 +10,7 @@ import qualified Logger
 import qualified Logger.Impl
 import qualified News
 import qualified Server
+import qualified System.IO
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ExceptionTypes as ExceptionTypes
 
@@ -17,20 +18,20 @@ main :: IO ()
 main = do
   conf <- EXS.catch (Config.tryLoadConfig "config.conf") ExceptionTypes.handleExceptionToTerminal
   putStrLn "main: load config file, my news-server started"
-  withLogHandle conf $ \logHandle -> do
+  loggerImplConfig <- Config.getLoggerConfig conf
+  putStrLn "getLoggerConfig OK!"
+  withLogHandle loggerImplConfig $ \logHandle -> do
     serverHandle <- makeServerHandle conf logHandle
     putStrLn "main: makeServerHandle: OК. ServerHandle created"
-    runServer serverHandle
+    runServer serverHandle loggerImplConfig
 
-withLogHandle :: CT.Config -> (Logger.Handle IO -> IO ()) -> IO ()
-withLogHandle conf f = do
-  config <- Config.getLoggerConfig conf
-  putStrLn "getLoggerConfig OK!"
+withLogHandle :: Logger.Impl.Config -> (Logger.Handle IO -> IO ()) -> IO ()
+withLogHandle config f = do
   Logger.Impl.withHandle config f
 
-runServer :: News.Handle IO -> IO ()
-runServer serverHandle =
-  Server.run DataTypes.Handle {DataTypes.hServerHandle = serverHandle}
+runServer :: News.Handle IO -> Logger.Impl.Config -> IO ()
+runServer serverHandle conf = do
+  EXS.finally (Server.run DataTypes.Handle {DataTypes.hServerHandle = serverHandle}) (System.IO.hClose $ Logger.Impl.confFileHandle conf)
 
 makeServerHandle :: CT.Config -> Logger.Handle IO -> IO (News.Handle IO)
 makeServerHandle conf logHandle = do
