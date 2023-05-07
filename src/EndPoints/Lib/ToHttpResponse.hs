@@ -19,7 +19,6 @@ import qualified Types.ErrorTypes as ErrorTypes
 class ToHttpResponse e r where
   toHttpResponse :: Either e r -> Handler r
 
--- | 1
 -- | AddEditCategoryError - Add and edit category errors
 instance ToHttpResponse ErrorTypes.AddEditCategoryError DataTypes.Category where
   toHttpResponse (Right category) = return category
@@ -27,7 +26,7 @@ instance ToHttpResponse ErrorTypes.AddEditCategoryError DataTypes.Category where
     throwError err500 {errReasonPhrase = ErrorTypes.error500}
   toHttpResponse (Left (ErrorTypes.InvalidPermissionAddEditCategory _)) =
     throwError err404 {errReasonPhrase = ErrorTypes.error404}
-  toHttpResponse (Left (ErrorTypes.CategoryAlreadyExisted a)) =
+  toHttpResponse (Left (ErrorTypes.CategoryAlreadyExists a)) =
     throwError err400 {errReasonPhrase = show a}
   toHttpResponse (Left (ErrorTypes.InvalidParentIdAddEditCategory a)) =
     throwError err400 {errReasonPhrase = show a}
@@ -38,7 +37,6 @@ instance ToHttpResponse ErrorTypes.AddEditCategoryError DataTypes.Category where
   toHttpResponse (Left (ErrorTypes.AddEditCategorySomeException _)) =
     throwError err500 {errReasonPhrase = ErrorTypes.error500}
 
--- | 2
 -- | AddImageError  - Add image error
 instance ToHttpResponse ErrorTypes.AddImageError DataTypes.URI where
   toHttpResponse (Right uri) = return uri
@@ -50,14 +48,13 @@ instance ToHttpResponse ErrorTypes.AddImageError DataTypes.URI where
     throwError err400 {errReasonPhrase = show a}
   toHttpResponse (Left (ErrorTypes.NotBase64Image a)) =
     throwError err400 {errReasonPhrase = show a}
-  toHttpResponse (Left (ErrorTypes.NotExistImageFile a)) =
+  toHttpResponse (Left (ErrorTypes.ImageFileNotExists a)) =
     throwError err400 {errReasonPhrase = show a}
   toHttpResponse (Left (ErrorTypes.AddImageSearchUserError _)) =
     throwError err500 {errReasonPhrase = ErrorTypes.error500}
   toHttpResponse (Left (ErrorTypes.AddImageSomeException _)) =
     throwError err500 {errReasonPhrase = ErrorTypes.error500}
 
--- | 3
 -- | AddEditNewsError  - Add or edit news error
 instance ToHttpResponse ErrorTypes.AddEditNewsError DataTypes.News where
   toHttpResponse (Right news) = return news
@@ -71,7 +68,7 @@ instance ToHttpResponse ErrorTypes.AddEditNewsError DataTypes.News where
     throwError err400 {errReasonPhrase = show a}
   toHttpResponse (Left (ErrorTypes.NotBase64ImageAddEditNews a)) =
     throwError err400 {errReasonPhrase = show a}
-  toHttpResponse (Left (ErrorTypes.NotExistImageFileAddEditNews a)) =
+  toHttpResponse (Left (ErrorTypes.ImageFileAddEditNewsNotExists a)) =
     throwError err400 {errReasonPhrase = show a}
   toHttpResponse (Left (ErrorTypes.InvalidNewsId _)) =
     throwError err404 {errReasonPhrase = ErrorTypes.error404}
@@ -80,13 +77,12 @@ instance ToHttpResponse ErrorTypes.AddEditNewsError DataTypes.News where
   toHttpResponse (Left (ErrorTypes.AddEditNewsSomeException _)) =
     throwError err500 {errReasonPhrase = ErrorTypes.error500}
 
--- | 4
 -- | AddUserError - creation user errors
 instance ToHttpResponse ErrorTypes.AddUserError DataTypes.User where
   toHttpResponse (Right user) = return user
   toHttpResponse (Left (ErrorTypes.InvalidPermissionAddUser _)) =
     throwError err404 {errReasonPhrase = ErrorTypes.error404}
-  toHttpResponse (Left (ErrorTypes.UserAlreadyExisted a)) =
+  toHttpResponse (Left (ErrorTypes.UserAlreadyExists a)) =
     throwError err400 {errReasonPhrase = show a}
   toHttpResponse (Left (ErrorTypes.AddUserSQLRequestError _)) =
     throwError err500 {errReasonPhrase = ErrorTypes.error500}
@@ -95,7 +91,6 @@ instance ToHttpResponse ErrorTypes.AddUserError DataTypes.User where
   toHttpResponse (Left (ErrorTypes.AddUserSomeException _)) =
     throwError err500 {errReasonPhrase = ErrorTypes.error500}
 
--- | 5
 -- | GetNewsError - get news list error
 instance ToHttpResponse ErrorTypes.GetNewsError [DataTypes.News] where
   toHttpResponse (Right news) = return news
@@ -116,7 +111,6 @@ instance ToHttpResponse ErrorTypes.GetNewsError [DataTypes.News] where
   toHttpResponse (Left (ErrorTypes.InvalidCategoryIdGetNews a)) =
     throwError err400 {errReasonPhrase = show a}
 
--- | 6
 -- | GetContentError - get users or category list error
 instance ToHttpResponse ErrorTypes.GetContentError a where
   toHttpResponse (Right cat) = return cat
@@ -127,7 +121,6 @@ instance ToHttpResponse ErrorTypes.GetContentError a where
   toHttpResponse (Left (ErrorTypes.GetContentSomeException _)) =
     throwError err500 {errReasonPhrase = ErrorTypes.error500}
 
--- | 7
 -- | GetImageError - get one image
 instance ToHttpResponse ErrorTypes.GetImageError B.ByteString where
   toHttpResponse (Right str) = return str

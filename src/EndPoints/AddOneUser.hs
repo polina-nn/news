@@ -14,6 +14,7 @@ import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.LibIO as LibIO
+import qualified EndPoints.Lib.ThrowError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
 import Logger (logInfo)
@@ -37,18 +38,16 @@ addUser ::
   POOL.Pool SQL.Connection ->
   (News.Handle IO, DataTypes.Token, DataTypes.CreateUserRequest) ->
   IO (Either ErrorTypes.AddUserError DataTypes.User)
-addUser pool (h, account, req) = do
-  let reqResult = EXS.catch (addUserExcept pool (h, account, req)) (ErrorTypes.handleAddUserError h)
-  EX.runExceptT reqResult
+addUser pool (h, account, req) = EX.runExceptT $ addUserExcept pool (h, account, req)
 
 addUserExcept ::
   POOL.Pool SQL.Connection ->
   (News.Handle IO, DataTypes.Token, DataTypes.CreateUserRequest) ->
   EX.ExceptT ErrorTypes.AddUserError IO DataTypes.User
 addUserExcept pool (h, token, req) = do
-  user <- EX.withExceptT ErrorTypes.AddUserSearchUserError (EXS.catch (LibIO.searchUser pool token) (ErrorTypes.handleSearchUserError h))
+  user <- EX.withExceptT ErrorTypes.AddUserSearchUserError (LibIO.searchUser pool h token)
   liftIO $ Logger.logInfo (News.hLogHandle h) $ "\n\nRequest: Add User: \n" <> ToText.toText req <> "by user: " <> ToText.toText user
-  _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddUser (EX.catchE (Lib.checkUserAdmin h user) (ErrorTypes.handleInvalidAdminPermission h))
+  _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddUser (Lib.checkUserAdmin h user)
   newUser <- addUserToDB pool h req
   addTokenToDB pool h newUser
 
@@ -72,11 +71,11 @@ addTokenToDB pool h r@DataTypes.User {..} = do
           IO (Either EXS.SomeException I.Int64)
       )
   case res of
-    Left err -> EXS.throwM $ ErrorTypes.AddUserSomeException err
+    Left err -> Throw.throwSomeException h " addTokenToDB  " err
     Right 1 -> do
       liftIO $ Logger.logInfo (News.hLogHandle h) " addTokenToDB: OK!"
       return r
-    Right _ -> EXS.throwM $ ErrorTypes.AddUserSQLRequestError $ ErrorTypes.SQLRequestError " Developer error "
+    Right _ -> Throw.throwSqlRequestError h " addTokenToDB  " (ErrorTypes.SQLRequestError "Developer error!")
 
 addUserToDB ::
   POOL.Pool SQL.Connection ->
@@ -112,10 +111,10 @@ addUserToDB pool h DataTypes.CreateUserRequest {..} = do
             )
       liftIO $ Logger.logInfo (News.hLogHandle h) $ " addUserToDB: OK!" <> ToText.toText newUser
       return newUser
-    Right _ -> EXS.throwM $ ErrorTypes.AddUserSQLRequestError $ ErrorTypes.SQLRequestError " Developer error"
+    Right _ -> Throw.throwSqlRequestError h " addUserToDB  " (ErrorTypes.SQLRequestError "Developer error!")
   where
     handleError (EXS.SomeException e) =
       let errMsg = EXS.displayException e
        in if "duplicate key value" `T.isInfixOf` T.pack errMsg
-            then EXS.throwM $ ErrorTypes.UserAlreadyExisted $ ErrorTypes.InvalidContent " User with this login already exists"
-            else EXS.throwM $ ErrorTypes.AddUserSomeException (EXS.SomeException e)
+            then Throw.throwAlreadyExists h "addUserToDB " $ ErrorTypes.InvalidContent " User with this login already exists"
+            else Throw.throwSomeException h "addUserToDB " (EXS.SomeException e)

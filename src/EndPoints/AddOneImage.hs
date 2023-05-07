@@ -16,6 +16,7 @@ import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.LibIO as LibIO
 import qualified EndPoints.Lib.News.NewsIO as NewsIO
+import qualified EndPoints.Lib.ThrowError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
 import Logger (logDebug, logInfo, (.<))
@@ -42,18 +43,16 @@ addImage ::
   POOL.Pool SQL.Connection ->
   (News.Handle IO, DataTypes.Token, DataTypes.CreateImageRequest) ->
   IO (Either ErrorTypes.AddImageError DataTypes.URI)
-addImage pool (h, token, createImage) = do
-  let reqResult = EXS.catch (addImageExcept pool (h, token, createImage)) (ErrorTypes.handleAddImageError h)
-  EX.runExceptT reqResult
+addImage pool (h, token, createImage) = EX.runExceptT $ addImageExcept pool (h, token, createImage)
 
 addImageExcept ::
   POOL.Pool SQL.Connection ->
   (News.Handle IO, DataTypes.Token, DataTypes.CreateImageRequest) ->
   EX.ExceptT ErrorTypes.AddImageError IO DataTypes.URI
 addImageExcept pool (h, token, createImage) = do
-  user <- EX.withExceptT ErrorTypes.AddImageSearchUserError (EXS.catch (LibIO.searchUser pool token) (ErrorTypes.handleSearchUserError h))
+  user <- EX.withExceptT ErrorTypes.AddImageSearchUserError (LibIO.searchUser pool h token)
   liftIO $ Logger.logInfo (News.hLogHandle h) $ "\n\nRequest: Add One Image " <> ToText.toText createImage <> "\nby user: " <> ToText.toText user
-  _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddImage (EX.catchE (Lib.checkUserAuthor h user) (ErrorTypes.handleInvalidAuthorPermission h))
+  _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddImage (Lib.checkUserAuthor h user)
   _ <- checkPngImage h createImage
   _ <- checkImageFileExist h createImage
   allCheckAndDecodeBase64ByteString <- checkAndDecodeBase64Image h createImage
@@ -69,7 +68,7 @@ checkImageFileExist h r@DataTypes.CreateImageRequest {..} = do
     then do
       liftIO $ Logger.logDebug (News.hLogHandle h) "checkImageFileExist: OK!"
       return r
-    else EXS.throwM $ ErrorTypes.NotExistImageFile $ ErrorTypes.InvalidContent " File: does not exist (No such file or directory) "
+    else Throw.throwNotExists h "checkImageFileExist" $ ErrorTypes.InvalidContent " No such file or directory "
 
 checkPngImage ::
   EXS.MonadThrow m =>
@@ -82,7 +81,7 @@ checkPngImage h r@DataTypes.CreateImageRequest {..} =
       lift $ Logger.logDebug (News.hLogHandle h) "checkPngImage: OK!"
       return r
     else do
-      EXS.throwM $ ErrorTypes.NotPngImage $ ErrorTypes.InvalidContent " Bad Format "
+      Throw.throwNotPng h "checkPngImage" $ ErrorTypes.InvalidContent " Image not png "
 
 checkAndDecodeBase64Image ::
   News.Handle IO ->
@@ -94,7 +93,7 @@ checkAndDecodeBase64Image h DataTypes.CreateImageRequest {..} = do
     Right val -> do
       liftIO $ Logger.logDebug (News.hLogHandle h) "checkAndDecodeBase64Image: OK!"
       return val
-    Left err -> EXS.throwM $ ErrorTypes.NotBase64Image $ ErrorTypes.InvalidContent (show err)
+    Left err -> Throw.throwNotBase64 h "checkBase64Images" $ ErrorTypes.InvalidContent $ " Image not Base64 " <> show err
 
 addImageToDB ::
   POOL.Pool SQL.Connection ->
@@ -115,10 +114,10 @@ addImageToDB pool h DataTypes.CreateImageRequest {..} im = do
           IO (Either EXS.SomeException [SQL.Only Int])
       )
   case res of
-    Left err -> EXS.throwM $ ErrorTypes.AddImageSomeException err
+    Left err -> Throw.throwSomeException h "addImageToDB " err
     Right [SQL.Only idIm] -> do
       let uriBegin = show $ News.hURIConfig h
           uriEnd = show $ DataTypes.URI' {uriPath = "image", uriId = idIm}
       liftIO $ Logger.logDebug (News.hLogHandle h) ("addImageToDB: OK! " .< (uriBegin ++ uriEnd))
       return $ uriBegin ++ uriEnd
-    Right _ -> EXS.throwM $ ErrorTypes.AddImageSQLRequestError $ ErrorTypes.SQLRequestError "Developer error"
+    Right _ -> Throw.throwSqlRequestError h "addImageToDB " (ErrorTypes.SQLRequestError "Developer error!")

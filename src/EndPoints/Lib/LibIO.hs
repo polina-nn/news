@@ -10,15 +10,18 @@ import qualified Data.Time as TIME
 import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.Lib as Lib
+import qualified EndPoints.Lib.ThrowError as Throw
+import qualified News
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
 
 -- | searchUser - searchUser by token in database.
 searchUser ::
   POOL.Pool SQL.Connection ->
+  News.Handle IO ->
   DataTypes.Token ->
   EX.ExceptT ErrorTypes.SearchUserError IO DataTypes.User
-searchUser pool DataTypes.Token {..} = do
+searchUser pool h DataTypes.Token {..} = do
   res <-
     liftIO
       ( EXS.try
@@ -33,7 +36,7 @@ searchUser pool DataTypes.Token {..} = do
           IO (Either EXS.SomeException [(T.Text, String, Bool, Bool, TIME.Day)])
       )
   case res of
-    Left err -> EXS.throwM $ ErrorTypes.SearchUseSomeException err
+    Left err -> Throw.throwSomeException h "searchUser " err
     Right [user] -> return $ Lib.toUser user
-    Right [] -> EXS.throwM $ ErrorTypes.SearchUserNotExist $ ErrorTypes.SQLRequestError " Token exists, but not user "
-    Right _ -> EXS.throwM $ ErrorTypes.SearchUserSQLRequestError $ ErrorTypes.SQLRequestError "Developer error!"
+    Right [] -> EX.throwE $ ErrorTypes.SearchUserNotExist $ ErrorTypes.SQLRequestError " Token exists, but not user "
+    Right _ -> Throw.throwSqlRequestError h "searchUser " $ ErrorTypes.SQLRequestError "Developer error!"

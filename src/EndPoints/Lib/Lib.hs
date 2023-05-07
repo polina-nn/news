@@ -18,6 +18,7 @@ import qualified Data.ByteString.Char8 as BSC8
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Data.Time as TIME
+import qualified EndPoints.Lib.ThrowError as Throw
 import Logger (logDebug)
 import qualified News
 import qualified Types.DataTypes as DataType
@@ -34,7 +35,7 @@ checkUserAdmin h r@DataTypes.User {..} =
     then do
       lift $ Logger.logDebug (News.hLogHandle h) "checkUserAdmin: OK!"
       return r
-    else EX.throwE $ ErrorTypes.InvalidAdminPermission " BAD! User is not admin. Invalid Permission for this request."
+    else Throw.throwInvalidAdminPermission h "checkUserAdmin" ErrorTypes.InvalidAdminPermission
 
 checkUserAuthor ::
   Monad m =>
@@ -46,7 +47,7 @@ checkUserAuthor h r@DataTypes.User {..} =
     then do
       lift $ Logger.logDebug (News.hLogHandle h) "checkUserAuthor: OK!"
       return r
-    else EX.throwE $ ErrorTypes.InvalidAuthorPermission " BAD! User is not author. Invalid Permission for this request."
+    else Throw.throwInvalidAuthorPermission h " checkUserAuthor " ErrorTypes.InvalidAuthorPermission
 
 -- | imageIdToURI - create URI of one image from ImageId
 imageIdToURI :: News.Handle IO -> DataTypes.Id DataTypes.Image -> DataTypes.URI

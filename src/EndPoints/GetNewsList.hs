@@ -18,6 +18,7 @@ import qualified EndPoints.Lib.News.News as News
 import qualified EndPoints.Lib.News.NewsHelpTypes as NewsHelpTypes
 import qualified EndPoints.Lib.News.NewsIO as NewsIO
 import qualified EndPoints.Lib.OffsetLimit as OffsetLimit
+import qualified EndPoints.Lib.ThrowError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
 import Logger (logDebug, logInfo, (.<))
@@ -57,9 +58,7 @@ newsList ::
     Maybe DataTypes.Limit
   ) ->
   IO (Either ErrorTypes.GetNewsError [DataTypes.News])
-newsList pool (h, f, mSort, mo, ml) = do
-  let reqResult = EXS.catch (newsListExcept pool (h, f, mSort, mo, ml)) (ErrorTypes.handleGetNewsError h)
-  EX.runExceptT reqResult
+newsList pool (h, f, mSort, mo, ml) = EX.runExceptT $ newsListExcept pool (h, f, mSort, mo, ml)
 
 newsListExcept ::
   POOL.Pool SQL.Connection ->
@@ -72,9 +71,9 @@ newsListExcept ::
   EX.ExceptT ErrorTypes.GetNewsError IO [DataTypes.News]
 newsListExcept pool (h, f, mSort, mo, ml) = do
   liftIO $ Logger.logInfo (News.hLogHandle h) $ "\n\nGet News List with filter " <> ToText.toText f <> " offset = " .< mo <> " limit = " .< ml
-  (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetNews (EX.catchE (OffsetLimit.checkOffsetLimit h mo ml) (ErrorTypes.handleInvalidOffsetOrLimit h))
-  dbFilter <- News.checkFilter f
-  dbNews <- newsListFromDb pool offset limit dbFilter
+  (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetNews $ OffsetLimit.checkOffsetLimit h mo ml
+  dbFilter <- News.checkFilter h f
+  dbNews <- newsListFromDb pool h offset limit dbFilter
   sortedDbNews <- News.sortNews h mSort dbNews
   news <- Prelude.mapM (NewsIO.toNews pool h) sortedDbNews
   let toTextNews = T.concat $ map ToText.toText news
@@ -84,23 +83,25 @@ newsListExcept pool (h, f, mSort, mo, ml) = do
 -- | newsListFromDb  get the full list of news if the array is empty, there is no news
 newsListFromDb ::
   POOL.Pool SQL.Connection ->
+  News.Handle IO ->
   DataTypes.Offset ->
   DataTypes.Limit ->
   NewsHelpTypes.DbFilter ->
   EX.ExceptT ErrorTypes.GetNewsError IO [NewsHelpTypes.DbNews]
-newsListFromDb pool mo ml f@NewsHelpTypes.DbFilter {..}
+newsListFromDb pool h mo ml f@NewsHelpTypes.DbFilter {..}
   --  category specified in db_filer_category_id
-  | isJust dbFilterCategoryId = newsListCategory pool mo ml f
+  | isJust dbFilterCategoryId = newsListCategory pool h mo ml f
   -- category not specified
-  | otherwise = newsListNotCategory pool mo ml f
+  | otherwise = newsListNotCategory pool h mo ml f
 
 newsListCategory ::
   POOL.Pool SQL.Connection ->
+  News.Handle IO ->
   DataTypes.Offset ->
   DataTypes.Limit ->
   NewsHelpTypes.DbFilter ->
   EX.ExceptT ErrorTypes.GetNewsError IO [NewsHelpTypes.DbNews]
-newsListCategory pool DataTypes.Offset {..} DataTypes.Limit {..} NewsHelpTypes.DbFilter {..} = do
+newsListCategory pool h DataTypes.Offset {..} DataTypes.Limit {..} NewsHelpTypes.DbFilter {..} = do
   res <-
     liftIO
       ( EXS.try
@@ -132,7 +133,7 @@ newsListCategory pool DataTypes.Offset {..} DataTypes.Limit {..} NewsHelpTypes.D
           IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, DataTypes.Id DataTypes.Category, T.Text, T.Text, SQLTypes.PGArray (DataTypes.Id DataTypes.Image), Int, Bool, DataTypes.Id DataTypes.News)])
       )
   case res of
-    Left err -> EXS.throwM $ ErrorTypes.GetNewsSomeException err
+    Left err -> Throw.throwSomeException h "newsListCategory" err
     Right news -> do
       let dbNews = Prelude.map News.toDbNews news
       return dbNews
@@ -141,11 +142,12 @@ newsListCategory pool DataTypes.Offset {..} DataTypes.Limit {..} NewsHelpTypes.D
 
 newsListNotCategory ::
   POOL.Pool SQL.Connection ->
+  News.Handle IO ->
   DataTypes.Offset ->
   DataTypes.Limit ->
   NewsHelpTypes.DbFilter ->
   EX.ExceptT ErrorTypes.GetNewsError IO [NewsHelpTypes.DbNews]
-newsListNotCategory pool DataTypes.Offset {..} DataTypes.Limit {..} NewsHelpTypes.DbFilter {..} = do
+newsListNotCategory pool h DataTypes.Offset {..} DataTypes.Limit {..} NewsHelpTypes.DbFilter {..} = do
   res <-
     liftIO
       ( EXS.try
@@ -175,7 +177,7 @@ newsListNotCategory pool DataTypes.Offset {..} DataTypes.Limit {..} NewsHelpType
           IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, DataTypes.Id DataTypes.Category, T.Text, T.Text, SQLTypes.PGArray (DataTypes.Id DataTypes.Image), Int, Bool, DataTypes.Id DataTypes.News)])
       )
   case res of
-    Left err -> EXS.throwM $ ErrorTypes.GetNewsSomeException err
+    Left err -> Throw.throwSomeException h "newsListNotCategory" err
     Right news -> do
       let dbNews = Prelude.map News.toDbNews news
       return dbNews

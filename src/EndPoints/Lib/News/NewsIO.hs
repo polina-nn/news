@@ -16,6 +16,7 @@ import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.Category.CategoryIO as CategoryIO
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.News.NewsHelpTypes as NewsHelpTypes
+import qualified EndPoints.Lib.ThrowError as Throw
 import Logger (logDebug, (.<))
 import qualified News
 import qualified Types.DataTypes as DataTypes
@@ -42,11 +43,11 @@ addImageNews pool h DataTypes.CreateImageRequest {..} = do
           IO (Either EXS.SomeException [SQL.Only (DataTypes.Id DataTypes.Image)])
       )
   case res of
-    Left err -> EXS.throwM $ ErrorTypes.AddEditNewsSomeException err
+    Left err -> Throw.throwSomeException h "addImageNews" err
     Right [SQL.Only idIm] -> do
       liftIO $ Logger.logDebug (News.hLogHandle h) ("addImageNews: OK! Image_id  " .< show idIm)
       return idIm
-    Right _ -> EXS.throwM $ ErrorTypes.AddEditNewsSQLRequestError $ ErrorTypes.SQLRequestError " Developer error"
+    Right _ -> Throw.throwSqlRequestError h "addImageNews " (ErrorTypes.SQLRequestError "Developer error!")
 
 toNews ::
   POOL.Pool SQL.Connection ->
@@ -54,7 +55,7 @@ toNews ::
   NewsHelpTypes.DbNews ->
   EX.ExceptT ErrorTypes.GetNewsError IO DataTypes.News
 toNews con h NewsHelpTypes.DbNews {..} = do
-  categories <- EX.withExceptT ErrorTypes.InvalidCategoryIdGetNews (EXS.catch (CategoryIO.getCategoriesById con h dbNewsCategoryId) (ErrorTypes.handleInvalidContentCategoryId h))
+  categories <- EX.withExceptT ErrorTypes.InvalidCategoryIdGetNews (CategoryIO.getCategoriesById con h dbNewsCategoryId)
   let news =
         DataTypes.News
           { newsTitle = dbNewsTitle,

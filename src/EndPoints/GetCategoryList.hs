@@ -14,6 +14,7 @@ import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.Category.CategoryHelpTypes as CategoryHelpTypes
 import qualified EndPoints.Lib.OffsetLimit as OffsetLimit
+import qualified EndPoints.Lib.ThrowError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
 import Logger (logDebug, logInfo, (.<))
@@ -35,9 +36,7 @@ categoryList ::
   POOL.Pool SQL.Connection ->
   (News.Handle IO, Maybe DataTypes.Offset, Maybe DataTypes.Limit) ->
   IO (Either ErrorTypes.GetContentError [DataTypes.Category])
-categoryList pool (h, mo, ml) = do
-  let reqResult = EXS.catch (categoryListExcept pool (h, mo, ml)) (ErrorTypes.handleGetContentError h)
-  EX.runExceptT reqResult
+categoryList pool (h, mo, ml) = EX.runExceptT $ categoryListExcept pool (h, mo, ml)
 
 categoryListExcept ::
   POOL.Pool SQL.Connection ->
@@ -45,7 +44,7 @@ categoryListExcept ::
   EX.ExceptT ErrorTypes.GetContentError IO [DataTypes.Category]
 categoryListExcept pool (h, mo, ml) = do
   liftIO $ Logger.logInfo (News.hLogHandle h) $ "\n\nRequest: Get Category List  with offset = " .< mo <> " limit = " .< ml
-  (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetContent (EX.catchE (OffsetLimit.checkOffsetLimit h mo ml) (ErrorTypes.handleInvalidOffsetOrLimit h))
+  (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetContent $ OffsetLimit.checkOffsetLimit h mo ml
   getAllCategories pool h offset limit
 
 getAllCategories ::
@@ -74,7 +73,7 @@ getAllCategories pool h offset limit = do
           IO (Either EXS.SomeException [(DataTypes.Id DataTypes.Category, DataTypes.Name, DataTypes.Id DataTypes.Category, DataTypes.Name)])
       )
   case res of
-    Left err -> EXS.throwM $ ErrorTypes.GetContentSomeException err
+    Left err -> Throw.throwSomeException h "getAllCategories" err
     Right value -> do
       let categorySort = Prelude.map (\(a, b, c, d) -> CategoryHelpTypes.CategorySort a b c d) value
           result = getCategoriesWithOffsetLimit offset limit (sortedAllCategories categorySort)
