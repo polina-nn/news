@@ -49,7 +49,7 @@ import Servant
     throwError,
     (:<|>) ((:<|>)),
   )
-import Servant.Server.Experimental.Auth (AuthHandler, mkAuthHandler) -- AuthServerData,
+import Servant.Server.Experimental.Auth (AuthHandler, mkAuthHandler)
 import qualified Types.ApiTypes as ApiTypes
 import qualified Types.DataTypes as DataTypes
 import qualified Types.ErrorTypes as ErrorTypes
