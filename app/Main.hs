@@ -26,12 +26,10 @@ main = do
     runServer serverHandle loggerImplConfig
 
 withLogHandle :: Logger.Impl.Config -> (Logger.Handle IO -> IO ()) -> IO ()
-withLogHandle config f = do
-  Logger.Impl.withHandle config f
+withLogHandle = Logger.Impl.withHandle
 
 runServer :: News.Handle IO -> Logger.Impl.Config -> IO ()
-runServer serverHandle conf = do
-  EXS.finally (Server.run DataTypes.Handle {DataTypes.hServerHandle = serverHandle}) (System.IO.hClose $ Logger.Impl.confFileHandle conf)
+runServer serverHandle conf = EXS.finally (Server.run DataTypes.Handle {DataTypes.hServerHandle = serverHandle}) (System.IO.hClose $ Logger.Impl.confFileHandle conf)
 
 makeServerHandle :: CT.Config -> Logger.Handle IO -> IO (News.Handle IO)
 makeServerHandle conf logHandle = do
