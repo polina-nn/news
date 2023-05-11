@@ -20,7 +20,7 @@ import qualified EndPoints.Lib.News.News as News
 import qualified EndPoints.Lib.News.NewsHelpTypes as NewsHelpTypes
 import qualified EndPoints.Lib.News.NewsIO as NewsIO
 import qualified EndPoints.Lib.OffsetLimit as OffsetLimit
-import qualified EndPoints.Lib.ThrowRequestError as Throw
+import qualified EndPoints.Lib.ThrowError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
 import Logger (logDebug, logInfo, (.<))
@@ -62,7 +62,7 @@ authorsNewsList ::
     Maybe DataTypes.Limit
   ) ->
   IO (Either ErrorTypes.GetNewsError [DataTypes.News])
-authorsNewsList pool (h, token, f, mSort, mo, ml) = do EX.runExceptT $ authorsNewsListExcept pool (h, token, f, mSort, mo, ml)
+authorsNewsList pool (h, token, f, mSort, mo, ml) = EX.runExceptT $ authorsNewsListExcept pool (h, token, f, mSort, mo, ml)
 
 authorsNewsListExcept ::
   POOL.Pool SQL.Connection ->
@@ -75,11 +75,11 @@ authorsNewsListExcept ::
   ) ->
   EX.ExceptT ErrorTypes.GetNewsError IO [DataTypes.News]
 authorsNewsListExcept pool (h, token, f, mSort, mo, ml) = do
-  user <- EX.withExceptT ErrorTypes.GetNewsSQLRequestError (LibIO.searchUser h pool token)
+  user <- EX.withExceptT ErrorTypes.GetNewsSearchUserError (LibIO.searchUser pool h token)
   liftIO $ Logger.logInfo (News.hLogHandle h) $ "Request with authentication: Get News List with filter " <> ToText.toText f <> " offset = " .< mo <> " limit = " .< ml
   _ <- EX.withExceptT ErrorTypes.InvalidPermissionGetNews (Lib.checkUserAuthor h user)
-  (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetNews $ OffsetLimit.checkOffsetLimit h mo ml
-  dbFilter <- News.checkFilter f
+  (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetNews (OffsetLimit.checkOffsetLimit h mo ml)
+  dbFilter <- News.checkFilter h f
   dbNews <- authorsNewsListFromDb pool h user offset limit dbFilter
   sortedDbNews <- News.sortNews h mSort dbNews
   news <- Prelude.mapM (NewsIO.toNews pool h) sortedDbNews
@@ -143,7 +143,7 @@ authorsNewsListCategory pool h DataTypes.User {..} DataTypes.Offset {..} DataTyp
           IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, DataTypes.Id DataTypes.Category, T.Text, T.Text, SQLTypes.PGArray (DataTypes.Id DataTypes.Image), Int, Bool, DataTypes.Id DataTypes.News)])
       )
   case res of
-    Left err -> Throw.throwSqlRequestError h ("authorsNewsListCategory", show err)
+    Left err -> Throw.throwSomeException h "authorsNewsListCategory" err
     Right news -> do
       let dbNews = Prelude.map News.toDbNews news
       return dbNews
@@ -189,7 +189,7 @@ authorsNewsListNotCategory pool h DataTypes.User {..} DataTypes.Offset {..} Data
           IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, DataTypes.Id DataTypes.Category, T.Text, T.Text, SQLTypes.PGArray (DataTypes.Id DataTypes.Image), Int, Bool, DataTypes.Id DataTypes.News)])
       )
   case res of
-    Left err -> Throw.throwSqlRequestError h ("authorsNewsListNotCategory", show err)
+    Left err -> Throw.throwSomeException h "authorsNewsListNotCategory" err
     Right news -> do
       let dbNews = Prelude.map News.toDbNews news
       return dbNews

@@ -16,10 +16,10 @@ import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.LibIO as LibIO
 import qualified EndPoints.Lib.News.NewsIO as NewsIO
-import qualified EndPoints.Lib.ThrowRequestError as Throw
+import qualified EndPoints.Lib.ThrowError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
-import Logger (logDebug, logError, logInfo, (.<))
+import Logger (logDebug, logInfo, (.<))
 import qualified News
 import Servant (Handler)
 import qualified System.Directory as SD
@@ -50,7 +50,7 @@ addImageExcept ::
   (News.Handle IO, DataTypes.Token, DataTypes.CreateImageRequest) ->
   EX.ExceptT ErrorTypes.AddImageError IO DataTypes.URI
 addImageExcept pool (h, token, createImage) = do
-  user <- EX.withExceptT ErrorTypes.AddImageSQLRequestError (LibIO.searchUser h pool token)
+  user <- EX.withExceptT ErrorTypes.AddImageSearchUserError (LibIO.searchUser pool h token)
   liftIO $ Logger.logInfo (News.hLogHandle h) $ "\n\nRequest: Add One Image " <> ToText.toText createImage <> "\nby user: " <> ToText.toText user
   _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddImage (Lib.checkUserAuthor h user)
   _ <- checkPngImage h createImage
@@ -68,20 +68,10 @@ checkImageFileExist h r@DataTypes.CreateImageRequest {..} = do
     then do
       liftIO $ Logger.logDebug (News.hLogHandle h) "checkImageFileExist: OK!"
       return r
-    else do
-      liftIO $
-        Logger.logError
-          (News.hLogHandle h)
-          ( "ERROR "
-              .< ErrorTypes.NotExistImageFile
-                ( ErrorTypes.InvalidContent
-                    "checkImageFileExist: BAD!  File: does not exist (No such file or directory) "
-                )
-          )
-      EX.throwE $ ErrorTypes.NotExistImageFile $ ErrorTypes.InvalidContent []
+    else Throw.throwNotExists h "checkImageFileExist" $ ErrorTypes.InvalidContent " No such file or directory "
 
 checkPngImage ::
-  Monad m =>
+  EXS.MonadThrow m =>
   News.Handle m ->
   DataTypes.CreateImageRequest ->
   EX.ExceptT ErrorTypes.AddImageError m DataTypes.CreateImageRequest
@@ -91,29 +81,19 @@ checkPngImage h r@DataTypes.CreateImageRequest {..} =
       lift $ Logger.logDebug (News.hLogHandle h) "checkPngImage: OK!"
       return r
     else do
-      lift $
-        Logger.logError
-          (News.hLogHandle h)
-          ( "ERROR "
-              .< ErrorTypes.NotPngImage
-                ( ErrorTypes.InvalidContent "checkPngImage: BAD! Format "
-                )
-          )
-      EX.throwE $ ErrorTypes.NotPngImage $ ErrorTypes.InvalidContent []
+      Throw.throwNotPng h "checkPngImage" $ ErrorTypes.InvalidContent " Image not png "
 
 checkAndDecodeBase64Image ::
   News.Handle IO ->
   DataTypes.CreateImageRequest ->
   EX.ExceptT ErrorTypes.AddImageError IO ImageDecodeBase64ByteString
 checkAndDecodeBase64Image h DataTypes.CreateImageRequest {..} = do
-  imageFile <- NewsIO.tryReadImageFile h image
+  imageFile <- EX.withExceptT ErrorTypes.NotBase64Image (NewsIO.tryReadImageFile image)
   case Base64.decodeBase64 imageFile of
     Right val -> do
       liftIO $ Logger.logDebug (News.hLogHandle h) "checkAndDecodeBase64Image: OK!"
       return val
-    Left err -> do
-      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.NotBase64Image (ErrorTypes.InvalidContent ("checkAndDecodeBase64Image: BAD!" <> show err)))
-      EX.throwE $ ErrorTypes.NotBase64Image $ ErrorTypes.InvalidContent []
+    Left err -> Throw.throwNotBase64 h "checkBase64Images" $ ErrorTypes.InvalidContent $ " Image not Base64 " <> show err
 
 addImageToDB ::
   POOL.Pool SQL.Connection ->
@@ -134,10 +114,10 @@ addImageToDB pool h DataTypes.CreateImageRequest {..} im = do
           IO (Either EXS.SomeException [SQL.Only Int])
       )
   case res of
-    Left err -> Throw.throwSqlRequestError h ("addImageToDB", show err)
+    Left err -> Throw.throwSomeException h "addImageToDB " err
     Right [SQL.Only idIm] -> do
       let uriBegin = show $ News.hURIConfig h
           uriEnd = show $ DataTypes.URI' {uriPath = "image", uriId = idIm}
       liftIO $ Logger.logDebug (News.hLogHandle h) ("addImageToDB: OK! " .< (uriBegin ++ uriEnd))
       return $ uriBegin ++ uriEnd
-    Right _ -> Throw.throwSqlRequestError h ("addImageToDB ", "Developer error")
+    Right _ -> Throw.throwSqlRequestError h "addImageToDB " (ErrorTypes.SQLRequestError "Developer error!")

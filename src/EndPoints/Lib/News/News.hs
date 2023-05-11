@@ -14,6 +14,7 @@ import qualified Data.Text as T
 import qualified Data.Time as TIME
 import qualified Database.PostgreSQL.Simple.Types as SQLTypes
 import qualified EndPoints.Lib.News.NewsHelpTypes as NewsHelpTypes
+import qualified EndPoints.Lib.ThrowError as Throw
 import qualified Logger
 import qualified News
 import qualified Types.DataTypes as DataTypes
@@ -42,10 +43,11 @@ toFilter filterDayAt filterDayUntil filterDaySince filterAuthor filterCategoryId
 -- | checkFilter - Check the values in the filters and send the default values for sql request
 checkFilter ::
   Monad m =>
+  News.Handle m ->
   DataTypes.Filter ->
   EX.ExceptT ErrorTypes.GetNewsError m NewsHelpTypes.DbFilter
-checkFilter f@DataTypes.Filter {..} = do
-  _ <- checkDayFilter f
+checkFilter h f@DataTypes.Filter {..} = do
+  _ <- checkDayFilter h f
   return $
     NewsHelpTypes.DbFilter
       { dbFilterDayAt = dayAt filterDayAt,
@@ -60,14 +62,15 @@ checkFilter f@DataTypes.Filter {..} = do
 -- | checkDayFilter - no more than one date filter in a request
 checkDayFilter ::
   Monad m =>
+  News.Handle m ->
   DataTypes.Filter ->
   EX.ExceptT ErrorTypes.GetNewsError m DataTypes.Filter
-checkDayFilter fi@DataTypes.Filter {..}
+checkDayFilter h fi@DataTypes.Filter {..}
   | M.isNothing filterDayAt && M.isNothing filterDayUntil && M.isNothing filterDaySince = return fi
   | M.isNothing filterDayUntil && M.isNothing filterDaySince = return fi
   | M.isNothing filterDayAt && M.isNothing filterDaySince = return fi
   | M.isNothing filterDayAt && M.isNothing filterDayUntil = return fi
-  | otherwise = EX.throwE $ ErrorTypes.InvalidFilterGetNews $ ErrorTypes.InvalidRequest []
+  | otherwise = Throw.throwInvalidFilter h "checkDayFilter" $ ErrorTypes.InvalidRequest " Filter in request not valid"
 
 -- | dayAt -- return value for part "AND (news_created = dbFilterDayAt OR news_created < dbFilterDayUntil OR news_created > dbFilterDaySince)"  at select request
 -- if filter dbFilterDayAt is not specified, use day before data base created (remotePast)

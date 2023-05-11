@@ -17,10 +17,10 @@ import qualified EndPoints.Lib.Category.CategoryIO as CategoryIO
 import qualified EndPoints.Lib.Lib as Lib
 import qualified EndPoints.Lib.LibIO as LibIO
 import qualified EndPoints.Lib.News.NewsIO as NewsIO
-import qualified EndPoints.Lib.ThrowRequestError as Throw
+import qualified EndPoints.Lib.ThrowError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
-import Logger (logDebug, logError, logInfo, (.<))
+import Logger (logDebug, logInfo)
 import qualified News
 import Servant (Handler)
 import qualified System.Directory as SD
@@ -49,14 +49,14 @@ addNewsExcept ::
   (News.Handle IO, DataTypes.Token, DataTypes.CreateNewsRequest) ->
   EX.ExceptT ErrorTypes.AddEditNewsError IO DataTypes.News
 addNewsExcept pool (h, token, r@DataTypes.CreateNewsRequest {..}) = do
-  user <- EX.withExceptT ErrorTypes.AddEditNewsSQLRequestError (LibIO.searchUser h pool token)
+  user <- EX.withExceptT ErrorTypes.AddEditNewsSearchUserError (LibIO.searchUser pool h token)
   liftIO $ Logger.logInfo (News.hLogHandle h) $ "\n\nRequest: Add One News: \n" <> ToText.toText r <> "by user: " <> ToText.toText user
   _ <- EX.withExceptT ErrorTypes.InvalidPermissionAddEditNews (Lib.checkUserAuthor h user)
   _ <- checkImageFilesExist h r
   _ <- checkPngImages h r
   _ <- checkBase64Images h r
-  _ <- CategoryIO.checkCategoryExistsById pool h newsCategoryId
-  categories' <- CategoryIO.getCategoriesById pool h newsCategoryId
+  _ <- EX.withExceptT ErrorTypes.InvalidCategoryIdAddEditNews (CategoryIO.checkCategoryExistsById pool h newsCategoryId)
+  categories' <- EX.withExceptT ErrorTypes.InvalidCategoryIdAddEditNews (CategoryIO.getCategoriesById pool h newsCategoryId)
   images' <- addAllImages pool h r
   addNewsToDB pool h user categories' r images'
 
@@ -70,22 +70,12 @@ checkImageFilesExist h r@(DataTypes.CreateNewsRequest _ _ _ (Just req) _) = do
   rez <- liftIO $ mapM (SD.doesFileExist . DataTypes.image) req
   if and rez
     then do
-      liftIO $ Logger.logDebug (News.hLogHandle h) "checkImageFilesExist: OK!"
+      liftIO $ Logger.logDebug (News.hLogHandle h) " checkImageFilesExist: OK!"
       return r
-    else do
-      liftIO $
-        Logger.logError
-          (News.hLogHandle h)
-          ( "ERROR "
-              .< ErrorTypes.NotExistImageFileAddEditNews
-                ( ErrorTypes.InvalidContent
-                    "checkImageFileExist: BAD!  File: does not exist (No such file or directory) "
-                )
-          )
-      EX.throwE $
-        ErrorTypes.NotExistImageFileAddEditNews $ ErrorTypes.InvalidContent []
+    else Throw.throwNotExists h "checkImageFilesExist" $ ErrorTypes.InvalidContent " No such file or directory "
 
 checkPngImages ::
+  EXS.MonadThrow m =>
   Monad m =>
   News.Handle m ->
   DataTypes.CreateNewsRequest ->
@@ -95,19 +85,9 @@ checkPngImages _ r@(DataTypes.CreateNewsRequest _ _ _ Nothing _) =
 checkPngImages h r@(DataTypes.CreateNewsRequest _ _ _ (Just req) _) =
   if length (filter (\x -> DataTypes.format x == "png") req) == length req
     then do
-      lift $ Logger.logDebug (News.hLogHandle h) "checkPngImages: OK!"
+      lift $ Logger.logDebug (News.hLogHandle h) " checkPngImages: OK!"
       return r
-    else do
-      lift $
-        Logger.logError
-          (News.hLogHandle h)
-          ( "ERROR "
-              .< ErrorTypes.NotPngImageAddEditNews
-                ( ErrorTypes.InvalidContent "checkPngImages: BAD!"
-                )
-          )
-      EX.throwE $
-        ErrorTypes.NotPngImageAddEditNews $ ErrorTypes.InvalidContent []
+    else Throw.throwNotPng h "checkPngImages" $ ErrorTypes.InvalidContent " Image not png "
 
 checkBase64Images ::
   News.Handle IO ->
@@ -116,14 +96,12 @@ checkBase64Images ::
 checkBase64Images _ r@(DataTypes.CreateNewsRequest _ _ _ Nothing _) =
   return r
 checkBase64Images h r@(DataTypes.CreateNewsRequest _ _ _ (Just req) _) = do
-  imageFiles <- mapM (NewsIO.tryReadImageFile h . DataTypes.image) req
+  imageFiles <- EX.withExceptT ErrorTypes.ImageFileAddEditNewsNotExists (mapM (NewsIO.tryReadImageFile . DataTypes.image) req)
   if length (filter Base64.isBase64 imageFiles) == length req
     then do
-      liftIO $ Logger.logDebug (News.hLogHandle h) "checkBase64Image: OK!"
+      liftIO $ Logger.logDebug (News.hLogHandle h) " checkBase64Image: OK!"
       return r
-    else do
-      liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.NotBase64ImageAddEditNews (ErrorTypes.InvalidContent "checkBase64Image: BAD!"))
-      EX.throwE $ ErrorTypes.NotBase64ImageAddEditNews $ ErrorTypes.InvalidContent []
+    else Throw.throwNotBase64 h "checkBase64Images" $ ErrorTypes.InvalidContent " Image not Base64 "
 
 -- | addAllImagesIO Add all the pictures for the news.
 addAllImages ::
@@ -134,7 +112,7 @@ addAllImages ::
 addAllImages _ _ (DataTypes.CreateNewsRequest _ _ _ Nothing _) = return []
 addAllImages pool h (DataTypes.CreateNewsRequest _ _ _ (Just req) _) = do
   rez <- mapM (NewsIO.addImageNews pool h) req
-  liftIO $ Logger.logDebug (News.hLogHandle h) "addAllImages: OK!"
+  liftIO $ Logger.logDebug (News.hLogHandle h) " addAllImages: OK!"
   return rez
 
 addNewsToDB ::
@@ -167,7 +145,7 @@ addNewsToDB pool h DataTypes.User {..} categories DataTypes.CreateNewsRequest {.
           IO (Either EXS.SomeException [SQL.Only (DataTypes.Id DataTypes.News)])
       )
   case res of
-    Left err -> Throw.throwSqlRequestError h ("addNewsToDB", show err)
+    Left err -> Throw.throwSomeException h "addNewsToDB  " err
     Right [SQL.Only idNews] -> do
       let news =
             DataTypes.News
@@ -182,4 +160,4 @@ addNewsToDB pool h DataTypes.User {..} categories DataTypes.CreateNewsRequest {.
               }
       liftIO $ Logger.logInfo (News.hLogHandle h) $ "addNewsToDB: OK!" <> ToText.toText news
       return news
-    Right _ -> Throw.throwSqlRequestError h ("addNewsToDB", "Developer error")
+    Right _ -> Throw.throwSqlRequestError h "addNewsToDB " (ErrorTypes.SQLRequestError "Developer error!")

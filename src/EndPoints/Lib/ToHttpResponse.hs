@@ -22,92 +22,111 @@ class ToHttpResponse e r where
 -- | AddEditCategoryError - Add and edit category errors
 instance ToHttpResponse ErrorTypes.AddEditCategoryError DataTypes.Category where
   toHttpResponse (Right category) = return category
-  toHttpResponse (Left (ErrorTypes.AddEditCategorySQLRequestError a)) =
-    throwError err500 {errReasonPhrase = show a}
-  toHttpResponse (Left (ErrorTypes.InvalidPermissionAddEditCategory a)) =
-    throwError err404 {errReasonPhrase = show a}
-  toHttpResponse (Left (ErrorTypes.CategoryAlreadyExisted a)) =
+  toHttpResponse (Left (ErrorTypes.AddEditCategorySQLRequestError _)) =
+    throwError err500 {errReasonPhrase = ErrorTypes.error500}
+  toHttpResponse (Left (ErrorTypes.InvalidPermissionAddEditCategory _)) =
+    throwError err404 {errReasonPhrase = ErrorTypes.error404}
+  toHttpResponse (Left (ErrorTypes.CategoryAlreadyExists a)) =
     throwError err400 {errReasonPhrase = show a}
   toHttpResponse (Left (ErrorTypes.InvalidParentIdAddEditCategory a)) =
     throwError err400 {errReasonPhrase = show a}
-  toHttpResponse (Left (ErrorTypes.InvalidCategoryId a)) =
-    throwError err404 {errReasonPhrase = show a}
+  toHttpResponse (Left (ErrorTypes.InvalidCategoryId _)) =
+    throwError err404 {errReasonPhrase = ErrorTypes.error404}
+  toHttpResponse (Left (ErrorTypes.AddEditCategorySearchUserError _)) =
+    throwError err500 {errReasonPhrase = ErrorTypes.error500}
+  toHttpResponse (Left (ErrorTypes.AddEditCategorySomeException _)) =
+    throwError err500 {errReasonPhrase = ErrorTypes.error500}
 
 -- | AddImageError  - Add image error
 instance ToHttpResponse ErrorTypes.AddImageError DataTypes.URI where
   toHttpResponse (Right uri) = return uri
-  toHttpResponse (Left (ErrorTypes.InvalidPermissionAddImage a)) =
-    throwError err403 {errReasonPhrase = show a}
-  toHttpResponse (Left (ErrorTypes.AddImageSQLRequestError a)) =
-    throwError err500 {errReasonPhrase = show a}
+  toHttpResponse (Left (ErrorTypes.InvalidPermissionAddImage _)) =
+    throwError err403 {errReasonPhrase = ErrorTypes.error403}
+  toHttpResponse (Left (ErrorTypes.AddImageSQLRequestError _)) =
+    throwError err500 {errReasonPhrase = ErrorTypes.error500}
   toHttpResponse (Left (ErrorTypes.NotPngImage a)) =
     throwError err400 {errReasonPhrase = show a}
   toHttpResponse (Left (ErrorTypes.NotBase64Image a)) =
     throwError err400 {errReasonPhrase = show a}
-  toHttpResponse (Left (ErrorTypes.NotExistImageFile a)) =
+  toHttpResponse (Left (ErrorTypes.ImageFileNotExists a)) =
     throwError err400 {errReasonPhrase = show a}
+  toHttpResponse (Left (ErrorTypes.AddImageSearchUserError _)) =
+    throwError err500 {errReasonPhrase = ErrorTypes.error500}
+  toHttpResponse (Left (ErrorTypes.AddImageSomeException _)) =
+    throwError err500 {errReasonPhrase = ErrorTypes.error500}
 
 -- | AddEditNewsError  - Add or edit news error
 instance ToHttpResponse ErrorTypes.AddEditNewsError DataTypes.News where
   toHttpResponse (Right news) = return news
-  toHttpResponse (Left (ErrorTypes.AddEditNewsSQLRequestError a)) =
-    throwError err500 {errReasonPhrase = show a}
-  toHttpResponse (Left (ErrorTypes.InvalidPermissionAddEditNews a)) =
-    throwError err403 {errReasonPhrase = show a}
+  toHttpResponse (Left (ErrorTypes.AddEditNewsSQLRequestError _)) =
+    throwError err500 {errReasonPhrase = ErrorTypes.error500}
+  toHttpResponse (Left (ErrorTypes.InvalidPermissionAddEditNews _)) =
+    throwError err403 {errReasonPhrase = ErrorTypes.error403}
   toHttpResponse (Left (ErrorTypes.InvalidCategoryIdAddEditNews a)) =
     throwError err400 {errReasonPhrase = show a}
   toHttpResponse (Left (ErrorTypes.NotPngImageAddEditNews a)) =
     throwError err400 {errReasonPhrase = show a}
   toHttpResponse (Left (ErrorTypes.NotBase64ImageAddEditNews a)) =
     throwError err400 {errReasonPhrase = show a}
-  toHttpResponse (Left (ErrorTypes.NotExistImageFileAddEditNews a)) =
+  toHttpResponse (Left (ErrorTypes.ImageFileAddEditNewsNotExists a)) =
     throwError err400 {errReasonPhrase = show a}
-  toHttpResponse (Left (ErrorTypes.InvalidNewsId a)) =
-    throwError err404 {errReasonPhrase = show a}
+  toHttpResponse (Left (ErrorTypes.InvalidNewsId _)) =
+    throwError err404 {errReasonPhrase = ErrorTypes.error404}
+  toHttpResponse (Left (ErrorTypes.AddEditNewsSearchUserError _)) =
+    throwError err500 {errReasonPhrase = ErrorTypes.error500}
+  toHttpResponse (Left (ErrorTypes.AddEditNewsSomeException _)) =
+    throwError err500 {errReasonPhrase = ErrorTypes.error500}
 
 -- | AddUserError - creation user errors
 instance ToHttpResponse ErrorTypes.AddUserError DataTypes.User where
   toHttpResponse (Right user) = return user
-  toHttpResponse (Left (ErrorTypes.InvalidPermissionAddUser a)) =
-    throwError err404 {errReasonPhrase = show a}
-  toHttpResponse (Left (ErrorTypes.UserAlreadyExisted a)) =
+  toHttpResponse (Left (ErrorTypes.InvalidPermissionAddUser _)) =
+    throwError err404 {errReasonPhrase = ErrorTypes.error404}
+  toHttpResponse (Left (ErrorTypes.UserAlreadyExists a)) =
     throwError err400 {errReasonPhrase = show a}
-  toHttpResponse (Left (ErrorTypes.AddUserSQLRequestError a)) =
-    throwError err500 {errReasonPhrase = show a}
+  toHttpResponse (Left (ErrorTypes.AddUserSQLRequestError _)) =
+    throwError err500 {errReasonPhrase = ErrorTypes.error500}
+  toHttpResponse (Left (ErrorTypes.AddUserSearchUserError _)) =
+    throwError err500 {errReasonPhrase = ErrorTypes.error500}
+  toHttpResponse (Left (ErrorTypes.AddUserSomeException _)) =
+    throwError err500 {errReasonPhrase = ErrorTypes.error500}
 
 -- | GetNewsError - get news list error
 instance ToHttpResponse ErrorTypes.GetNewsError [DataTypes.News] where
   toHttpResponse (Right news) = return news
-  toHttpResponse (Left (ErrorTypes.GetNewsSQLRequestError a)) =
-    throwError err500 {errReasonPhrase = show a}
-  toHttpResponse (Left (ErrorTypes.InvalidPermissionGetNews a)) =
-    throwError err403 {errReasonPhrase = show a}
+  toHttpResponse (Left (ErrorTypes.GetNewsSQLRequestError _)) =
+    throwError err500 {errReasonPhrase = ErrorTypes.error500}
+  toHttpResponse (Left (ErrorTypes.InvalidPermissionGetNews _)) =
+    throwError err403 {errReasonPhrase = ErrorTypes.error403}
   toHttpResponse (Left (ErrorTypes.InvalidOffsetOrLimitGetNews a)) =
     throwError err400 {errReasonPhrase = show a}
   toHttpResponse (Left (ErrorTypes.InvalidFilterGetNews a)) =
     throwError err400 {errReasonPhrase = show a}
   toHttpResponse (Left (ErrorTypes.InvalidSearchGetNews a)) =
     throwError err400 {errReasonPhrase = show a}
-
+  toHttpResponse (Left (ErrorTypes.GetNewsSearchUserError _)) =
+    throwError err500 {errReasonPhrase = ErrorTypes.error500}
+  toHttpResponse (Left (ErrorTypes.GetNewsSomeException _)) =
+    throwError err500 {errReasonPhrase = ErrorTypes.error500}
+  toHttpResponse (Left (ErrorTypes.InvalidCategoryIdGetNews a)) =
+    throwError err400 {errReasonPhrase = show a}
+    
 -- | GetContentError - get users or category list error
-instance ToHttpResponse ErrorTypes.GetContentError [DataTypes.Category] where
+instance ToHttpResponse ErrorTypes.GetContentError a where
   toHttpResponse (Right cat) = return cat
-  toHttpResponse (Left (ErrorTypes.GetContentSQLRequestError a)) =
-    throwError err500 {errReasonPhrase = show a}
+  toHttpResponse (Left (ErrorTypes.GetContentSQLRequestError _)) =
+    throwError err500 {errReasonPhrase = ErrorTypes.error500}
   toHttpResponse (Left (ErrorTypes.InvalidOffsetOrLimitGetContent a)) =
     throwError err400 {errReasonPhrase = show a}
-
-instance ToHttpResponse ErrorTypes.GetContentError [DataTypes.User] where
-  toHttpResponse (Right cat) = return cat
-  toHttpResponse (Left (ErrorTypes.GetContentSQLRequestError a)) =
-    throwError err500 {errReasonPhrase = show a}
-  toHttpResponse (Left (ErrorTypes.InvalidOffsetOrLimitGetContent a)) =
-    throwError err400 {errReasonPhrase = show a}
+  toHttpResponse (Left (ErrorTypes.GetContentSomeException _)) =
+    throwError err500 {errReasonPhrase = ErrorTypes.error500}
 
 -- | GetImageError - get one image
 instance ToHttpResponse ErrorTypes.GetImageError B.ByteString where
   toHttpResponse (Right str) = return str
-  toHttpResponse (Left (ErrorTypes.GetImageSQLRequestError a)) =
-    throwError err500 {errReasonPhrase = show a}
-  toHttpResponse (Left (ErrorTypes.InvalidImagedId a)) =
-    throwError err404 {errReasonPhrase = show a}
+  toHttpResponse (Left (ErrorTypes.GetImageSQLRequestError _)) =
+    throwError err500 {errReasonPhrase = ErrorTypes.error500}
+  toHttpResponse (Left (ErrorTypes.InvalidImagedId _)) =
+    throwError err404 {errReasonPhrase = ErrorTypes.error404}
+  toHttpResponse (Left (ErrorTypes.GetImageSomeException _)) =
+    throwError err500 {errReasonPhrase = ErrorTypes.error500}

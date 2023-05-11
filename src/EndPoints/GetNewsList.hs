@@ -18,7 +18,7 @@ import qualified EndPoints.Lib.News.News as News
 import qualified EndPoints.Lib.News.NewsHelpTypes as NewsHelpTypes
 import qualified EndPoints.Lib.News.NewsIO as NewsIO
 import qualified EndPoints.Lib.OffsetLimit as OffsetLimit
-import qualified EndPoints.Lib.ThrowRequestError as Throw
+import qualified EndPoints.Lib.ThrowError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
 import Logger (logDebug, logInfo, (.<))
@@ -58,7 +58,7 @@ newsList ::
     Maybe DataTypes.Limit
   ) ->
   IO (Either ErrorTypes.GetNewsError [DataTypes.News])
-newsList pool (h, f, mSort, mo, ml) = do EX.runExceptT $ newsListExcept pool (h, f, mSort, mo, ml)
+newsList pool (h, f, mSort, mo, ml) = EX.runExceptT $ newsListExcept pool (h, f, mSort, mo, ml)
 
 newsListExcept ::
   POOL.Pool SQL.Connection ->
@@ -72,7 +72,7 @@ newsListExcept ::
 newsListExcept pool (h, f, mSort, mo, ml) = do
   liftIO $ Logger.logInfo (News.hLogHandle h) $ "\n\nGet News List with filter " <> ToText.toText f <> " offset = " .< mo <> " limit = " .< ml
   (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetNews $ OffsetLimit.checkOffsetLimit h mo ml
-  dbFilter <- News.checkFilter f
+  dbFilter <- News.checkFilter h f
   dbNews <- newsListFromDb pool h offset limit dbFilter
   sortedDbNews <- News.sortNews h mSort dbNews
   news <- Prelude.mapM (NewsIO.toNews pool h) sortedDbNews
@@ -133,7 +133,7 @@ newsListCategory pool h DataTypes.Offset {..} DataTypes.Limit {..} NewsHelpTypes
           IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, DataTypes.Id DataTypes.Category, T.Text, T.Text, SQLTypes.PGArray (DataTypes.Id DataTypes.Image), Int, Bool, DataTypes.Id DataTypes.News)])
       )
   case res of
-    Left err -> Throw.throwSqlRequestError h ("newsListCategory", show err)
+    Left err -> Throw.throwSomeException h "newsListCategory" err
     Right news -> do
       let dbNews = Prelude.map News.toDbNews news
       return dbNews
@@ -177,7 +177,7 @@ newsListNotCategory pool h DataTypes.Offset {..} DataTypes.Limit {..} NewsHelpTy
           IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, DataTypes.Id DataTypes.Category, T.Text, T.Text, SQLTypes.PGArray (DataTypes.Id DataTypes.Image), Int, Bool, DataTypes.Id DataTypes.News)])
       )
   case res of
-    Left err -> Throw.throwSqlRequestError h ("newsListNotCategory", show err)
+    Left err -> Throw.throwSomeException h "newsListNotCategory" err
     Right news -> do
       let dbNews = Prelude.map News.toDbNews news
       return dbNews

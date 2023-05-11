@@ -14,7 +14,7 @@ import qualified Database.PostgreSQL.Simple as SQL
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import qualified EndPoints.Lib.Category.CategoryHelpTypes as CategoryHelpTypes
 import qualified EndPoints.Lib.OffsetLimit as OffsetLimit
-import qualified EndPoints.Lib.ThrowRequestError as Throw
+import qualified EndPoints.Lib.ThrowError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
 import Logger (logDebug, logInfo, (.<))
@@ -36,7 +36,7 @@ categoryList ::
   POOL.Pool SQL.Connection ->
   (News.Handle IO, Maybe DataTypes.Offset, Maybe DataTypes.Limit) ->
   IO (Either ErrorTypes.GetContentError [DataTypes.Category])
-categoryList pool (h, mo, ml) = do EX.runExceptT $ categoryListExcept pool (h, mo, ml)
+categoryList pool (h, mo, ml) = EX.runExceptT $ categoryListExcept pool (h, mo, ml)
 
 categoryListExcept ::
   POOL.Pool SQL.Connection ->
@@ -73,7 +73,7 @@ getAllCategories pool h offset limit = do
           IO (Either EXS.SomeException [(DataTypes.Id DataTypes.Category, DataTypes.Name, DataTypes.Id DataTypes.Category, DataTypes.Name)])
       )
   case res of
-    Left err -> Throw.throwSqlRequestError h ("getAllCategories", show err)
+    Left err -> Throw.throwSomeException h "getAllCategories" err
     Right value -> do
       let categorySort = Prelude.map (\(a, b, c, d) -> CategoryHelpTypes.CategorySort a b c d) value
           result = getCategoriesWithOffsetLimit offset limit (sortedAllCategories categorySort)

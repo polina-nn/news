@@ -19,10 +19,10 @@ import qualified EndPoints.Lib.News.News as News
 import qualified EndPoints.Lib.News.NewsHelpTypes as NewsHelpTypes
 import qualified EndPoints.Lib.News.NewsIO as NewsIO
 import qualified EndPoints.Lib.OffsetLimit as OffsetLimit
-import qualified EndPoints.Lib.ThrowRequestError as Throw
+import qualified EndPoints.Lib.ThrowError as Throw
 import qualified EndPoints.Lib.ToHttpResponse as ToHttpResponse
 import qualified EndPoints.Lib.ToText as ToText
-import Logger (logError, (.<))
+import Logger ((.<))
 import qualified Logger
 import qualified News
 import Servant (Handler)
@@ -51,7 +51,7 @@ authorsNewsSearchList ::
     Maybe DataTypes.Limit
   ) ->
   IO (Either ErrorTypes.GetNewsError [DataTypes.News])
-authorsNewsSearchList pool (h, token, search, mo, ml) = do EX.runExceptT $ authorsNewsSearchListExcept pool (h, token, search, mo, ml)
+authorsNewsSearchList pool (h, token, search, mo, ml) = EX.runExceptT $ authorsNewsSearchListExcept pool (h, token, search, mo, ml)
 
 authorsNewsSearchListExcept ::
   POOL.Pool SQL.Connection ->
@@ -62,11 +62,9 @@ authorsNewsSearchListExcept ::
     Maybe DataTypes.Limit
   ) ->
   EX.ExceptT ErrorTypes.GetNewsError IO [DataTypes.News]
-authorsNewsSearchListExcept _ (h, _, Nothing, _, _) = do
-  liftIO $ Logger.logError (News.hLogHandle h) ("ERROR " .< ErrorTypes.InvalidSearchGetNews (ErrorTypes.InvalidRequest "authorsNewsSearchListExcept: BAD! Not text for searching \n"))
-  EX.throwE $ ErrorTypes.InvalidSearchGetNews $ ErrorTypes.InvalidRequest []
+authorsNewsSearchListExcept _ (h, _, Nothing, _, _) = Throw.throwInvalidSearch h "newsSearchListExcept" $ ErrorTypes.InvalidRequest " Not text for searching"
 authorsNewsSearchListExcept pool (h, token, Just search, mo, ml) = do
-  user <- EX.withExceptT ErrorTypes.GetNewsSQLRequestError (LibIO.searchUser h pool token)
+  user <- EX.withExceptT ErrorTypes.GetNewsSearchUserError (LibIO.searchUser pool h token)
   liftIO $ Logger.logInfo (News.hLogHandle h) $ "\n\nRequest with authentication: Get News Search List " <> search <> ", offset = " .< mo <> ", limit = " .< ml
   _ <- EX.withExceptT ErrorTypes.InvalidPermissionGetNews (Lib.checkUserAuthor h user)
   (offset, limit) <- EX.withExceptT ErrorTypes.InvalidOffsetOrLimitGetNews $ OffsetLimit.checkOffsetLimit h mo ml
@@ -102,7 +100,7 @@ authorsNewsSearchListFromDb pool h DataTypes.User {..} search DataTypes.Offset {
           IO (Either EXS.SomeException [(T.Text, TIME.Day, T.Text, DataTypes.Id DataTypes.Category, T.Text, T.Text, SQLTypes.PGArray (DataTypes.Id DataTypes.Image), Int, Bool, DataTypes.Id DataTypes.News)])
       )
   case res of
-    Left err -> Throw.throwSqlRequestError h ("authorsNewsSearchListFromDb", show err)
+    Left err -> Throw.throwSomeException h "authorsNewsSearchListFromDb" err
     Right newsList -> do
       let dbNews = Prelude.map News.toDbNews newsList
       return dbNews
