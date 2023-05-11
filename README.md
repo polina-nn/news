@@ -72,7 +72,7 @@ stack build
 stack exec news-exe
 ```
 ## For test
-* for test use. I tested only logic function for working with categories and offset&limit.
+* for test use
 ```haskell
 stack test
 ```
@@ -87,7 +87,7 @@ All migrations are at  [migrations](migrations).
 Before starting the server, you need to create a new empty database in the Postgres DB.
 During migrations, a user with login "polina" and password "polina" is automatically created (Author and administrator).
 You can create other administrators and authors, if you login as "polina", password "polina". 
-You can change in [_migrations/01.sql](_migrations/01.sql) the login and password. You must generating a password hash by [app/MainBase64.hs](app/MainBase64.hs). 
+You can change in [_migrations/01.sql](_migrations/01.sql) the login and password. In this case, you also need to change in [_migrations/02.sql](_migrations/02.sql) the token login (== login) and token key (=="key" ++ login).   You must generating a password hash and a token key by [app/MainBase64.hs](app/MainBase64.hs). 
 
 The name of the database and the owner put in the config:
 ```
@@ -118,13 +118,15 @@ news/
 │ │
 │ _scripts/ # One request for each endpoint
 │ │
-│ _requests/ # Many requests for some endpoints
+│ _scripts_error/ # Some requests for testing error codes
+│ │
+│ _requests/ # Many requests for get news endpoints (use filters & sort & limit & offset)
 │ │
 │ app/
 │ │
 │ ├── Main.hs       
 │ ├── MainBase64.hs # Convert file from png to base64
-│ ├── MainCR.hs     # Generate hash for password
+│ ├── MainCR.hs     # Generate hash for password, token key
 │ │
 │ src/
 │ │
@@ -141,8 +143,8 @@ news/
 │ │   ├── AddOneImage.hs #  Create a path to one loaded image (authentication author required)
 │ │   ├── AddOneNews.hs #  Create one news  (authentication author required)
 │ │   ├── AddOneUser.hs # Create one user (authentication admin required)
-│ │   ├── EditOneCategory.hs #  Edit one category
-│ │   ├── EditOneNews.hs #  Edit one news
+│ │   ├── EditOneCategory.hs #  Edit one category (authentication admin required)
+│ │   ├── EditOneNews.hs #  Edit one news (authentication author required)
 │ │   ├── GetAuthorsNewsList.hs # Get news list after filers and sorts (authentication author required)
 │ │   ├── GetAuthorsNewsSearchList.hs # Get news list after search (authentication author required)
 │ │   ├── GetCategoryList.hs # Get a list of categories
@@ -164,10 +166,10 @@ news/
 │ ├── DbServices.hs # Connection pool to DB used in module Server
 │ ├── Logger.hs # The logger interface module. Not define an implementation
 │ ├── News.hs # Handle for config and logger
-│ └── Server.hs # run server and authorization (basic auth)
+│ └── Server.hs # run server and authorization (servant-auth-cookie)
 │
 ├── config.conf # config file 
-└── logs # You create file logs by yourself for logging
+└── logs #  File with logs  (created automatically)
 
 ```
 # API endpoints
@@ -225,11 +227,13 @@ I define general list of errors, and errors list for each endpoint or group of e
 
 # ToDoList
 ------
+Thanks to my mentors Pavel and Roman , I could to close all ToDoList еxcept the first: 
+
 * By default, data sorting by news creation time (newest news first) by the Postgress.
 Then it sorted accord by haskell code (if sortBy parameter exists in request). This is due to incorrect sorting of Cyrillic by the Postgress. I was unable to set up the correct alphabetical sorting of the data.
 * Нandling exceptions connecting to a non-existent database and work with log file
 ```
-"Exception: libpq: failed (connection to server at "localhost" (::1), port 5432 failed: FATAL:  database "news2" does not exist"
+"Exception: libpq: failed (connection to server at "localhost" (::1), port 5432 failed: FATAL:  database "news2" does not exist")
 "Exception: logs: openFile: resource busy (file is locked)"
 
 ```
