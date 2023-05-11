@@ -15,7 +15,6 @@ import qualified Data.Text as T
 import qualified Logger
 import qualified Logger.Impl
 import qualified News
-import qualified System.Directory as SD
 import qualified System.IO
 import Text.Read (readMaybe)
 import qualified Types.ExceptionTypes as ExceptionTypes
@@ -64,25 +63,15 @@ getLoggerConfig conf = do
         Logger.Impl.confMinLevel = confFieldValueMinLogLevel
       }
 
+-- | validateFileHandle  -  if "logs.txt" does't  exist, create and append
 validateFileHandle :: Maybe StdError -> IO System.IO.Handle
 validateFileHandle (Just Terminal) = return System.IO.stderr
-validateFileHandle (Just File) = appendLog "logs.txt"
+validateFileHandle (Just File) = System.IO.openFile "logs.txt" System.IO.AppendMode
 validateFileHandle Nothing = EXS.throw (ExceptionTypes.NotConfigField "config.stdError")
 
 validateLevel :: Maybe Logger.Level -> IO Logger.Level
 validateLevel (Just val) = return val
 validateLevel Nothing = EXS.throw (ExceptionTypes.NotConfigField "config.minLogLevel")
-
--- | appendLog  - check the existence of the file, if it does't  exist, create and append
-appendLog :: FilePath -> IO System.IO.Handle
-appendLog path = do
-  rez <- SD.doesFileExist path
-  if rez
-    then System.IO.openFile "logs.txt" System.IO.AppendMode
-    else do
-      putStrLn "Create the file /logs.txt"
-      System.IO.writeFile "logs.txt" []
-      System.IO.openFile "logs.txt" System.IO.AppendMode
 
 getAppConfig :: C.Config -> IO News.AppConfig
 getAppConfig conf = do
