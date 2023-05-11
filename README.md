@@ -84,10 +84,17 @@ You can use it such as curl request. If you have never worked with curl - https:
 ## Migrations
 
 All migrations are at  [migrations](migrations).
+
 Before starting the server, you need to create a new empty database in the Postgres DB.
+
 During migrations, a user with login "polina" and password "polina" is automatically created (Author and administrator).
-You can create other administrators and authors, if you login as "polina", password "polina". 
-You can change in [_migrations/01.sql](_migrations/01.sql) the login and password. In this case, you also need to change in [_migrations/02.sql](_migrations/02.sql) the token login (== login) and token key (=="key" ++ login).   You must generating a password hash and a token key by [app/MainBase64.hs](app/MainBase64.hs). 
+You can create other administrators and authors, if you login as "polina" in request :
+
+--header "Cookie: servant-auth-cookie=keypolina" 
+
+You can change in [_migrations/01.sql](_migrations/01.sql) the login and password (In this case, you also need to change in [_migrations/02.sql](_migrations/02.sql) the token login (== login) and token key (=="key" ++ login)) for the first user in server.
+
+You must generating a password hash and a token key by [app/MainBase64.hs](app/MainBase64.hs). 
 
 The name of the database and the owner put in the config:
 ```
