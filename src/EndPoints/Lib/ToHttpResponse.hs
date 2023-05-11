@@ -110,7 +110,7 @@ instance ToHttpResponse ErrorTypes.GetNewsError [DataTypes.News] where
     throwError err500 {errReasonPhrase = ErrorTypes.error500}
   toHttpResponse (Left (ErrorTypes.InvalidCategoryIdGetNews a)) =
     throwError err400 {errReasonPhrase = show a}
-
+    
 -- | GetContentError - get users or category list error
 instance ToHttpResponse ErrorTypes.GetContentError a where
   toHttpResponse (Right cat) = return cat
